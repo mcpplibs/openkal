@@ -12,7 +12,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      MCPP_VERSION: 2026.8.19.4
+      # A version verified to build this package, not a measured minimum. The
+      # package uses modules, exported extern "C" declarations and ordinary
+      # dependencies, none of which is recent; the pin exists for reproducibility
+      # rather than because an older mcpp is known to fail.
+      MCPP_VERSION: 2026.8.19.3
       XLINGS_VERSION: v2026.8.17.2
       XLINGS_NON_INTERACTIVE: '1'
     steps:
