@@ -7,6 +7,3 @@ version = "0.1.0"
 [dependencies]
 openkal = { path = "../../.." }
 
-[targets.impl-fd]
-kind    = "lib"
-sources = ["src/**/*.cpp"]
