@@ -11,28 +11,17 @@
 // cannot be altered without a synchronisation rule this specification declines
 // to impose. The values a started program receives are supplied at the point of
 // starting it, which is openkal.process.
+module;
+#include <openkal/env.h>
+
 export module openkal.env;
 export import openkal.types;
 
-export extern "C" {
-
-// The number of arguments, and the argument at a given position. Position zero
-// is the name by which the program was started, which an environment that has
-// no such name reports as an empty string rather than omitting.
-kal_uintptr   kal_env_arg_count(void);
-const char*   kal_env_arg(kal_uintptr index, kal_uintptr* len);
-
-// The value of a named variable, or a null pointer. The name is passed with an
-// explicit length so that the interface does not require a string function.
-const char*   kal_env_var(const char* name, kal_uintptr name_len, kal_uintptr* value_len);
-
-// Enumeration, for a program that must copy the whole set. The order is
-// unspecified and is not required to be stable between calls.
-kal_uintptr   kal_env_var_count(void);
-const char*   kal_env_var_at(kal_uintptr index, kal_uintptr* name_len,
-                             const char** value, kal_uintptr* value_len);
-
-}
+export using ::kal_env_arg_count;
+export using ::kal_env_arg;
+export using ::kal_env_var;
+export using ::kal_env_var_count;
+export using ::kal_env_var_at;
 
 export namespace kal::env {
 
