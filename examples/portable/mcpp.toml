@@ -1,0 +1,18 @@
+# The program declares the contract and names no implementation. Whoever builds
+# it names one: an ordinary consumer writes the line below, and an
+# implementation's continuous integration substitutes a path to itself.
+#
+# That the implementation is named here rather than in the source is the
+# arrangement this example exists to demonstrate.
+[package]
+name    = "portable"
+version = "0.1.0"
+
+[dependencies]
+openkal = "0.4.0"
+
+[target.'cfg(os = "linux")'.dependencies]
+openkal-linux = "0.4.0"
+
+[target.'cfg(os = "macos")'.dependencies]
+openkal-macos = "0.2.0"

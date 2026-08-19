@@ -37,6 +37,11 @@ export extern "C" {
 // there is no operation that changes it afterwards: a working directory that
 // can be changed is shared mutable state between execution contexts, and the
 // specification declines to impose a synchronisation rule upon it.
+// The argument vector is complete and is passed unaltered: argv[0] is the name
+// the started program observes as its own, and an implementation neither
+// derives it from `path` nor prepends anything to the vector. Clause 7.6. The
+// two sides must agree, because the started program reads argv[0] through
+// kal_env_arg(0).
 int kal_process_spawn(kal_dir base,
                       const char*  path,     kal_uintptr path_len,
                       const char** argv,     const kal_uintptr* argv_lens, kal_uintptr argc,

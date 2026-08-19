@@ -82,6 +82,11 @@ kal_uintptr kal_fs_stream(kal_file);
 int kal_fs_seek(kal_file, __INT64_TYPE__ offset, int whence, __UINT64_TYPE__* result);
 
 // Enquiry, creation and removal, all relative to a directory.
+//
+// Enquiry about a name that does not exist succeeds and reports kal_node_absent
+// rather than failing: a caller that asks what a name refers to has been
+// answered when told that it refers to nothing. Clause 7.7. Opening is access
+// rather than enquiry and reports kal_err_not_found instead.
 int kal_fs_info  (kal_dir base, const char* name, kal_uintptr len, kal_node_info* out);
 int kal_fs_mkdir (kal_dir base, const char* name, kal_uintptr len);
 int kal_fs_remove(kal_dir base, const char* name, kal_uintptr len);

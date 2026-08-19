@@ -1,4 +1,4 @@
-# openkal Specification, version 0.3
+# openkal Specification, version 0.4
 
 ## 1. Scope
 
@@ -331,7 +331,47 @@ call from a genuine failure without knowledge of the environment, and an
 implementation that reports it produces short transfers on any system that
 delivers asynchronous notifications.
 
-### 7.6 Termination
+### 7.6 Argument vectors
+
+The vector supplied to `kal_process_spawn` is complete: its first element is the
+name the started program shall observe as its own, and an implementation shall
+pass the vector unaltered. An implementation shall not derive the first element
+from the `path` argument, and shall not prepend, append or reorder elements.
+
+The rule exists because the two sides must agree. A started program reads its
+own name through `kal_env_arg(0)`, so a caller that did not supply it could not
+predict what the program would read; and the name a program observes as its own
+is behaviour on every environment that has an argument vector, so the choice
+belongs to the caller rather than to the implementation.
+
+An implementation whose environment has no argument vector shall report
+`kal_err_unsupported` from `kal_process_spawn` rather than discard the vector.
+
+This rule was absent from version 0.3, and both implementations existing at the
+time prepended the path. They agreed only because they shared an author; a third
+implementer had nothing to consult. The defect was found by writing one program
+against the specification and running it, which is what clause 9 exists to
+require.
+
+### 7.7 Absence as an answer
+
+`kal_fs_info` shall report a name that does not exist by returning `kal_ok` and
+setting `kind` to `kal_node_absent`. It shall not report absence as an error.
+
+Enquiry and access are different operations. A caller that asks what a name
+refers to has been answered when told that it refers to nothing, and an
+implementation that reports absence as a failure obliges every caller to
+distinguish that failure from the ones that denote a broken enquiry — a
+directory it may not read, a name it may not resolve.
+
+`kal_fs_open_file` and `kal_fs_open_dir` are access rather than enquiry, and
+shall report a name that does not exist as `kal_err_not_found`.
+
+The distinction is the same one `openkal.env` draws between a variable that is
+absent and one whose value is empty, and it is drawn for the same reason: a
+caller that cannot tell them apart cannot act correctly upon either.
+
+### 7.8 Termination
 
 `kal_exit` shall terminate immediately. Registered exit handlers and static
 destructors shall not run. An implementation that runs them prevents a caller

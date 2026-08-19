@@ -76,3 +76,36 @@ jobs:
             echo "the checker accepted an unspecified name"; exit 1
           fi
           rm -f src/extra.cpp
+
+      # The specification is a claim about programs, and a claim about programs
+      # is tested by running one. The implementation is checked out at its own
+      # head rather than named by version, so that this step asserts what it is
+      # for: that the specification as written here and an implementation as
+      # written there agree today.
+      #
+      # Two rules in clause 7 were added because this program was written and
+      # run. Neither was visible in the specification text.
+      - uses: actions/checkout@v4
+        with:
+          repository: mcpplibs/openkal-linux
+          path: .impl
+
+      - name: The portable program runs above an implementation
+        run: |
+          cat > examples/portable/mcpp.toml <<'TOML'
+          [package]
+          name    = "portable"
+          version = "0.1.0"
+
+          [dependencies]
+          openkal       = { path = "../.." }
+          openkal-linux = { path = "../../.impl" }
+          TOML
+          # The implementation names the specification by version; here it is
+          # the working tree that is under test, so the path is substituted.
+          sed -i 's|^openkal = ".*"$|openkal = { path = ".." }|' .impl/mcpp.toml || true
+          cd examples/portable
+          mcpp run 2>&1 | tee run.log
+          grep -q 'openkal: the portable program, above eight interfaces' run.log
+          grep -q 'openkal: observations that did not hold: 0' run.log
+          ! grep -q 'NOT HELD' run.log
