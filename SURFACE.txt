@@ -1,19 +1,64 @@
-# The C surface of openkal 0.1, one name per line.
+# The C surface of openkal 0.3, one name per line.
 #
-# This file is normative and is the single source consulted by clause 9.3. A
-# conforming implementation exports the names of the interfaces it provides and
-# exports no other name beginning with kal_.
+# This file is normative and is the single source consulted by clause 9. A
+# conforming implementation exports the names of the interfaces it provides
+# and exports no other name beginning with kal_.
 #
+# An implementation provides an interface in whole or not at all, so the
+# absence of a group below denotes an interface the implementation does not
+# provide and is not a deviation.
 # openkal.abort
 kal_abort
 kal_exit
 # openkal.stream
+kal_stderr
 kal_stdin
 kal_stdout
-kal_stderr
-kal_stream_write
-kal_stream_read
 kal_stream_flush
+kal_stream_read
+kal_stream_write
 # openkal.memory
 kal_alloc
 kal_free
+# openkal.env
+kal_env_arg
+kal_env_arg_count
+kal_env_var
+kal_env_var_at
+kal_env_var_count
+# openkal.time
+kal_time_monotonic
+kal_time_monotonic_granularity
+kal_time_props
+kal_time_sleep
+kal_time_wall
+# openkal.fs
+kal_fs_close_dir
+kal_fs_close_file
+kal_fs_info
+kal_fs_list_begin
+kal_fs_list_next
+kal_fs_mkdir
+kal_fs_open_dir
+kal_fs_open_file
+kal_fs_props
+kal_fs_remove
+kal_fs_rename
+kal_fs_preopen
+kal_fs_preopen_count
+kal_fs_seek
+kal_fs_stream
+# openkal.process
+kal_process_close
+kal_process_props
+kal_process_spawn
+kal_process_terminate
+kal_process_wait
+# openkal.task
+kal_task_current
+kal_task_join
+kal_task_props
+kal_task_start
+kal_task_wait
+kal_task_wake
+kal_task_yield

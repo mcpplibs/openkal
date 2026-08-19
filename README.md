@@ -11,12 +11,17 @@ Declarations, and no definitions. Every function declared here is supplied by an
 implementation package; building this package alone produces a library with
 undefined references, which is the intended outcome.
 
-| Module | Interface |
-| --- | --- |
-| `openkal.types` | shared definitions: machine word, error values, transfer result |
-| `openkal.abort` | termination |
-| `openkal.stream` | byte streams |
-| `openkal.memory` | allocation |
+| Module | Interface | Class |
+| --- | --- | --- |
+| `openkal.types` | machine word, error values, transfer result | — |
+| `openkal.abort` | termination | core |
+| `openkal.stream` | byte streams | core |
+| `openkal.memory` | allocation | core |
+| `openkal.env` | the parameters a program receives at inception | standard |
+| `openkal.time` | monotonic and wall time sources | standard |
+| `openkal.fs` | directories and open files, relative throughout | standard |
+| `openkal.process` | starting a program and waiting for it | standard |
+| `openkal.task` | execution contexts, and the primitive they are built upon | standard |
 
 ## How a program uses openkal
 
@@ -26,10 +31,10 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.2.0"
+openkal = "0.3.0"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.2.0"
+openkal-linux = "0.3.0"
 ```
 
 The program imports the interface and names no implementation.

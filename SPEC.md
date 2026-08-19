@@ -1,4 +1,4 @@
-# openkal Specification, version 0.2
+# openkal Specification, version 0.3
 
 ## 1. Scope
 
@@ -30,18 +30,24 @@ provides an interface in whole or not at all.
 
 | Interface | Resource | Core |
 | --- | --- | --- |
-| `openkal.abort` | termination | yes |
-| `openkal.stream` | a byte stream | yes |
-| `openkal.memory` | a region of memory | yes |
-| `openkal.time` | a time source | no |
-| `openkal.task` | an execution context | no |
-| `openkal.fs` | a file-system descriptor | no |
-| `openkal.net` | a network endpoint | no |
-| `openkal.channel` | a message channel | no |
+| `openkal.abort` | termination | core |
+| `openkal.stream` | a byte stream | core |
+| `openkal.memory` | a region of the address space | core |
+| `openkal.env` | the parameters a program receives at inception | standard |
+| `openkal.time` | a time source | standard |
+| `openkal.fs` | a directory, and an open file | standard |
+| `openkal.process` | a program image that has been started | standard |
+| `openkal.task` | an execution context, and a suspension primitive | standard |
+| `openkal.event` | readiness of a set of resources | reserved |
 
-Version 0.2 specifies the core interfaces only. The remaining rows are reserved:
-their names shall not be used for other purposes, and their contents are not yet
-normative.
+Version 0.3 specifies the core and standard interfaces. The optional rows are
+specified; the reserved row is not, and its name shall not be used for other
+purposes.
+
+*Core* denotes an interface every implementation provides. *Standard* denotes
+one an implementation hosting a C library provides. *Optional* denotes one it
+may omit without ceasing to host a C library, at the cost of the facilities
+built upon it.
 
 ### 3.1 The basis of the core set
 
@@ -152,7 +158,7 @@ it is not portable.
 ### 5.3 Structure layouts
 
 The layout of every structure declared by this specification is frozen at
-version 0.2. The evolution rule of clause 8 admits new declarations and excludes
+version 0.3. The evolution rule of clause 8 admits new declarations and excludes
 changes to existing ones; a structure layout is not protected by that rule
 unless it is separately declared immutable, and it is so declared here.
 
@@ -169,40 +175,56 @@ not as a means of expressing partiality.
 An interface that the specification does not define is absent as a module, and a
 consumer that imports it fails to compile.
 
-### 6.2 Optional operations
+### 6.2 Optional operations and varying properties
 
-Version 0.2 defines none. Every operation of every interface it specifies is
-required of an implementation that provides that interface.
+An **operation** an implementation may lack becomes an interface of its own, so
+that its absence is reported by the linker. A **property** that varies between
+implementations is reported by a capability word.
 
-The specification records this deliberately rather than leaving it implicit,
-because the mechanism by which an optional operation would be expressed is not
-obvious and is deferred until an optional operation exists.
+The two are not alike, and the distinction is the one clause 6.4 already draws.
+An operation that is present and always fails is a defect; the remedy is that its
+absence be expressed by its absence. A property cannot be called: whether names
+are compared case-sensitively, whether a clock advances while the machine is
+suspended, what the granularity of a measurement is. A program adapts to a
+property rather than invoking it.
 
-### 6.3 Mechanisms considered for optional operations
+Each interface that has properties declares a word named `kal_<interface>_props`
+and the positions within it. A position, once assigned, retains its meaning; a
+position that has not been assigned reads as zero, so that a program compiled
+against a later specification behaves correctly against an earlier
+implementation.
 
-Two arrangements are available, and each carries a constraint. The choice is
-deferred; the constraints are recorded so that the choice is informed when it is
-made.
+Information therefore becomes available at three times, each being the earliest
+at which it exists.
 
-**A separate interface.** An optional operation becomes an interface of its own,
-declared by the specification package. An implementation supplies it or does
-not, and a consumer that uses it without an implementation fails to link. This
-preserves the arrangement of clause 4 and offers no detection: a consumer cannot
-adapt, only require.
+| Time | Mechanism | Question answered |
+| --- | --- | --- |
+| dependency resolution | the implementation package declares what it provides | may this program be built against this implementation |
+| link | an undefined symbol | was an interface used that the implementation does not provide |
+| run | a capability word | how does this implementation behave within an interface it provides |
 
-**A module supplied by the implementation.** An optional operation is declared
-in a module the implementation provides, and a consumer that imports it without
-a supporting implementation fails to compile, with the module named. This
-permits detection but reintroduces, for the optional operation, the arrangement
-clause 4.1 rejects for the interface.
+### 6.3 Mechanisms considered and not adopted
 
-An earlier draft chose a third arrangement: fallback overloads in the interface,
-displaced by an implementation declaring its own, with presence detected through
-argument-dependent lookup. It was withdrawn. The arrangement requires an
-implementation's declarations to be visible to the consumer, which requires the
-implementation to own the module the consumer imports, which contradicts clause
-4. The measurements that motivated it remain valid and are recorded because they
-constrain the second option above:
+The rule of clause 6.2 replaced three arrangements that were built before it was
+recognised. They are recorded because each is the arrangement a reader is likely
+to propose, and because the measurements that exclude them remain useful.
+
+**A module supplied by the implementation**, declaring the optional operation, so
+that a consumer importing it without a supporting implementation fails to
+compile with the module named. Not adopted: it reintroduces, for the optional
+operation, the arrangement clause 4.1 rejects for the interface.
+
+**Fallback overloads in the interface**, displaced by an implementation
+declaring its own, with presence detected through argument-dependent lookup. Not
+adopted: the arrangement requires an implementation's declarations to be visible
+to the consumer, which requires the implementation to own the module the
+consumer imports, which contradicts clause 4.
+
+**A record of capability flags**, accompanied by a file in which an
+implementation declares them. Not adopted: a record can disagree with the code
+it describes, and the file is a second place in which a package is configured.
+
+The measurements that constrain any future proposal:
 
 1. A requires-expression naming a qualified entity that does not exist is
    ill-formed. Detection through unqualified lookup and argument-dependent
@@ -222,6 +244,32 @@ individual stream rather than of the implementation: the same implementation
 succeeds for a regular file and fails for a pipe. An implementation could
 therefore neither claim the operation honestly nor withhold it usefully.
 Positioning accordingly belongs to `openkal.fs`, whose resource is a descriptor.
+
+### 6.5 Concurrency
+
+An implementation shall permit concurrent operations upon distinct handles.
+
+Concurrent operations upon one handle shall not damage the implementation's own
+state. The order in which they take effect, and whether the bytes of one
+transfer may be separated by those of another, are unspecified.
+
+Atomicity below a threshold, which some systems guarantee for some resources, is
+not required. It is not universally implementable, and requiring it would oblige
+an implementation to introduce buffering it does not otherwise need.
+
+### 6.6 Ownership
+
+Handles obtained from the core interfaces are borrowed. They are not released,
+and no operation releases them.
+
+Handles obtained from `openkal.fs` and `openkal.process` are owned. Each of those
+interfaces provides the operation that releases one, and an implementation shall
+not treat a released handle as valid.
+
+The recommended construction divides the handle word into an index and a
+generation, incrementing the generation upon release. The specification requires
+the property and not the construction; this one achieves it without a lookup
+table, and therefore without the compatibility layer clause 7.1 excludes.
 
 ## 7. Requirements upon implementations
 
@@ -349,7 +397,7 @@ The following are recorded so that they are not mistaken for oversights.
 
 1. **Concurrency.** The behaviour of concurrent operations upon one handle is
    unspecified. The question becomes unavoidable when `openkal.task` is
-   specified, and version 0.2 does not specify it.
+   specified, and version 0.3 does not specify it.
 2. **Ownership.** Every handle in the core interfaces is borrowed. Owned
    handles arrive with `openkal.fs`, and the rules for their release, including
    the effect of releasing one twice, are deferred to that interface.
