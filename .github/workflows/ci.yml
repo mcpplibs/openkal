@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: declarations compile, and substitution holds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MCPP_VERSION: 2026.8.19.4
+      XLINGS_VERSION: v2026.8.17.2
+      XLINGS_NON_INTERACTIVE: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xlings
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/openxlings/xlings/main/tools/other/quick_install.sh \
+            | bash -s "$XLINGS_VERSION"
+          echo "$HOME/.xlings/subos/current/bin" >> "$GITHUB_PATH"
+
+      - name: Install mcpp
+        run: |
+          xlings update
+          xlings install "mcpp@$MCPP_VERSION" -y -g
+          mcpp --version
+          mcpp self config --mirror GLOBAL
+
+      - name: The declarations compile
+        run: mcpp build
+
+      - name: Substitution holds
+        working-directory: examples/substitution/app
+        run: |
+          # The property under test is that the source is invariant. The
+          # checksum is taken before the first build and compared after the
+          # second, so that a change made by either build would be detected.
+          before="$(sha256sum src/main.cpp | cut -d' ' -f1)"
+
+          mcpp run > with-fd.log 2>&1
+          grep -q 'the application produced this line' with-fd.log
+
+          sed -i 's|openkal-fd = { path = "../impl-fd" }|openkal-discard = { path = "../impl-discard" }|' mcpp.toml
+          rm -rf target
+          mcpp run > with-discard.log 2>&1
+          if grep -q 'the application produced this line' with-discard.log; then
+            echo "the discarding implementation produced output"; exit 1
+          fi
+
+          after="$(sha256sum src/main.cpp | cut -d' ' -f1)"
+          [ "$before" = "$after" ] || { echo "the source changed between builds"; exit 1; }
+
+      - name: The surface checker detects an addition
+        working-directory: examples/substitution/impl-fd
+        run: |
+          # The checker is only useful if it fails when it should. An
+          # unspecified name is introduced, the checker is required to reject
+          # it, and the name is then removed.
+          mcpp build > /dev/null
+          bash ../../../tools/check-surface.sh ../../../SURFACE.txt \
+            $(find target -name '*.o' | tr '\n' ' ')
+
+          printf 'extern "C" void kal_vendor_extension(void) {}\n' > src/extra.cpp
+          mcpp build > /dev/null
+          if bash ../../../tools/check-surface.sh ../../../SURFACE.txt \
+               $(find target -name '*.o' | tr '\n' ' '); then
+            echo "the checker accepted an unspecified name"; exit 1
+          fi
+          rm -f src/extra.cpp

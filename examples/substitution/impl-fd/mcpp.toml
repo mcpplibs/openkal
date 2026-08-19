@@ -1,0 +1,8 @@
+# One of two implementations provided so that the substitution property can be
+# demonstrated rather than asserted. It writes to descriptors.
+[package]
+name    = "openkal-fd"
+version = "0.1.0"
+
+[dependencies]
+openkal = { path = "../../.." }

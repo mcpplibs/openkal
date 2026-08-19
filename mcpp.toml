@@ -1,0 +1,15 @@
+[package]
+namespace   = "mcpplibs"
+name        = "openkal"
+version     = "0.1.0"
+description = "openkal: a portable kernel ABI specification. This package carries the normative declarations; implementations are separate packages."
+license     = "Apache-2.0"
+authors     = ["mcpplibs"]
+repo        = "https://github.com/mcpplibs/openkal"
+
+# This package declares and does not define. Every function declared here is
+# supplied by an implementation package, which is selected as a conditional
+# dependency by the consuming project. Building this package alone therefore
+# produces a library with undefined references, which is the intended result.
+[targets.openkal]
+kind = "lib"

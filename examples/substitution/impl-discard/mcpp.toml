@@ -1,0 +1,8 @@
+# A second implementation, provided so that the substitution property can be
+# demonstrated rather than asserted. It accepts every transfer and discards it.
+[package]
+name    = "openkal-discard"
+version = "0.1.0"
+
+[dependencies]
+openkal = { path = "../../.." }

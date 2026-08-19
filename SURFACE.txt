@@ -1,0 +1,19 @@
+# The C surface of openkal 0.1, one name per line.
+#
+# This file is normative and is the single source consulted by clause 9.3. A
+# conforming implementation exports the names of the interfaces it provides and
+# exports no other name beginning with kal_.
+#
+# openkal.abort
+kal_abort
+kal_exit
+# openkal.stream
+kal_stdin
+kal_stdout
+kal_stderr
+kal_stream_write
+kal_stream_read
+kal_stream_flush
+# openkal.memory
+kal_alloc
+kal_free

@@ -1,0 +1,10 @@
+# The implementation is selected here and nowhere else. Substituting
+# `openkal-discard` for `openkal-fd` changes the observable behaviour of the
+# program without changing a byte of its source.
+[package]
+name    = "app"
+version = "0.1.0"
+
+[dependencies]
+openkal    = { path = "../../.." }
+openkal-fd = { path = "../impl-fd" }
