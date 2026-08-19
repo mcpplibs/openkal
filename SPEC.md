@@ -1,4 +1,4 @@
-# openkal Specification, version 0.1
+# openkal Specification, version 0.2
 
 ## 1. Scope
 
@@ -39,7 +39,7 @@ provides an interface in whole or not at all.
 | `openkal.net` | a network endpoint | no |
 | `openkal.channel` | a message channel | no |
 
-Version 0.1 specifies the core interfaces only. The remaining rows are reserved:
+Version 0.2 specifies the core interfaces only. The remaining rows are reserved:
 their names shall not be used for other purposes, and their contents are not yet
 normative.
 
@@ -75,7 +75,7 @@ all yield a byte stream. That decomposition was withdrawn for three reasons.
 2. It merged the operations of unrelated resources. Positioning applies to a
    file and not to a connection; half-closure applies to a connection and not to
    a file. The merged interface would have contained operations that some of its
-   resources can never satisfy, which clause 6.2 identifies as a defect.
+   resources can never satisfy, which clause 6.4 identifies as a defect.
 3. The precedent cited in its support was misread. The WebAssembly System
    Interface, second preview, separates resource kinds into distinct interfaces
    and shares only the stream type between them.
@@ -85,50 +85,47 @@ common entrance.
 
 ## 4. Module organisation
 
-Two module names participate, and their ownership differs.
+The specification package provides one module per interface. An implementation
+provides no module at all.
 
 | Module | Provided by | Imported by |
 | --- | --- | --- |
-| `openkal.decl.<interface>` | the specification package | implementations |
-| `openkal.<interface>` | the implementation package | consumers |
+| `openkal.types` | the specification package | the other interface modules |
+| `openkal.abort` | the specification package | consumers, implementations |
+| `openkal.stream` | the specification package | consumers, implementations |
+| `openkal.memory` | the specification package | consumers, implementations |
 
-An implementation shall provide `openkal.<interface>` and shall re-export
-`openkal.decl.<interface>` from it. A consumer shall import
-`openkal.<interface>` and shall not import the implementation package's other
-modules, if it has any.
+A consumer imports the interface. An implementation imports the same interface,
+because it needs the declarations it is defining, and it exports nothing.
 
-### 4.1 Why the implementation owns the consumer-visible name
+    consumer ──imports──► openkal ◄──imports── implementation
+         │                                          │
+         └──────────── links against ───────────────┘
 
-Argument-dependent lookup does not reach a module that the translation unit has
-not imported. An implementation's optional operations are therefore invisible to
-a consumer unless they are declared in the module the consumer imports. Placing
-the consumer-visible name in the specification package would make optional
-capabilities undetectable, and the specification prefers the arrangement in
-which they are detectable.
+### 4.1 What an implementation contributes
 
-### 4.2 Naming constraint
+Definitions of the functions the interface declares, and nothing else. An
+implementation that declares a module has misunderstood its role: the interface
+is the specification's, and an implementation that exported one would place a
+name the consumer relies upon under the control of a party the specification
+does not govern.
 
-The declaration module shall be named `openkal.decl.<interface>`. It shall not
-be named `openkal.<interface>.decl`.
+The consequence is that an implementation cannot extend the interface. This is
+not a restriction that must be enforced; it follows from the arrangement. An
+implementation may of course publish additional facilities, and it does so in
+its own modules, which a consumer that uses them must import by name.
 
-The prohibition is not stylistic. Build systems that derive module dependencies
-from the dotted name treat the second form as a submodule of
-`openkal.<interface>` and report a dependency cycle. The constraint is recorded
-here with its reason because a reader who is given only the rule will reach for
-the prohibited form.
+### 4.2 Absence of an implementation
 
-### 4.3 What an implementation may add
+A consumer that depends upon the specification and upon no implementation
+compiles and fails to link, and the diagnostic names the undefined functions:
 
-An implementation shall not redeclare a type, concept or function template
-obtained from `openkal.decl.<interface>`. This prohibition is enforced by the
-language: a module that redeclares an imported entity is rejected during
-compilation.
+    undefined reference to `kal_stream_write'
+    undefined reference to `kal_stdout'
 
-The remaining freedom is the addition of overloads. An implementation shall add
-only those overloads that this specification lists as optional capabilities of
-the interface. An implementation that offers facilities beyond the
-specification shall place them in a module whose name is not of the form
-`openkal.<interface>`, so that a consumer relying on them does so visibly.
+The failure is later than a compilation failure would be and is legible. An
+arrangement that reported it during compilation was considered and is described
+in clause 6.3, together with the reason it was not adopted.
 
 ## 5. Common definitions
 
@@ -155,7 +152,7 @@ it is not portable.
 ### 5.3 Structure layouts
 
 The layout of every structure declared by this specification is frozen at
-version 0.1. The evolution rule of clause 8 admits new declarations and excludes
+version 0.2. The evolution rule of clause 8 admits new declarations and excludes
 changes to existing ones; a structure layout is not protected by that rule
 unless it is separately declared immutable, and it is so declared here.
 
@@ -163,37 +160,60 @@ unless it is separately declared immutable, and it is so declared here.
 
 ### 6.1 Presence of an interface
 
-An interface that an implementation does not provide is absent as a module. A
-consumer that imports it is rejected during compilation, and the diagnostic
-names the module. A conforming implementation shall not provide an interface
-whose operations report a lack of support at run time; the specification treats
-run-time refusal as a defect and not as a means of expressing partiality.
+An interface that an implementation does not provide is absent as a link-time
+definition, and a consumer that uses it fails to link. A conforming
+implementation shall not provide an interface whose operations report a lack of
+support at run time; the specification treats run-time refusal as a defect and
+not as a means of expressing partiality.
 
-### 6.2 Presence of an operation within an interface
+An interface that the specification does not define is absent as a module, and a
+consumer that imports it fails to compile.
 
-Optional operations are declared as function templates in
-`openkal.decl.<interface>` whose bodies fail to instantiate and whose return
-type is `kal::unsupported_t`. An implementation supplies such an operation by
-declaring an overload returning the interface's ordinary result type, and
-withholds it by declaring nothing.
+### 6.2 Optional operations
 
-A consumer detects the presence of an operation with the concept the interface
-provides. The concept examines the return type, because a fallback and a real
-implementation that agreed in return type would be indistinguishable: a
-requires-expression does not instantiate a function body, so the failing
-assertion inside the fallback would never be reached.
+Version 0.2 defines none. Every operation of every interface it specifies is
+required of an implementation that provides that interface.
 
-A consumer that calls an absent operation without first testing for it is
-rejected during compilation, and the diagnostic carries the wording this
-specification supplies. That behaviour is the default and requires nothing of
-the consumer.
+The specification records this deliberately rather than leaving it implicit,
+because the mechanism by which an optional operation would be expressed is not
+obvious and is deferred until an optional operation exists.
 
-No separate record of capabilities exists, and none shall be introduced. A
-record can disagree with the code it describes; a declaration cannot. An
-implementation cannot claim an operation it has not declared, and an operation
-it has declared but not defined is reported at link time.
+### 6.3 Mechanisms considered for optional operations
 
-### 6.3 Operations that cannot be uniformly present
+Two arrangements are available, and each carries a constraint. The choice is
+deferred; the constraints are recorded so that the choice is informed when it is
+made.
+
+**A separate interface.** An optional operation becomes an interface of its own,
+declared by the specification package. An implementation supplies it or does
+not, and a consumer that uses it without an implementation fails to link. This
+preserves the arrangement of clause 4 and offers no detection: a consumer cannot
+adapt, only require.
+
+**A module supplied by the implementation.** An optional operation is declared
+in a module the implementation provides, and a consumer that imports it without
+a supporting implementation fails to compile, with the module named. This
+permits detection but reintroduces, for the optional operation, the arrangement
+clause 4.1 rejects for the interface.
+
+An earlier draft chose a third arrangement: fallback overloads in the interface,
+displaced by an implementation declaring its own, with presence detected through
+argument-dependent lookup. It was withdrawn. The arrangement requires an
+implementation's declarations to be visible to the consumer, which requires the
+implementation to own the module the consumer imports, which contradicts clause
+4. The measurements that motivated it remain valid and are recorded because they
+constrain the second option above:
+
+1. A requires-expression naming a qualified entity that does not exist is
+   ill-formed. Detection through unqualified lookup and argument-dependent
+   lookup is well-formed and evaluates to false.
+2. Argument-dependent lookup does not reach a module the translation unit has
+   not imported.
+3. A module whose name extends another module's name by a further component is
+   treated by some build systems as a submodule of it, and the two then form a
+   dependency cycle.
+
+### 6.4 Operations that cannot be uniformly present
 
 An operation that some resources of an interface can never satisfy shall not be
 placed in that interface. Positioning is the example the specification records.
@@ -275,12 +295,12 @@ Each interface is versioned independently. A revision may add declarations and
 shall not alter existing ones. Structure layouts are immutable as stated in
 clause 5.3.
 
-A consumer declares a dependency upon the specification package in addition to
-its dependency upon an implementation. The second dependency is what selects an
-implementation; the first is what fixes the version of the contract the consumer
-is written against, and it converts a mismatch between consumer and
-implementation into a failure of dependency resolution rather than a collection
-of signature errors at compile time.
+A consumer declares a dependency upon the specification package, which is the
+package it imports, and a dependency upon an implementation, which is the
+package that supplies the definitions. The first fixes the version of the
+contract; the second is ordinarily conditional upon the target, so that changing
+implementation is a change to one line of the manifest and to no line of the
+source.
 
 ## 9. Conformance procedure
 
@@ -288,15 +308,12 @@ A conformance suite shall verify both halves of an implementation's claim.
 
 1. **Behaviour.** Every operation the implementation declares shall behave as
    this specification requires.
-2. **Absence.** Every operation the implementation does not declare shall be
-   absent from the exported names of `openkal.<interface>`. This half is a
-   static examination of the artefact and is therefore neither slow nor
-   susceptible to incomplete coverage.
-3. **Surface.** The exported names of `openkal.<interface>`, and their
-   signatures, shall be compared against the specification's list. A signature
-   that differs in a parameter type is not a benign deviation: it remains
-   selected by argument-dependent lookup through an implicit conversion while
-   its semantics may differ.
+2. **Surface.** The names an implementation exports beginning with `kal_` shall
+   be compared against `SURFACE.txt`. An implementation exports the names of the
+   interfaces it provides and no other. This half is a static examination of the
+   artefact and is therefore neither slow nor susceptible to incomplete
+   coverage, and it is the half that detects an implementation which has
+   extended the interface rather than implemented it.
 
 Behavioural conformance cannot be established exhaustively, and this
 specification does not claim otherwise. An implementation may export the correct
@@ -332,7 +349,7 @@ The following are recorded so that they are not mistaken for oversights.
 
 1. **Concurrency.** The behaviour of concurrent operations upon one handle is
    unspecified. The question becomes unavoidable when `openkal.task` is
-   specified, and version 0.1 does not specify it.
+   specified, and version 0.2 does not specify it.
 2. **Ownership.** Every handle in the core interfaces is borrowed. Owned
    handles arrive with `openkal.fs`, and the rules for their release, including
    the effect of releasing one twice, are deferred to that interface.

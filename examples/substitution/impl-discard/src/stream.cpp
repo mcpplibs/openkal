@@ -1,5 +1,4 @@
-import openkal.decl.stream;
-import openkal.decl.types;
+import openkal.stream;
 
 extern "C" {
 kal_stream kal_stdin (void) { return kal_stream{0}; }

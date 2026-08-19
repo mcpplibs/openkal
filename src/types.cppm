@@ -1,10 +1,10 @@
-// openkal.decl.types --- definitions shared by every openkal interface.
+// openkal.types --- definitions shared by every openkal interface.
 //
 // The declarations in this module are normative. An implementation package
 // re-exports them unchanged; it may not redefine them. That prohibition is
 // enforced by the language rather than by convention: a module that redeclares
 // an imported type is rejected by the compiler.
-export module openkal.decl.types;
+export module openkal.types;
 
 // The width of a machine word, obtained from the compiler rather than from a
 // header. A freestanding target may have no <cstdint>, and openkal is required

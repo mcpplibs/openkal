@@ -1,11 +1,11 @@
-// openkal.decl.abort --- termination.
+// openkal.abort --- termination.
 //
 // This interface belongs to the core set. Every implementation provides it,
 // because every environment can terminate: an implementation with nothing else
 // available may halt the processor, and halting is an implementation rather
 // than a simulation.
-export module openkal.decl.abort;
-export import openkal.decl.types;
+export module openkal.abort;
+export import openkal.types;
 
 export extern "C" {
 

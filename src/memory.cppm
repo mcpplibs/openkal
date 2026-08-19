@@ -1,4 +1,4 @@
-// openkal.decl.memory --- allocation.
+// openkal.memory --- allocation.
 //
 // This interface belongs to the core set. The judgement rests on a distinction
 // the specification applies throughout: an implementation that would make its
@@ -10,8 +10,8 @@
 //
 // Whether an environment "has a heap" is therefore not a property of the
 // hardware. Any environment with writable memory can supply one.
-export module openkal.decl.memory;
-export import openkal.decl.types;
+export module openkal.memory;
+export import openkal.types;
 
 export extern "C" {
 

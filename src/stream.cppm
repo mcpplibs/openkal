@@ -1,4 +1,4 @@
-// openkal.decl.stream --- byte streams.
+// openkal.stream --- byte streams.
 //
 // A stream is the resource through which bytes are transferred sequentially.
 // Files, network connections, pipes and serial ports differ in how they are
@@ -12,8 +12,8 @@
 // failure for a pipe. An interface that offered positioning on every stream
 // would therefore contain an operation that some streams can never satisfy,
 // which is the defect this specification's decomposition exists to avoid.
-export module openkal.decl.stream;
-export import openkal.decl.types;
+export module openkal.stream;
+export import openkal.types;
 
 // An opaque handle occupying one machine word.
 //
@@ -69,30 +69,15 @@ inline int           flush(stream s)                                { return kal
 
 // --- Optional capabilities -------------------------------------------------
 //
-// The declarations below are the fallbacks an implementation displaces by
-// providing its own. They are reached by ordinary argument-dependent lookup, so
-// an implementation supplies a capability by declaring it and withholds one by
-// remaining silent. No separate capability record is required, and none is
-// permitted: a record can disagree with the code it describes, whereas a
-// declaration cannot.
+// Version 0.2 defines none. The mechanism by which an optional operation would
+// be expressed is deferred until one exists, and clause 6 of the specification
+// records the candidates together with the constraint each carries.
 //
-// The return type distinguishes the fallback from a real implementation. If the
-// two agreed, the detection predicate below would be satisfied by the fallback
-// itself, because a requires-expression does not instantiate a function body
-// and the assertion inside it would never be reached.
-struct unsupported_t {};
-template <class> inline constexpr bool always_false = false;
-
-template <class S>
-unsupported_t write_vectored(S, const void*, kal_uintptr) {
-    static_assert(always_false<S>,
-        "this openkal implementation does not provide vectored writes");
-    return {};
-}
-
-template <class S> concept has_write_vectored =
-    requires(S s, const void* p, kal_uintptr n) {
-        requires __is_same(decltype(write_vectored(s, p, n)), kal_io_result);
-    };
+// An earlier draft placed a fallback overload here, to be displaced by an
+// implementation declaring its own. That arrangement requires the
+// implementation's declarations to be visible to the consumer, which requires
+// the implementation to own the module the consumer imports, which contradicts
+// the layering this specification adopts. The fallback was removed with the
+// mechanism it belonged to.
 
 }
