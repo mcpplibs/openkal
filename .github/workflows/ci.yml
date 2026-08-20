@@ -72,8 +72,35 @@ jobs:
 
       - name: Install mcpp
         run: |
-          xlings update
-          xlings install "mcpp@$MCPP_VERSION" -y -g
+          # ⚠️ A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
+          # WITHOUT SAYING SO.
+          #
+          # The index is published as an artifact behind a pointer, and that
+          # pointer propagates asynchronously after a version bump is merged.
+          # Measured on release day: an update run four minutes after the merge
+          # printed `index updated`, and the install then failed with
+          #
+          #     package 'mcpp@<ver>' not found in the synced index
+          #     (xim@artifact:<an older sha>, ...), synced 0 seconds ago
+          #
+          # Nothing had gone wrong. The update fetched the PREVIOUS artifact,
+          # and "synced 0 seconds ago" describes when it was fetched rather than
+          # what it contains — which is why the message reads as freshness.
+          #
+          # So this is not a retry around flakiness; it is the wait that a
+          # single update does not perform. A pin naming a version that was
+          # never published still fails, after the last attempt, and says which
+          # of the two situations it is.
+          for attempt in 1 2 3 4 5 6; do
+            xlings update > /dev/null 2>&1 || true
+            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if [ "$attempt" = 6 ]; then
+              echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
+              exit 1
+            fi
+            echo "the index has not caught up yet (attempt $attempt of 6); waiting 60s"
+            sleep 60
+          done
           mcpp --version
           mcpp self config --mirror GLOBAL
 
@@ -129,8 +156,35 @@ jobs:
 
       - name: Install mcpp
         run: |
-          xlings update
-          xlings install "mcpp@$MCPP_VERSION" -y -g
+          # ⚠️ A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
+          # WITHOUT SAYING SO.
+          #
+          # The index is published as an artifact behind a pointer, and that
+          # pointer propagates asynchronously after a version bump is merged.
+          # Measured on release day: an update run four minutes after the merge
+          # printed `index updated`, and the install then failed with
+          #
+          #     package 'mcpp@<ver>' not found in the synced index
+          #     (xim@artifact:<an older sha>, ...), synced 0 seconds ago
+          #
+          # Nothing had gone wrong. The update fetched the PREVIOUS artifact,
+          # and "synced 0 seconds ago" describes when it was fetched rather than
+          # what it contains — which is why the message reads as freshness.
+          #
+          # So this is not a retry around flakiness; it is the wait that a
+          # single update does not perform. A pin naming a version that was
+          # never published still fails, after the last attempt, and says which
+          # of the two situations it is.
+          for attempt in 1 2 3 4 5 6; do
+            xlings update > /dev/null 2>&1 || true
+            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if [ "$attempt" = 6 ]; then
+              echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
+              exit 1
+            fi
+            echo "the index has not caught up yet (attempt $attempt of 6); waiting 60s"
+            sleep 60
+          done
           mcpp self config --mirror GLOBAL
 
       # The compiler family and version for this row. mcpp keeps its toolchains
@@ -259,8 +313,35 @@ jobs:
 
       - name: Install mcpp
         run: |
-          xlings update
-          xlings install "mcpp@$MCPP_VERSION" -y -g
+          # ⚠️ A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
+          # WITHOUT SAYING SO.
+          #
+          # The index is published as an artifact behind a pointer, and that
+          # pointer propagates asynchronously after a version bump is merged.
+          # Measured on release day: an update run four minutes after the merge
+          # printed `index updated`, and the install then failed with
+          #
+          #     package 'mcpp@<ver>' not found in the synced index
+          #     (xim@artifact:<an older sha>, ...), synced 0 seconds ago
+          #
+          # Nothing had gone wrong. The update fetched the PREVIOUS artifact,
+          # and "synced 0 seconds ago" describes when it was fetched rather than
+          # what it contains — which is why the message reads as freshness.
+          #
+          # So this is not a retry around flakiness; it is the wait that a
+          # single update does not perform. A pin naming a version that was
+          # never published still fails, after the last attempt, and says which
+          # of the two situations it is.
+          for attempt in 1 2 3 4 5 6; do
+            xlings update > /dev/null 2>&1 || true
+            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if [ "$attempt" = 6 ]; then
+              echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
+              exit 1
+            fi
+            echo "the index has not caught up yet (attempt $attempt of 6); waiting 60s"
+            sleep 60
+          done
           mcpp self config --mirror GLOBAL
 
       # The compiler family and version for this row. mcpp keeps its toolchains
