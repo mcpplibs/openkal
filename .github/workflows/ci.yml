@@ -137,11 +137,36 @@ jobs:
       #
       # Compile-only: there is no 32-bit implementation to run against, and the
       # claim under test is about layout rather than behaviour.
+      # ⚠️ A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
+      #
+      # Every other row here is hosted, and every hosted target this
+      # specification serves is 64-bit. That is a structural blind spot: the C
+      # ABI this repository freezes is instantiated at two pointer widths, and
+      # only one of them was ever compiled.
+      #
+      # Measured 2026-08-20: `kal_node_info`'s frozen-layout assertion read
+      # `offsetof(modified_ns) == sizeof(kal_uintptr)`, true at 64 bits and
+      # false at 32 — the timestamp is a naturally-aligned `kal_u64`, so a
+      # 32-bit `size` is followed by four bytes of padding and the offset stays
+      # at eight. It surfaced in a CONSUMER (`mcpplibs/riscv-virt-rt`'s rv32
+      # leg), the only place the 32-bit layout existed at all.
+      #
+      # ⚠️ THROUGH `mcpp`, NOT THROUGH A BORROWED clang. The first version of
+      # this step globbed the LLVM payload for `clang++` — which is absent on
+      # the gcc and msvc rows, and is named `clang++.exe` on Windows, so the
+      # command expanded to nothing and the step died with `: command not
+      # found` on four rows. mcpp resolves the toolchain for a target itself;
+      # asking it is the only spelling that holds on every row.
       - name: The C ABI holds at thirty-two bits as well as sixty-four
         run: |
           set -euo pipefail
-          CL="$(find "$HOME/.mcpp/registry/data/xpkgs/xim-x-llvm" -name 'clang++' | head -1)"
-          cat > /tmp/abi.cpp <<'EOF'
+          mkdir -p /tmp/abi/src
+          cat > /tmp/abi/mcpp.toml <<'EOF'
+          [package]
+          name    = "abi"
+          version = "0.1.0"
+          EOF
+          cat > /tmp/abi/src/main.cpp <<EOF
           #include <openkal/types.h>
           #include <openkal/fs.h>
           static_assert(__builtin_offsetof(kal_node_info, size) == 0);
@@ -149,12 +174,18 @@ jobs:
           static_assert(sizeof(kal_node_info) == 24);
           static_assert(sizeof(kal_dir)  == sizeof(kal_uintptr));
           static_assert(sizeof(kal_file) == sizeof(kal_uintptr));
+          extern "C" void _start() { for (;;) {} }
           EOF
-          for spec in "riscv64-none-elf|-march=rv64gc -mabi=lp64d" \
-                      "riscv32-none-elf|-march=rv32imac -mabi=ilp32"; do
-            t="${spec%%|*}"; a="${spec#*|}"
-            "$CL" --no-default-config --target="$t" $a -ffreestanding -fno-exceptions \
-                  -std=c++23 -Iinclude -fsyntax-only /tmp/abi.cpp \
+          cat > /tmp/abi/build.mcpp <<EOF
+          import mcpp;
+          import std;
+          int main() {
+              mcpp::include_dir("$GITHUB_WORKSPACE/include");
+              return 0;
+          }
+          EOF
+          for t in riscv64-none-elf riscv32-none-elf; do
+            ( cd /tmp/abi && rm -rf target && mcpp build --target "$t" ) \
               || { echo "the frozen layout does not hold for $t"; exit 1; }
             echo "$t: layout holds"
           done
