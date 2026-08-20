@@ -60,7 +60,32 @@ static_assert(sizeof(kal_file) == sizeof(kal_uintptr), "clause 7.2");
 // different times must agree on where each field is, and nothing else reports
 // a disagreement.
 static_assert(__builtin_offsetof(kal_node_info, size) == 0);
-static_assert(__builtin_offsetof(kal_node_info, modified_ns) == sizeof(kal_uintptr));
+
+// ⚠️ `8`, NOT `sizeof(kal_uintptr)`, AND THE DIFFERENCE IS AN ABI FACT RATHER
+// THAN A SPELLING.
+//
+// `modified_ns` is a `kal_u64` and is naturally aligned. On a 64-bit target
+// `size` occupies eight bytes and the timestamp follows at eight. On a 32-bit
+// target `size` occupies four, the compiler inserts four bytes of padding, and
+// the timestamp still lands at eight. The offset is therefore the SAME on both
+// widths, which is exactly the property a frozen layout wants — and
+// `sizeof(kal_uintptr)` described only the 64-bit case.
+//
+// Measured on `riscv32-none-elf`:
+//
+//     fs.cppm:63: static assertion failed due to requirement
+//     '__builtin_offsetof(kal_node_info, modified_ns) == sizeof(unsigned int)'
+//
+// ⚠️ Nothing in this repository's own CI could have found it: openkal is built
+// and tested hosted, and every hosted target it serves is 64-bit. The failure
+// surfaced in a consumer — `mcpplibs/riscv-virt-rt`, whose rv32 leg activates
+// the `openkal` feature — which is the only place the 32-bit layout is
+// instantiated at all.
+//
+// `sizeof(kal_node_info)` is 24 on both widths for the same reason: 8+8+4+4 and
+// 4+4(padding)+8+4+4.
+static_assert(__builtin_offsetof(kal_node_info, modified_ns) == 8);
+static_assert(sizeof(kal_node_info) == 24);
 
 export namespace kal::fs {
 

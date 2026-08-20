@@ -120,6 +120,45 @@ jobs:
 
       # The C++ form. The modules are the artefact a C++ consumer imports, and
       # building them is what proves the compiler accepts them.
+      # ⚠️ A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
+      #
+      # Every row of every job here is hosted, and every hosted target this
+      # specification serves is 64-bit. That is a structural blind spot rather
+      # than an omission: the C ABI this repository freezes is instantiated at
+      # two pointer widths, and only one of them was ever compiled.
+      #
+      # Measured 2026-08-20: `kal_node_info`'s frozen-layout assertion read
+      # `offsetof(modified_ns) == sizeof(kal_uintptr)`, which is true at 64 bits
+      # and false at 32 — the timestamp is a naturally-aligned `kal_u64`, so a
+      # 32-bit `size` is followed by four bytes of padding and the offset stays
+      # at eight. The failure surfaced in a CONSUMER (`mcpplibs/riscv-virt-rt`,
+      # whose rv32 leg activates the openkal feature), which is the only place
+      # the 32-bit layout existed at all.
+      #
+      # Compile-only: there is no 32-bit implementation to run against, and the
+      # claim under test is about layout rather than behaviour.
+      - name: The C ABI holds at thirty-two bits as well as sixty-four
+        run: |
+          set -euo pipefail
+          CL="$(find "$HOME/.mcpp/registry/data/xpkgs/xim-x-llvm" -name 'clang++' | head -1)"
+          cat > /tmp/abi.cpp <<'EOF'
+          #include <openkal/types.h>
+          #include <openkal/fs.h>
+          static_assert(__builtin_offsetof(kal_node_info, size) == 0);
+          static_assert(__builtin_offsetof(kal_node_info, modified_ns) == 8);
+          static_assert(sizeof(kal_node_info) == 24);
+          static_assert(sizeof(kal_dir)  == sizeof(kal_uintptr));
+          static_assert(sizeof(kal_file) == sizeof(kal_uintptr));
+          EOF
+          for spec in "riscv64-none-elf|-march=rv64gc -mabi=lp64d" \
+                      "riscv32-none-elf|-march=rv32imac -mabi=ilp32"; do
+            t="${spec%%|*}"; a="${spec#*|}"
+            "$CL" --no-default-config --target="$t" $a -ffreestanding -fno-exceptions \
+                  -std=c++23 -Iinclude -fsyntax-only /tmp/abi.cpp \
+              || { echo "the frozen layout does not hold for $t"; exit 1; }
+            echo "$t: layout holds"
+          done
+
       - name: The module form compiles
         run: mcpp build
 
