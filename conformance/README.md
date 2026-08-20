@@ -10,15 +10,21 @@ mcpp build --features full
 ```
 
 The implementation under examination is not named in this package's manifest.
-It is supplied by whoever runs the suite, as a second dependency, exactly as any
-consumer supplies one:
+It is supplied by whoever runs the suite, exactly as any consumer supplies one —
+and `tools/run-conformance.sh` in the parent directory is where that is done, so
+that a change to how it is done is one change:
 
-```toml
-[dependencies]
-openkal              = "0.5.0"
-openkal-conformance  = "0.5.0"
-openkal-linux        = "0.5.0"   # or whichever is being examined
+```bash
+git clone https://github.com/mcpplibs/openkal .spec
+bash .spec/tools/run-conformance.sh openkal-linux . full
+#                                   ^ the package    ^ where it is
 ```
+
+This package is not published to the index separately. It is a program rather
+than a library — a dependency that contributed a binary target to its dependant
+would be a surprising thing for `[dependencies]` to name — and it is reached by
+checking out the specification, which is the package it is the conformance
+procedure for.
 
 ## It is composable, because openkal is
 
