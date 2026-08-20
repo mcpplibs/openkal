@@ -79,6 +79,19 @@ void records_its_own(void*) {
 
 void does_nothing(void*) { }
 
+// Every context records the identity openkal gave it, so that the identities can
+// be compared with each other rather than each with the starting one.
+constexpr int    kIdentities = 4;
+kal_uintptr      g_identities[kIdentities];
+volatile kal_u32 g_next_identity = 0;
+
+void records_its_identity(void*) {
+    kal_u32 slot = 0;
+    do { slot = load_acquire(&g_next_identity); }
+    while (slot < kIdentities && !compare_exchange(&g_next_identity, slot, slot + 1));
+    if (slot < kIdentities) g_identities[slot] = kal_task_current();
+}
+
 #endif
 
 }  // namespace
@@ -110,6 +123,14 @@ void run() {
             observe(kind::behaviour, kal_task_join(t) == kal_ok, "the context is awaited");
             observe(kind::behaviour, g_identity != kal_task_current(),
                     "a started context has an identity distinct from the starting one");
+            // Zero is the value an implementation reaches by not answering, and
+            // a consumer keyed on the identity reads it as "no entry" however
+            // many times it is written. An implementation that returned zero for
+            // every started context satisfied the observation above --- zero
+            // differs from the starting context's identity --- and satisfied
+            // nothing a consumer needs.
+            observe(kind::behaviour, g_identity != 0,
+                    "the identity of a started context is not zero");
         }
     }
 
@@ -129,6 +150,28 @@ void run() {
                 "a mutex built from the suspension primitive loses no increment");
         put("  increments: "); put_signed(g_counter);
         put(" of "); put_signed(static_cast<long long>(started) * kIncrements); put("\n");
+    }
+
+    // The identities of contexts that ran at the same time, compared with each
+    // other. Comparing each with the starting context's is satisfied by an
+    // implementation that answers one wrong value for all of them.
+    {
+        kal_task t[kIdentities]{};
+        int started = 0;
+        g_next_identity = 0;
+        for (int i = 0; i < kIdentities; ++i) g_identities[i] = 0;
+        for (int i = 0; i < kIdentities; ++i)
+            if (kal_task_start(records_its_identity, nullptr, &t[i]) == kal_ok) ++started;
+        for (int i = 0; i < started; ++i) kal_task_join(t[i]);
+
+        bool distinct = started == kIdentities;
+        for (int i = 0; i < started; ++i) {
+            if (g_identities[i] == 0) distinct = false;
+            for (int k = i + 1; k < started; ++k)
+                if (g_identities[i] == g_identities[k]) distinct = false;
+        }
+        observe(kind::behaviour, distinct,
+                "contexts that ran at the same time have identities distinct from each other");
     }
 
     // Relinquishing the processor is permitted to do nothing, and an

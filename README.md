@@ -109,7 +109,7 @@ names against `SURFACE.txt`. It detects the one freedom an implementation retain
 after the language has removed the others: the addition of names.
 
 **The behaviour.** [`conformance/`](conformance/) is a program an implementation
-runs against itself — 95 observations across eight interfaces, in four kinds:
+runs against itself — 97 observations across eight interfaces, in four kinds:
 behaviour, ABI, stability and cost.
 
 ```bash
@@ -120,7 +120,7 @@ bash /path/to/openkal/tools/run-conformance.sh openkal-linux . full
 It is composable, because openkal is: an implementation provides an interface in
 whole or not at all, so each interface is a feature and a run reports on what was
 selected. It reports three counts, and the third is the one to read —
-`95 held, 0 did not hold, 0 not observed` — because a suite that reported only
+`97 held, 0 did not hold, 0 not observed` — because a suite that reported only
 the first two cannot distinguish an interface that behaved from one it never
 examined.
 

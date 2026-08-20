@@ -60,7 +60,7 @@ and be discarded rather than consulted.
 ## Three counts, and the third is the one to read
 
 ```
-observations: 91 held, 0 did not hold, 0 not observed
+observations: 97 held, 0 did not hold, 0 not observed
 ```
 
 A suite that reported only what held and what did not cannot distinguish an
