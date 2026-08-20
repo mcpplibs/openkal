@@ -71,7 +71,14 @@ binary="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-c
 # between ninety-one observations and ninety.
 export OPENKAL_CONFORMANCE_EMPTY=""
 
+# A suite built for a system other than the one building it is run through
+# whatever runs it, named in the environment. The suite starts a copy of itself
+# for the three observations that end the program that makes them, and it does
+# so through openkal.process rather than through anything this script arranges,
+# so the copy is started by the same mechanism as the original.
+runner="${OPENKAL_CONFORMANCE_RUNNER:-}"
+
 # The suite's own exit status is the verdict: 0 when every observation held, 1
 # when one did not, 2 when nothing was observed. The last is the one a run that
 # selected no interface would otherwise pass silently.
-"./$binary"
+$runner "./$binary"

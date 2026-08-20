@@ -77,10 +77,24 @@ jobs:
           mcpp --version
           mcpp self config --mirror GLOBAL
 
+      # The compiler family and version for this row. mcpp keeps its toolchains
+      # in a sandbox of its own, so this selects rather than installs into the
+      # system, and `mcpp test' and `mcpp run' have no flag for it --- which is
+      # why it is set once here rather than passed to each command.
+      - name: Select the toolchain
+        run: |
+          spec='${{ matrix.toolchain }}'
+          case "$spec" in
+            msvc*) mcpp toolchain default msvc ;;
+            *)     mcpp toolchain install "${spec%@*}" "${spec#*@}"
+                   mcpp toolchain default "$spec" ;;
+          esac
+          mcpp toolchain list
+
       # The C++ form. The modules are the artefact a C++ consumer imports, and
       # building them is what proves the compiler accepts them.
       - name: The module form compiles
-        run: mcpp build --toolchain '${{ matrix.toolchain }}'
+        run: mcpp build
 
       # The C form, with the environment's own headers excluded --- because the
       # consumer this form exists for, a C library being ported onto openkal, is
@@ -119,6 +133,20 @@ jobs:
           xlings install "mcpp@$MCPP_VERSION" -y -g
           mcpp self config --mirror GLOBAL
 
+      # The compiler family and version for this row. mcpp keeps its toolchains
+      # in a sandbox of its own, so this selects rather than installs into the
+      # system, and `mcpp test' and `mcpp run' have no flag for it --- which is
+      # why it is set once here rather than passed to each command.
+      - name: Select the toolchain
+        run: |
+          spec='${{ matrix.toolchain }}'
+          case "$spec" in
+            msvc*) mcpp toolchain default msvc ;;
+            *)     mcpp toolchain install "${spec%@*}" "${spec#*@}"
+                   mcpp toolchain default "$spec" ;;
+          esac
+          mcpp toolchain list
+
       - name: Substitution holds
         working-directory: examples/substitution/app
         run: |
@@ -127,13 +155,13 @@ jobs:
           # second, so that a change made by either build would be detected.
           before="$(sha256sum src/main.cpp | cut -d' ' -f1)"
 
-          mcpp build --toolchain '${{ matrix.toolchain }}' > /dev/null
+          mcpp build > /dev/null
           ./target/*/*/bin/app > with-fd.log 2>&1
           grep -q 'the application produced this line' with-fd.log
 
           sed -i 's|openkal-fd = { path = "../impl-fd" }|openkal-discard = { path = "../impl-discard" }|' mcpp.toml
           rm -rf target
-          mcpp build --toolchain '${{ matrix.toolchain }}' > /dev/null
+          mcpp build > /dev/null
           ./target/*/*/bin/app > with-discard.log 2>&1
           if grep -q 'the application produced this line' with-discard.log; then
             echo "the discarding implementation produced output"; exit 1
@@ -148,12 +176,12 @@ jobs:
           # The checker is only useful if it fails when it should. An
           # unspecified name is introduced, the checker is required to reject
           # it, and the name is then removed.
-          mcpp build --toolchain '${{ matrix.toolchain }}' > /dev/null
+          mcpp build > /dev/null
           bash ../../../tools/check-surface.sh ../../../SURFACE.txt \
             $(find target -name '*.o' | tr '\n' ' ')
 
           printf 'extern "C" void kal_vendor_extension(void) {}\n' > src/extra.cpp
-          mcpp build --toolchain '${{ matrix.toolchain }}' > /dev/null
+          mcpp build > /dev/null
           if bash ../../../tools/check-surface.sh ../../../SURFACE.txt \
                $(find target -name '*.o' | tr '\n' ' '); then
             echo "the checker accepted an unspecified name"; exit 1
@@ -217,14 +245,27 @@ jobs:
           xlings install "mcpp@$MCPP_VERSION" -y -g
           mcpp self config --mirror GLOBAL
 
+      # The compiler family and version for this row. mcpp keeps its toolchains
+      # in a sandbox of its own, so this selects rather than installs into the
+      # system, and `mcpp test' and `mcpp run' have no flag for it --- which is
+      # why it is set once here rather than passed to each command.
+      - name: Select the toolchain
+        run: |
+          spec='${{ matrix.toolchain }}'
+          case "$spec" in
+            msvc*) mcpp toolchain default msvc ;;
+            *)     mcpp toolchain install "${spec%@*}" "${spec#*@}"
+                   mcpp toolchain default "$spec" ;;
+          esac
+          mcpp toolchain list
+
       # Every interface and every kind of examination. The exit status is the
       # verdict: 0 when every observation held, 1 when one did not, and 2 when
       # nothing was observed --- the last being the outcome a run that selected
       # no interface would otherwise pass silently.
       - name: Every interface, every kind of examination
         run: |
-          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl full \
-            --toolchain '${{ matrix.toolchain }}'
+          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl full
 
       # The suite is composable because openkal is: an implementation provides
       # an interface in whole or not at all, and a suite that examined all eight
@@ -235,7 +276,7 @@ jobs:
         run: |
           rm -rf conformance/target
           bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl core,fs,task \
-            --toolchain '${{ matrix.toolchain }}' | tee selected.log
+            | tee selected.log
 
           # A report was produced, and nothing in it failed.
           grep -qE 'observations: [0-9]+ held, 0 did not hold' selected.log
