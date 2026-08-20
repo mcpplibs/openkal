@@ -263,7 +263,12 @@ void run() {
             if (kal::fs::open_file(d, "a", 1, flags, &f) == kal_ok) kal_fs_close_file(f);
             if (kal::fs::open_file(d, "b", 1, flags, &f) == kal_ok) kal_fs_close_file(f);
 
+            // What was reported is kept, not only how much of it. A count that
+            // does not match tells a reader that something is wrong and not
+            // what, and the difference between "one entry too many" and "the
+            // wrong two entries" is the whole of the diagnosis.
             int seen = 0;
+            char reported[256]; kal_uintptr at = 0;
             kal_uintptr iter = 0;
             if (kal_fs_list_begin(d, &iter) == kal_ok) {
                 for (;;) {
@@ -271,10 +276,17 @@ void run() {
                     if (kal_fs_list_next(d, &iter, &name, &len, &knd) != kal_ok) break;
                     if (!name) break;
                     ++seen;
+                    if (at + len + 2 < sizeof reported) {
+                        if (at) reported[at++] = ' ';
+                        for (kal_uintptr k = 0; k < len; ++k) reported[at++] = name[k];
+                        reported[at] = '\0';
+                    }
                 }
             }
+            reported[at < sizeof reported ? at : sizeof reported - 1] = '\0';
             observe(kind::behaviour, seen == 2,
                     "enumeration reports the entries that were created and nothing else");
+            if (seen != 2) { line("  what it reported: "); line(reported); line("\n"); }
 
             kal_fs_remove(d, "a", 1);
             kal_fs_remove(d, "b", 1);
