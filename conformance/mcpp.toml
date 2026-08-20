@@ -1,0 +1,83 @@
+[package]
+namespace   = "mcpplibs"
+name        = "openkal-conformance"
+version     = "0.5.0"
+description = "The behavioural half of clause 9: a suite an implementation of openkal runs against itself, selectable to the interfaces it provides."
+license     = "Apache-2.0"
+authors     = ["mcpplibs"]
+repo        = "https://github.com/mcpplibs/openkal"
+
+# The specification, and nothing else.
+#
+# The suite does not import std. It is written to run against an implementation
+# in either arrangement, including one in a program that carries no other
+# runtime, and a suite that reached for a standard library would not link there
+# --- and where it did link, it would be reporting on an implementation while
+# resting on facilities that implementation may be the only supplier of.
+#
+# What it depends upon is therefore openkal and the language. The formatting in
+# okc.report is the price of that, and it is sixty lines.
+[dependencies]
+openkal = "0.5.0"
+
+# The implementation under examination is not named here.
+#
+# It is supplied by whoever runs the suite, as a second dependency, exactly as
+# any consumer supplies one. An implementation's own continuous integration adds
+# a path to itself; a reader examining a published implementation adds its
+# version. Naming one here would make the suite an implementation's dependant
+# rather than an implementation's instrument.
+
+[targets.openkal-conformance]
+kind = "bin"
+main = "src/main.cpp"
+
+# What is examined, selected the way openkal is provided.
+#
+# An interface is the unit of provision: an implementation provides one in whole
+# or not at all, and one it does not provide is absent as a link-time
+# definition. A suite that examined every interface unconditionally would
+# therefore fail to link against a conforming implementation of five of them,
+# and would report nothing at all rather than reporting five.
+#
+# So each interface is a feature. A section whose feature is not active is
+# compiled with its body removed and reports itself as not examined, which keeps
+# the count of what was skipped in the report rather than in the reader's head.
+#
+#     mcpp run                          the core set
+#     mcpp run --features standard      every interface version 0.5 defines
+#     mcpp run --features fs,task       the core set, and these two
+#
+# The core set is the default because clause 3 says every implementation
+# provides it. There is no arrangement that examines nothing.
+[features]
+default  = ["core"]
+
+core     = []
+env      = []
+time     = []
+fs       = []
+process  = ["fs"]     # a program is started relative to a directory
+task     = []
+
+standard = ["core", "env", "time", "fs", "process", "task"]
+
+# The kinds of examination. Behaviour is always performed; the other three are
+# selected, because each costs time that a reader running the suite to answer
+# "does this implementation work" does not want to spend.
+#
+#   abi        the shapes the specification freezes, checked against the
+#              implementation that was linked rather than against the headers
+#              that were compiled
+#   stability  the same operation many times, which is where a handle scheme
+#              that leaks and an allocator that fragments become visible
+#   cost       reported, never asserted: a number that varies with the machine
+#              cannot be a verdict, and a suite that made it one would fail on a
+#              loaded runner
+abi       = []
+stability = []
+# A cost is a duration, and a duration is openkal.time. The dependency is
+# declared rather than assumed, so that requesting cost without time selects
+# time instead of failing to link.
+cost      = ["time"]
+full      = ["standard", "abi", "stability", "cost"]
