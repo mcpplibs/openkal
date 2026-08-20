@@ -220,10 +220,28 @@ jobs:
           branch='${{ github.head_ref || github.ref_name }}'
           if git -C .impl rev-parse --verify --quiet "origin/$branch" > /dev/null; then
             git -C .impl checkout --quiet "origin/$branch"
-            echo "the implementation is at $branch"
+            echo "the implementation is at $branch $(git -C .impl rev-parse --short HEAD)"
           else
-            echo "the implementation has no $branch; its default branch is used"
+            echo "the implementation has no $branch; its default branch is used" \
+                 "($(git -C .impl rev-parse --short HEAD))"
           fi
+
+          # Whether the two are describing the same version of the contract.
+          #
+          # This job asserts that the specification as written here and the
+          # implementation as written there agree today, and that assertion is
+          # only meaningful when the implementation is written against this
+          # version. During a release across five repositories they are out of
+          # step for the seconds between one merge and the next, and the
+          # compiler's report on that is a hundred errors about names a header
+          # no longer has --- which names the symptom and not the cause.
+          here="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' mcpp.toml | head -1)"
+          there="$(sed -n 's/^openkal[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' .impl/mcpp.toml | head -1)"
+          if [ "$here" != "$there" ]; then
+            echo "::error::this is openkal $here and ${{ matrix.implementation }} is written against openkal $there. Nothing is wrong with either; they are not in step. Re-run after the implementation's branch has the matching version." >&2
+            exit 1
+          fi
+          echo "both describe openkal $here"
 
       - name: Install xlings and mcpp (Unix)
         if: runner.os != 'Windows'
