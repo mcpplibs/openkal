@@ -9,6 +9,8 @@
  * appears to continue, which is the point the function exists to remove. */
 #if defined(__cplusplus)
 #  define KAL_NORETURN [[noreturn]]
+#elif defined(_MSC_VER)
+#  define KAL_NORETURN __declspec(noreturn)
 #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 #  define KAL_NORETURN _Noreturn
 #else

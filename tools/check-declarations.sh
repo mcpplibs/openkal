@@ -10,7 +10,7 @@
 # package, where a build of the modules already exists. Neither form is
 # therefore the other's source.
 #
-#   check-declarations.sh [<surface-list>] [<include-dir>]
+#   check-declarations.sh [--write] [<surface-list>] [<include-dir>]
 #
 # The translation unit is compiled with -nostdinc, because the consumer this
 # header exists for --- a C library being ported onto openkal --- is compiled
@@ -18,6 +18,9 @@
 # unusable by it. A check that permitted the environment's headers would pass
 # for a header that cannot be used.
 set -euo pipefail
+
+write=0
+if [ "${1:-}" = "--write" ]; then write=1; shift; fi
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
 list="${1:-$here/SURFACE.txt}"
@@ -47,3 +50,45 @@ builtin_inc="$("$cc" -print-file-name=include)"
       -I"$incdir" -c "$work/surface.c" -o "$work/surface.o"
 
 echo "the C declarations are complete and compile without the environment's headers: $count name(s)"
+
+# The same list, as a translation unit the conformance suite carries.
+#
+# This tool needs a driver it can pass -nostdinc to, and one of the three
+# toolchains the suite is built with has no such spelling; a header that failed
+# to compile as C under that toolchain would go unnoticed here. So the suite
+# carries a file naming the same entities, every toolchain compiles it, and this
+# is where the file is written --- and where a file that has fallen behind the
+# list is detected, since a stale copy would be compiled happily by all three.
+carried="$here/conformance/src/declarations.c"
+
+if [ "$write" -eq 1 ]; then
+    {
+        sed -n '1,/^ \*\/$/p' "$carried"
+        echo '#include <openkal.h>'
+        echo
+        echo 'void okc_declarations_c(void);'
+        echo 'void okc_declarations_c(void)'
+        echo '{'
+        while read -r n; do
+            [ -n "$n" ] && printf '    (void)sizeof(&%s);\n' "$n"
+        done <<< "$names"
+        echo '}'
+    } > "$carried.next"
+    mv "$carried.next" "$carried"
+    echo "wrote $carried: $count name(s)"
+    exit 0
+fi
+
+[ -f "$carried" ] || exit 0
+
+carried_names="$(grep -oE '&kal_[a-z_0-9]+' "$carried" | cut -c2- | sort -u)"
+if [ "$carried_names" != "$names" ]; then
+    echo "conformance/src/declarations.c does not name the surface list." >&2
+    echo "only in SURFACE.txt:" >&2
+    comm -23 <(printf '%s\n' "$names") <(printf '%s\n' "$carried_names") >&2
+    echo "only in declarations.c:" >&2
+    comm -13 <(printf '%s\n' "$names") <(printf '%s\n' "$carried_names") >&2
+    echo "regenerate it: tools/check-declarations.sh --write" >&2
+    exit 1
+fi
+echo "the translation unit the suite carries names the same $count entities"

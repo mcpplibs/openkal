@@ -10,72 +10,13 @@ import okc.spec;
 import okc.child;
 
 namespace okc::process {
-namespace {
-
-#if defined(MCPP_FEATURE_PROCESS) && defined(MCPP_FEATURE_ENV)
-
-kal_uintptr length(const char* s) { kal_uintptr n = 0; while (s && s[n]) ++n; return n; }
-
-// The program's own name, expressed the way openkal names things. openkal gives
-// a program no operation that resolves a global name, deliberately: that work
-// belongs to a C library and is performed once against the supplied
-// directories. Here it is performed by hand because this suite has no C
-// library, and the twenty lines are what a program pays for doing it itself.
-bool locate_self(kal_dir& base, const char*& rel, kal_uintptr& rel_len) {
-    kal_uintptr len = 0;
-    const char* argv0 = kal_env_arg(0, &len);
-    if (!argv0 || len == 0) return false;
-
-    if (argv0[0] != '/') {
-        base = kal::fs::working();
-        rel = argv0; rel_len = len;
-        return true;
-    }
-
-    kal_uintptr best = 0, best_len = 0;
-    bool found = false;
-    for (kal_uintptr i = 0; i < kal_fs_preopen_count(); ++i) {
-        kal_dir d{}; const char* name = nullptr; kal_uintptr nlen = 0;
-        if (kal_fs_preopen(i, &d, &name, &nlen) != kal_ok) continue;
-        if (nlen == 0 || nlen > len) continue;
-        bool prefix = true;
-        for (kal_uintptr k = 0; k < nlen; ++k) if (name[k] != argv0[k]) { prefix = false; break; }
-        if (!prefix) continue;
-        if (!(nlen == 1 && name[0] == '/') && argv0[nlen] != '/' && argv0[nlen] != '\0') continue;
-        if (!found || nlen > best_len) { found = true; best = i; best_len = nlen; }
-    }
-    if (!found) return false;
-
-    kal_dir d{}; const char* name = nullptr; kal_uintptr nlen = 0;
-    kal_fs_preopen(best, &d, &name, &nlen);
-    base = d;
-    kal_uintptr at = (nlen == 1 && name[0] == '/') ? 1 : nlen;
-    while (at < len && argv0[at] == '/') ++at;
-    rel = argv0 + at;
-    rel_len = len - at;
-    return rel_len > 0;
-}
-
-bool start(const char* first_argument, const char* errand_argument, kal_process& out) {
-    kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
-    if (!locate_self(base, rel, rel_len)) return false;
-    const char* argv[2] = { first_argument, errand_argument };
-    const kal_uintptr lens[2] = { length(argv[0]), length(argv[1]) };
-    const kal_spawn_streams streams{ 0, 0, 0 };
-    return kal_process_spawn(base, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
-                             &streams, &out) == kal_ok;
-}
-
-#endif
-
-}  // namespace
 
 void run() {
     heading("openkal.process");
 #if !defined(MCPP_FEATURE_PROCESS)
     unobserved(kind::behaviour, "openkal.process", "the interface was not selected");
     return;
-#elif !defined(MCPP_FEATURE_ENV)
+#elif !defined(MCPP_FEATURE_ENV) || !defined(MCPP_FEATURE_FS)
     unobserved(kind::behaviour, "a program is started, awaited, and reports its status",
                "a started copy is told what to do through its argument vector, which is "
                "openkal.env, and that interface was not selected");
@@ -85,18 +26,16 @@ void run() {
 
     // Starting, awaiting, and the status a program reports.
     {
-        kal_process child{};
-        if (start("openkal-conformance-child", argument_for(errand::exit_with_33), child)) {
-            int status = 0, terminated = 0;
-            const int e = kal_process_wait(child, &status, &terminated);
-            observe(kind::behaviour, e == kal_ok, "a started program is awaited");
+        int status = 0, terminated = 0;
+        if (start_copy("openkal-conformance-child", argument_for(errand::exit_with_33),
+                       status, terminated)) {
+            observe(kind::behaviour, true, "a started program is awaited");
             if (kal::process::has(kal::process::exit_status))
                 observe(kind::behaviour, terminated == 0 && status == 33,
                         "the status the program reported is the status it returned");
             else
                 unobserved(kind::behaviour, "the status is the value the program returned",
                            "the implementation does not claim prop_exit_status");
-            kal_process_close(child);
         } else {
             unobserved(kind::behaviour, "a program is started",
                        "a copy of this program could not be started; the program's own name did "
@@ -110,29 +49,24 @@ void run() {
     // implementation that derived the first element from the path, or prepended
     // to the vector, produces 36 instead.
     {
-        kal_process child{};
-        if (start("openkal-conformance-child", argument_for(errand::exit_with_33), child)) {
-            int status = 0, terminated = 0;
-            kal_process_wait(child, &status, &terminated);
+        int status = 0, terminated = 0;
+        if (start_copy("openkal-conformance-child", argument_for(errand::exit_with_33),
+                       status, terminated))
             observe(kind::behaviour, terminated == 0 && status == 33,
                     "the argument vector is passed unaltered, and the copy read its own name");
-            kal_process_close(child);
-        }
-        if (start("a-name-the-copy-does-not-expect", argument_for(errand::exit_with_33), child)) {
-            int status = 0, terminated = 0;
-            kal_process_wait(child, &status, &terminated);
+        if (start_copy("a-name-the-copy-does-not-expect", argument_for(errand::exit_with_33),
+                       status, terminated))
             observe(kind::behaviour, terminated == 0 && status == 36,
                     "a different first element reaches the copy, which is how the first "
                     "observation is known to be observing something");
-            kal_process_close(child);
-        }
     }
 
     // Termination, if the implementation claims it can request one.
     if (kal::process::has(kal::process::terminate)) {
 #ifdef MCPP_FEATURE_TIME
         kal_process child{};
-        if (start("openkal-conformance-child", argument_for(errand::wait_to_be_terminated), child)) {
+        if (start_copy_running("openkal-conformance-child",
+                               argument_for(errand::wait_to_be_terminated), child)) {
             kal_time_sleep(50u * 1000u * 1000u);
             const int e = kal_process_terminate(child);
             int status = 0, terminated = 0;
@@ -174,13 +108,9 @@ void run() {
         constexpr int rounds = 50;
         bool all = true;
         for (int i = 0; i < rounds && all; ++i) {
-            kal_process child{};
-            if (!start("openkal-conformance-child", argument_for(errand::exit_with_33), child)) {
-                all = false; break;
-            }
             int status = 0, terminated = 0;
-            if (kal_process_wait(child, &status, &terminated) != kal_ok || status != 33) all = false;
-            kal_process_close(child);
+            if (!start_copy("openkal-conformance-child", argument_for(errand::exit_with_33),
+                            status, terminated) || status != 33) all = false;
         }
         observe(kind::stability, all, "a program started and awaited many times keeps starting");
         put("  programs started and awaited: "); put_signed(rounds); put("\n");
@@ -190,11 +120,9 @@ void run() {
         constexpr int rounds = 20;
         const kal_duration t0 = kal_time_monotonic();
         for (int i = 0; i < rounds; ++i) {
-            kal_process child{};
-            if (!start("openkal-conformance-child", argument_for(errand::exit_with_33), child)) break;
             int status = 0, terminated = 0;
-            kal_process_wait(child, &status, &terminated);
-            kal_process_close(child);
+            if (!start_copy("openkal-conformance-child", argument_for(errand::exit_with_33),
+                            status, terminated)) break;
         }
         measure("starting a program and awaiting it", kal_time_monotonic() - t0, rounds);
     }

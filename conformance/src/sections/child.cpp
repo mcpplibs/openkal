@@ -12,6 +12,8 @@ import openkal.abort;
 import openkal.env;
 import openkal.stream;
 import openkal.time;
+import openkal.fs;
+import openkal.process;
 
 namespace okc {
 namespace {
@@ -107,5 +109,99 @@ after g_after;
     }
     kal_exit(35);
 }
+
+// --- where this program is ---------------------------------------------------
+
+#if defined(MCPP_FEATURE_ENV) && defined(MCPP_FEATURE_FS)
+
+namespace {
+
+bool is_separator(char c) { return c == '/' || c == '\\'; }
+
+// Whether `name' is a prefix of `whole' that ends at a component boundary.
+// A supplied directory whose own name ends in a separator --- a volume, on an
+// environment that names volumes --- matches without requiring another.
+bool prefix_at_boundary(const char* name, kal_uintptr nlen,
+                        const char* whole, kal_uintptr wlen) {
+    if (nlen == 0 || nlen > wlen) return false;
+    for (kal_uintptr i = 0; i < nlen; ++i) if (name[i] != whole[i]) return false;
+    if (is_separator(name[nlen - 1])) return true;
+    return nlen == wlen || is_separator(whole[nlen]);
+}
+
+}  // namespace
+
+bool locate_self(kal_dir& base, const char*& relative, kal_uintptr& relative_len) {
+    kal_uintptr len = 0;
+    const char* argv0 = kal_env_arg(0, &len);
+    if (!argv0 || len == 0) return false;
+
+    kal_uintptr best = 0, best_len = 0;
+    bool found = false;
+    for (kal_uintptr i = 0; i < kal_fs_preopen_count(); ++i) {
+        kal_dir d{}; const char* name = nullptr; kal_uintptr nlen = 0;
+        if (kal_fs_preopen(i, &d, &name, &nlen) != kal_ok) continue;
+        if (!prefix_at_boundary(name, nlen, argv0, len)) continue;
+        if (!found || nlen > best_len) { found = true; best = i; best_len = nlen; }
+    }
+
+    if (!found) {
+        // No supplied directory names it, so the name is already relative to
+        // the directory the program was started in --- which is the first
+        // directory the environment supplied.
+        base = kal::fs::working();
+        relative = argv0; relative_len = len;
+        return relative_len > 0;
+    }
+
+    kal_dir d{}; const char* name = nullptr; kal_uintptr nlen = 0;
+    kal_fs_preopen(best, &d, &name, &nlen);
+    base = d;
+    kal_uintptr at = best_len;
+    while (at < len && is_separator(argv0[at])) ++at;
+    relative = argv0 + at;
+    relative_len = len - at;
+    return relative_len > 0;
+}
+
+#else
+
+bool locate_self(kal_dir&, const char*&, kal_uintptr&) { return false; }
+
+#endif
+
+// --- starting a copy ---------------------------------------------------------
+
+#if defined(MCPP_FEATURE_ENV) && defined(MCPP_FEATURE_FS) && defined(MCPP_FEATURE_PROCESS)
+
+bool start_copy_running(const char* first_element, const char* errand_argument,
+                        kal_process& out) {
+    kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
+    if (!locate_self(base, rel, rel_len)) return false;
+
+    const char* argv[2] = { first_element, errand_argument };
+    kal_uintptr lens[2];
+    for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
+
+    const kal_spawn_streams streams{ 0, 0, 0 };
+    return kal_process_spawn(base, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
+                             &streams, &out) == kal_ok;
+}
+
+bool start_copy(const char* first_element, const char* errand_argument,
+                int& status, int& terminated) {
+    kal_process child{};
+    if (!start_copy_running(first_element, errand_argument, child)) return false;
+    const int e = kal_process_wait(child, &status, &terminated);
+    kal_process_close(child);
+    return e == kal_ok;
+}
+
+#else
+
+bool start_copy(const char*, const char*, int&, int&) { return false; }
+bool start_copy_running(const char*, const char*, kal_process&) { return false; }
+
+#endif
 
 }  // namespace okc

@@ -14,8 +14,25 @@
 #define OPENKAL_TYPES_H
 
 /* The width of a machine word, obtained from the compiler rather than from a
- * header, for the reason stated above. */
+ * header, for the reason stated above.
+ *
+ * Two compilers state it and one does not. Where the compiler publishes its own
+ * spelling of the type, that spelling is used and the definition is exact. The
+ * remaining compiler publishes the property the type is defined by --- the width
+ * of a pointer --- and not the type, so the type is written from the property.
+ * Taking it from that compiler's own header instead would give this file an
+ * include, and the consumer this file exists for has none. */
+#if defined(__UINTPTR_TYPE__)
 typedef __UINTPTR_TYPE__ kal_uintptr;
+#elif defined(_MSC_VER)
+#  if defined(_WIN64)
+typedef unsigned __int64 kal_uintptr;
+#  else
+typedef unsigned int kal_uintptr;
+#  endif
+#else
+#  error "openkal requires a compiler that states the width of a pointer"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
