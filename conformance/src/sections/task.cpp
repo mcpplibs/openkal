@@ -3,6 +3,7 @@ module okc.task;
 import openkal.types;
 import openkal.task;
 import openkal.time;
+import okc.atomic;
 import okc.report;
 import okc.spec;
 
@@ -27,17 +28,16 @@ struct mutex {
 
     void lock() {
         kal_u32 expected = 0;
-        if (__atomic_compare_exchange_n(&state, &expected, 1u, false,
-                                        __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) return;
+        if (compare_exchange(&state, expected, 1u)) return;
         for (;;) {
-            const kal_u32 previous = __atomic_exchange_n(&state, 2u, __ATOMIC_ACQUIRE);
+            const kal_u32 previous = exchange(&state, 2u);
             if (previous == 0) return;
             kal_task_wait(const_cast<const kal_u32*>(&state), 2u, 0);
         }
     }
 
     void unlock() {
-        if (__atomic_exchange_n(&state, 0u, __ATOMIC_RELEASE) == 2u) {
+        if (exchange(&state, 0u) == 2u) {
             kal_uintptr woken = 0;
             kal_task_wake(const_cast<const kal_u32*>(&state), 1, &woken);
         }
@@ -63,8 +63,8 @@ kal_uintptr              g_identity = 0;
 
 void sets_the_word(void*) {
     g_identity = kal_task_current();
-    __atomic_store_n(&g_ran, 1, __ATOMIC_RELEASE);
-    __atomic_store_n(&g_word, 1u, __ATOMIC_RELEASE);
+    store_release(&g_ran, 1);
+    store_release(&g_word, 1u);
     kal_uintptr woken = 0;
     kal_task_wake(const_cast<const kal_u32*>(&g_word), 1, &woken);
 }
@@ -74,7 +74,7 @@ volatile int     g_saw = -1;
 
 void records_its_own(void*) {
     g_per_context = 7;
-    __atomic_store_n(&g_saw, g_per_context, __ATOMIC_RELEASE);
+    store_release(&g_saw, g_per_context);
 }
 
 void does_nothing(void*) { }
@@ -103,9 +103,9 @@ void run() {
             // and is the whole reason the operation exists. The loop
             // re-examines the condition after waking, because waking is
             // permitted to be spurious.
-            while (__atomic_load_n(&g_word, __ATOMIC_ACQUIRE) == 0)
+            while (load_acquire(&g_word) == 0)
                 kal_task_wait(const_cast<const kal_u32*>(&g_word), 0u, 0);
-            observe(kind::behaviour, __atomic_load_n(&g_ran, __ATOMIC_ACQUIRE) == 1,
+            observe(kind::behaviour, load_acquire(&g_ran) == 1,
                     "the started context ran");
             observe(kind::behaviour, kal_task_join(t) == kal_ok, "the context is awaited");
             observe(kind::behaviour, g_identity != kal_task_current(),
@@ -158,7 +158,7 @@ void run() {
         if (kal_task_start(records_its_own, nullptr, &t) == kal_ok) {
             kal_task_join(t);
             observe(kind::behaviour,
-                    __atomic_load_n(&g_saw, __ATOMIC_ACQUIRE) == 7 && g_per_context == 3,
+                    load_acquire(&g_saw) == 7 && g_per_context == 3,
                     "a started context observes its own thread-local storage");
         } else {
             unobserved(kind::behaviour, "a started context observes its own thread-local storage",
