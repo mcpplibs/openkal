@@ -92,6 +92,14 @@ starts a second copy with a *different* first element and requires the copy to
 report *that*. Without the second, an implementation that ignored the vector
 entirely and passed a fixed name would satisfy the first.
 
+**An identity is compared with its peers, not with the observer.** The suite
+requires the identities of four contexts that ran at the same time to be distinct
+*from each other*. Comparing each with the starting context's identity is
+satisfied by an implementation that answers one wrong value for all of them — and
+one did: it answered zero for every context it started, which differs from the
+starting context's identity and is useless to a consumer, because zero is what a
+table keyed on the identity reads as "no entry".
+
 **A claim is checked.** An implementation that claims `prop_wait_timeout` is
 required to have a wait that times out; one that claims `prop_thread_local` is
 required to give a started context its own instance of a `thread_local`
