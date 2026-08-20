@@ -1,10 +1,13 @@
-# openkal Specification, version 0.4
+# openkal Specification, version 0.5
 
 ## 1. Scope
 
 openkal defines an interface between a program and the environment that
-executes it. The interface is stated as a C application binary interface and is
-distributed as a set of C++ modules that declare it.
+executes it. The interface is stated as a C application binary interface. It is
+distributed as a set of C headers that declare it and a set of C++ modules that
+export those declarations, so that a consumer written in either language
+reaches the same entities. Clause 4.2 records why the second way of reaching
+them is not a convenience.
 
 The specification has two audiences. An *implementation* supplies the functions
 declared here and is judged by whether it can do so without constructing a
@@ -40,7 +43,7 @@ provides an interface in whole or not at all.
 | `openkal.task` | an execution context, and a suspension primitive | standard |
 | `openkal.event` | readiness of a set of resources | reserved |
 
-Version 0.3 specifies the core and standard interfaces. The optional rows are
+Version 0.5 specifies the core and standard interfaces. The optional rows are
 specified; the reserved row is not, and its name shall not be used for other
 purposes.
 
@@ -89,17 +92,25 @@ all yield a byte stream. That decomposition was withdrawn for three reasons.
 The stream is therefore the shared currency of the specification and not its
 common entrance.
 
-## 4. Module organisation
+## 4. Organisation of the declarations
 
-The specification package provides one module per interface. An implementation
-provides no module at all.
+The specification package provides one header per interface, which is where the
+declarations are, and one module per interface, which exports them. An
+implementation provides neither.
 
-| Module | Provided by | Imported by |
+| Interface | Module | Header |
 | --- | --- | --- |
-| `openkal.types` | the specification package | the other interface modules |
-| `openkal.abort` | the specification package | consumers, implementations |
-| `openkal.stream` | the specification package | consumers, implementations |
-| `openkal.memory` | the specification package | consumers, implementations |
+| shared definitions | `openkal.types` | `openkal/types.h` |
+| `openkal.abort` | `openkal.abort` | `openkal/abort.h` |
+| `openkal.stream` | `openkal.stream` | `openkal/stream.h` |
+| `openkal.memory` | `openkal.memory` | `openkal/memory.h` |
+| `openkal.env` | `openkal.env` | `openkal/env.h` |
+| `openkal.time` | `openkal.time` | `openkal/time.h` |
+| `openkal.fs` | `openkal.fs` | `openkal/fs.h` |
+| `openkal.process` | `openkal.process` | `openkal/process.h` |
+| `openkal.task` | `openkal.task` | `openkal/task.h` |
+
+`openkal.h` includes every header, for a consumer that uses several.
 
 A consumer imports the interface. An implementation imports the same interface,
 because it needs the declarations it is defining, and it exports nothing.
@@ -121,7 +132,81 @@ not a restriction that must be enforced; it follows from the arrangement. An
 implementation may of course publish additional facilities, and it does so in
 its own modules, which a consumer that uses them must import by name.
 
-### 4.2 Absence of an implementation
+### 4.2 One statement of the declarations, two ways to reach it
+
+The contract is a C application binary interface. The specification package
+states it once, as a C header per interface, and provides a C++ module per
+interface that includes that header in its global module fragment and exports
+the names it declares.
+
+The second way of reaching the declarations is not a convenience. A C++
+consumer imports the module for the interface it uses; a consumer written in C
+cannot, because a C translation unit has no import. The canonical consumer
+written in C is a C library being ported onto openkal, which is the case clause
+1 names first, so a specification reachable only by import would be unusable by
+the consumer it exists for. Version 0.4 was reachable only by import, and the
+omission was found by attempting that port.
+
+The arrangement is deliberately not two statements that agree. A module that
+re-declared what the header declares would be a second declaration of the same
+contract, and two declarations drift; here there is one declaration, and the
+module exports it. A consumer that imports and a consumer that includes
+therefore obtain the same entities, and no procedure is required to keep them
+equal because they are not two things.
+
+The headers include no header of their own, name no library, and obtain the
+width of a machine word from the compiler. The second way of reaching the
+declarations therefore adds nothing to what the specification package requires,
+which remains nothing.
+
+#### What the module adds
+
+The module is not a translation of the header. It carries what C++ can check
+and C cannot, and both are checks rather than facilities.
+
+**The frozen layouts are asserted.** Clause 5.3 declares the layout of every
+structure immutable. A declaration that something shall not change is not a
+mechanism; `static_assert` is. `kal_io_result` being two machine words is the
+difference between a result returned in registers and one returned through a
+hidden pointer, which is a change of calling convention that no declaration
+would report and that a consumer built against the earlier layout would not
+survive.
+
+**The capability words become types that cannot be mixed.** Clause 6.2 gives
+each interface a word and positions within it, and every such word is a
+`kal_uintptr`. A program that tests a file-system position against the task
+word therefore compiles, runs, and answers a question nobody asked; the
+position numbers are small and several interfaces have assigned the same ones,
+so the answer is frequently the plausible one. In the module each interface's
+positions carry the interface in their type, the operations that compose them
+are defined only within one interface, and the mistake becomes a diagnostic.
+Nothing is stored beyond the word and every operation is constant-evaluated.
+
+The same reasoning applies to the flags of `kal_fs_open`, which are an intent
+rather than a property and are a distinct type from either.
+
+#### Arrangements considered and not adopted
+
+**Two declarations, compared by a procedure.** Not adopted: it is the
+arrangement this clause exists to avoid, and a procedure that compares them is
+a thing that can be omitted, skipped or made to pass.
+
+**Generating the header from the modules.** Not adopted: it makes the module
+form normative, which contradicts clause 1, and it introduces a generator,
+which is a build-time dependency the specification package is written to avoid
+having.
+
+**Leaving the C form to each implementation.** Not adopted for the reason
+clause 4.1 gives: a name the consumer relies upon would be under the control of
+a party the specification does not govern, and a C library ported onto openkal
+would take its declarations from whichever implementation it happened to be
+built against.
+
+**A second package carrying the C form.** Not adopted: one contract in two
+packages can be resolved at two versions, and the property a contract has is
+that there is one of it.
+
+### 4.3 Absence of an implementation
 
 A consumer that depends upon the specification and upon no implementation
 compiles and fails to link, and the diagnostic names the undefined functions:
@@ -154,6 +239,21 @@ Detail beyond these values is not available. A per-thread channel carrying the
 environment's own error value was considered and rejected: such a channel is
 global mutable state with the defects of `errno`, and control flow that consults
 it is not portable.
+
+Version 0.5 adds five values, and records why, because the set being closed
+makes an addition to it the kind of change a reader is entitled to see argued.
+
+| Value | Why the set could not express it |
+| --- | --- |
+| `kal_err_not_found` | Clause 7.7 already required it. The value did not exist, so both implementations reported a missing name as `kal_err_invalid`, and a caller could not distinguish a name that is absent from a handle that is wrong. The defect was in the enumeration rather than in the implementations. |
+| `kal_err_exists` | `kal_fs_open` with `exclusive`, and `kal_fs_mkdir`, fail because the name is already there. It is an expected outcome, and mapping it to `kal_err_io` would report a medium failure for one. |
+| `kal_err_not_empty` | Removing a directory that is not empty. Same reasoning. |
+| `kal_err_is_directory` | A file operation applied to a directory. |
+| `kal_err_not_directory` | A directory operation applied to a file, and a component of a name that is not a directory. |
+
+The addition is governed by clause 8, which admits new declarations. A value
+already assigned retains its meaning, so a program compiled against version 0.4
+observes the same values for the same conditions as before.
 
 ### 5.3 Structure layouts
 
@@ -193,6 +293,14 @@ and the positions within it. A position, once assigned, retains its meaning; a
 position that has not been assigned reads as zero, so that a program compiled
 against a later specification behaves correctly against an earlier
 implementation.
+
+A property that varies between the *resources* of an interface rather than
+between implementations cannot be a word, because there is no one answer to
+record in it. Such a property is reported by an enquiry taking the resource.
+`kal_stream_props` is the example: the same implementation answers differently
+for a terminal and for a file. The enquiry is not the defect clause 6.4
+describes, because it is not an operation upon the resource --- nothing is
+transferred, and no resource can fail to answer.
 
 Information therefore becomes available at three times, each being the earliest
 at which it exists.
@@ -364,18 +472,114 @@ implementation that reports absence as a failure obliges every caller to
 distinguish that failure from the ones that denote a broken enquiry — a
 directory it may not read, a name it may not resolve.
 
-`kal_fs_open_file` and `kal_fs_open_dir` are access rather than enquiry, and
-shall report a name that does not exist as `kal_err_not_found`.
+`kal_fs_open_file`, `kal_fs_open` and `kal_fs_open_dir` are access rather than
+enquiry, and shall report a name that does not exist as `kal_err_not_found`.
 
 The distinction is the same one `openkal.env` draws between a variable that is
 absent and one whose value is empty, and it is drawn for the same reason: a
 caller that cannot tell them apart cannot act correctly upon either.
 
-### 7.8 Termination
+### 7.8 Stating the whole of an intent when opening
+
+`kal_fs_open` takes a flags word. The two-flag form of version 0.3 remains
+specified and remains available, and an implementation ordinarily defines it in
+terms of the flags form.
+
+The reason for the addition is that three of the conditions a C library must
+express cannot be reconstructed above the two-flag form without making the
+caller silently wrong, which clause 3.1 identifies as the boundary between a
+supply and a simulation.
+
+| Condition | What reconstruction above the two-flag form produces |
+| --- | --- |
+| truncate | Opening and then setting the length is two operations. A program that stops between them leaves the tail of a longer previous contents behind, and the file is neither the old one nor the new one. |
+| exclusive | Enquiring and then opening is not exclusion. Between the two, another context creates the name, and the caller that asked to be the creator is not. |
+| append | Seeking to the end and then writing is not appending. A second writer between the two produces an overwrite, and neither writer observes that it happened. |
+
+`kal_fs_truncate` and `kal_fs_file_info` are added for the same reason and are
+recorded here rather than in a list of conveniences. Setting the length of an
+open file is not expressible through any other operation. Enquiring about an
+open file is not expressible through `kal_fs_info`: the name a file was opened
+by may since have been removed or given to another file, so a C library
+answering the enquiry from the name would answer about a different file than
+the one the caller holds.
+
+### 7.9 Termination
 
 `kal_exit` shall terminate immediately. Registered exit handlers and static
 destructors shall not run. An implementation that runs them prevents a caller
 from reasoning about what executes after the call.
+
+### 7.10 Thread-local storage in a started context
+
+`openkal.task` reports, through `kal_task_props`, whether a context started by
+`kal_task_start` observes the thread-local storage of the toolchain that
+compiled the program.
+
+It is reported rather than provided. The register convention that delivers
+thread-local storage belongs to openarch (clause 10), and an operation here
+that installed a thread pointer would place a processor's calling convention in
+an interface that is meant to be independent of it.
+
+The property is reported because a C library ported onto openkal keeps its
+per-context state --- its error value, its locale, its cancellation state --- in
+one such variable, and therefore cannot be ported onto an implementation whose
+contexts lack it. Reporting the property allows the library to state that
+requirement. An implementation whose contexts are the host's threads has the
+property without doing anything; an implementation upon a scheduler of its own
+has it only if it establishes the convention, and one that does not shall report
+the position as zero rather than leave the question to be discovered.
+
+### 7.11 The inverse of an enquiry
+
+An interface that reports a property of a resource and offers no way to set it
+is incomplete wherever the property is one the environment records rather than
+derives.
+
+`kal_fs_file_info` reports the time at which a file was last modified.
+`kal_fs_set_modified` sets it. The operation was added in version 0.5 because
+three ordinary programs — one that copies a file and preserves its dates, one
+that extracts an archive, and one whose whole purpose is to mark a file as
+current — could not be written above the interface without it, and each of them
+is a program a C library above openkal is expected to host. The absence was not
+visible in the specification text; it became visible when such programs were
+compiled above an implementation.
+
+It takes the open file rather than the name, for the reason given at
+`kal_fs_file_info`: the name may since refer to something else, and setting the
+time of the wrong file is a worse outcome than not setting it.
+
+The three environments openkal has been implemented on record the time to a
+nanosecond, to a microsecond and to a hundred nanoseconds respectively. The
+interface states the value in nanoseconds and does not require that it be
+returned unchanged; the conformance procedure compares whole seconds, which is
+the resolution every environment that records the time at all agrees upon. An
+interface that required more would be requiring of every environment what one of
+them happens to provide.
+
+An implementation whose environment does not record the time at all does not
+claim `KAL_FS_PROP_MODIFIED_TIME` and reports `kal_err_not_supported`. An
+implementation that claims the position is required to perform the operation:
+clause 6.2 exists so that a claim is a claim about what can be done.
+
+### 7.12 One reserved name
+
+`openkal.fs` names things relative to a directory the program holds, and every
+operation that answers a question about a thing takes a name. A program holding
+a directory therefore had no way to ask a question about *that* directory: what
+it is, when it last changed, whether it can be written. The handle is not a
+name, and no operation took a handle alone.
+
+The remedy is one reserved word rather than five more operations. `"."` denotes
+the directory itself, wherever a name is accepted. It does not introduce a way
+to ascend, so the confinement clause 7.1 depends upon is unaffected; and every
+environment openkal has been implemented on can express it, two of them because
+their own naming already reserves the same word and the third because its
+object manager expresses the same thing as an empty name beside the directory's
+handle.
+
+`".."` remains invalid. The asymmetry is the point: the first names the thing
+the program already holds, and the second names something it does not.
 
 ## 8. Evolution
 
@@ -392,7 +596,8 @@ source.
 
 ## 9. Conformance procedure
 
-A conformance suite shall verify both halves of an implementation's claim.
+A conformance suite shall verify both halves of an implementation's claim, and
+the specification package shall verify the third.
 
 1. **Behaviour.** Every operation the implementation declares shall behave as
    this specification requires.
@@ -402,6 +607,15 @@ A conformance suite shall verify both halves of an implementation's claim.
    artefact and is therefore neither slow nor susceptible to incomplete
    coverage, and it is the half that detects an implementation which has
    extended the interface rather than implemented it.
+
+3. **Declarations.** The declarations, clause 4.2, shall be compared against
+   `SURFACE.txt` by compiling a translation unit that names every entity the
+   list contains. This half belongs to the specification package rather than to
+   an implementation. It does not compare the two ways of reaching the
+   declarations with each other, because there is one declaration and no
+   comparison to make; what it detects is a name the list requires and the
+   header does not declare. The translation unit is compiled without the
+   environment's headers, because the consumer the header exists for is.
 
 Behavioural conformance cannot be established exhaustively, and this
 specification does not claim otherwise. An implementation may export the correct

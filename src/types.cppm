@@ -1,48 +1,99 @@
 // openkal.types --- definitions shared by every openkal interface.
 //
-// The declarations in this module are normative. An implementation package
-// re-exports them unchanged; it may not redefine them. That prohibition is
-// enforced by the language rather than by convention: a module that redeclares
-// an imported type is rejected by the compiler.
+// There is one statement of the declarations and two ways to reach it. The
+// statement is the C header, because the contract is a C application binary
+// interface; this module includes it in its global module fragment and exports
+// the names, so a consumer that imports and a consumer that includes obtain
+// the same entities rather than two declarations that agree today.
+//
+// What the module adds is not a second declaration. It is what C++ can check
+// and C cannot: the layouts clause 5.3 freezes are asserted here, and the
+// capability words become types that cannot be mixed.
+module;
+#include <openkal/types.h>
+
 export module openkal.types;
 
-// The width of a machine word, obtained from the compiler rather than from a
-// header. A freestanding target may have no <cstdint>, and openkal is required
-// to be usable on such a target.
-export using kal_uintptr = __UINTPTR_TYPE__;
+// The width of a machine word, and the three fixed widths the operations use.
+export using ::kal_uintptr;
+export using ::kal_u32;
+export using ::kal_u64;
+export using ::kal_i64;
 
-// The complete set of error conditions openkal defines.
-//
-// The set is closed. An implementation maps its platform's error values onto
-// these; it does not extend the set. Mapping is not emulation: a table lookup
-// preserves the property that every backend implements the interface naturally,
-// whereas reproducing a foreign error namespace does not.
-//
-// Detail beyond these values is deliberately unavailable. A per-thread channel
-// carrying the platform's own error value was considered and rejected, because
-// such a channel is global mutable state with the same defects as errno, and
-// because control flow that depends on it is not portable by construction.
-export enum kal_error : int {
-    kal_ok             = 0,
-    kal_err_invalid    = 1,   // the handle or an argument is not valid
-    kal_err_again      = 2,   // the operation would block and blocking was not requested
-    kal_err_io         = 3,   // the device or medium reported a failure
-    kal_err_no_memory  = 4,
-    kal_err_no_space   = 5,
-    kal_err_permission = 6,
-    kal_err_not_supported = 7,
-    kal_err_closed     = 8,   // the peer closed the connection
-};
+// The complete set of error conditions openkal defines. The set is closed: an
+// implementation maps its environment's error values onto these and does not
+// extend them.
+export using ::kal_error;
+export using ::kal_ok;
+export using ::kal_err_invalid;
+export using ::kal_err_again;
+export using ::kal_err_io;
+export using ::kal_err_no_memory;
+export using ::kal_err_no_space;
+export using ::kal_err_permission;
+export using ::kal_err_not_supported;
+export using ::kal_err_closed;
+export using ::kal_err_not_found;
+export using ::kal_err_exists;
+export using ::kal_err_not_empty;
+export using ::kal_err_is_directory;
+export using ::kal_err_not_directory;
 
 // The result of an operation that transfers a count.
+export using ::kal_io_result;
+
+// Clause 5.3 declares the layout of every structure immutable. A declaration
+// that something shall not change is not a mechanism; this is the mechanism.
+// Two machine words are returned in registers on the architectures openkal
+// targets, and a wider result would be returned through a hidden pointer
+// instead --- a change of calling convention that no declaration would report
+// and that a consumer built against the earlier layout would not survive.
+static_assert(sizeof(kal_io_result) == 2 * sizeof(kal_uintptr),
+              "kal_io_result must remain two machine words: clause 5.3");
+static_assert(alignof(kal_io_result) == alignof(kal_uintptr));
+static_assert(__builtin_offsetof(kal_io_result, n) == 0);
+static_assert(__builtin_offsetof(kal_io_result, e) == sizeof(kal_uintptr));
+static_assert(sizeof(kal_uintptr) == sizeof(void*),
+              "kal_uintptr must hold a pointer: clause 5.1");
+
+export namespace kal {
+
+// A capability word, carrying the interface it belongs to in its type.
 //
-// The layout of this structure is frozen. openkal's evolution rule permits new
-// declarations and forbids changes to existing ones; a structure layout is not
-// protected by that rule unless the layout itself is declared immutable, which
-// it is here. Two machine words are returned in registers on the architectures
-// openkal targets, and a wider result would be returned through a hidden
-// pointer instead.
-export struct kal_io_result {
-    kal_uintptr n;
-    int         e;
+// Clause 6.2 gives each interface a word named kal_<interface>_props and
+// positions within it. Every such word is a kal_uintptr, so a program that
+// tests a file-system position against the task word compiles, runs, and
+// answers a question nobody asked. The position numbers are small and several
+// interfaces have assigned the same ones, so the answer is frequently the
+// plausible one.
+//
+// The tag makes the two words different types. The operations that compose
+// positions are defined only between positions of one interface, so the
+// mistake is a diagnostic rather than a result. Nothing is stored beyond the
+// word itself and every operation is constant-evaluated, so the type occupies
+// the same register the plain word did.
+template <class Tag>
+struct props {
+    kal_uintptr bits;
+
+    constexpr props() : bits(0) {}
+    constexpr explicit props(kal_uintptr b) : bits(b) {}
+
+    friend constexpr props operator|(props a, props b) { return props{a.bits | b.bits}; }
+    friend constexpr props operator&(props a, props b) { return props{a.bits & b.bits}; }
+    friend constexpr bool  operator==(props a, props b) { return a.bits == b.bits; }
+
+    // Whether every position in `p` is present. The question a program asks is
+    // "may I do this", and a program that requires two properties asks it once
+    // rather than twice, so the test is written for a set and not for a bit.
+    constexpr bool has(props p) const { return (bits & p.bits) == p.bits; }
+
+    constexpr explicit operator bool() const { return bits != 0; }
 };
+
+// Reads a capability word an implementation defined, as the type of the
+// interface it belongs to.
+template <class Tag>
+constexpr props<Tag> read_props(const kal_uintptr& word) { return props<Tag>{word}; }
+
+}  // namespace kal

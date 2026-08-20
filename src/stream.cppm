@@ -12,52 +12,44 @@
 // failure for a pipe. An interface that offered positioning on every stream
 // would therefore contain an operation that some streams can never satisfy,
 // which is the defect this specification's decomposition exists to avoid.
+module;
+#include <openkal/stream.h>
+
 export module openkal.stream;
 export import openkal.types;
 
-// An opaque handle occupying one machine word.
-//
-// The width is fixed and the interpretation is not. An implementation stores
-// whatever it natively uses: a descriptor, an operating-system handle, a
-// pointer to a driver structure, or a capability index. No implementation is
-// required to maintain a translation table, and the absence of that requirement
-// is what allows openkal to be implemented above a C library, below one, or
-// without one.
-export struct kal_stream { kal_uintptr h; };
+// An opaque handle occupying one machine word. The width is fixed and the
+// interpretation is not: an implementation stores whatever it natively uses ---
+// a descriptor, an operating-system handle, a pointer to a driver structure, a
+// capability index. No implementation is required to maintain a translation
+// table, and the absence of that requirement is what allows openkal to be
+// implemented above a C library, below one, or without one.
+export using ::kal_stream;
 
-export extern "C" {
+export using ::kal_stdin;
+export using ::kal_stdout;
+export using ::kal_stderr;
+export using ::kal_stream_write;
+export using ::kal_stream_read;
+export using ::kal_stream_flush;
+export using ::kal_stream_props;
 
-// The program's standard streams. These handles are borrowed: the caller does
-// not own them and does not close them.
-kal_stream kal_stdin (void);
-kal_stream kal_stdout(void);
-kal_stream kal_stderr(void);
-
-// Transfers the whole buffer, or reports the condition that prevented it.
-//
-// A partial transfer is not a successful outcome. The alternative convention,
-// in which the caller inspects the count and repeats the call, places the same
-// loop in every caller and has been a recurring source of defects in interfaces
-// that adopted it. The loop belongs in the implementation, which is written
-// once.
-//
-// On failure, `n` reports how many bytes were transferred before the failure.
-kal_io_result kal_stream_write(kal_stream s, const void* buf, kal_uintptr len);
-
-// Transfers at most `len` bytes and reports how many were transferred. A
-// result of zero bytes with `kal_ok` indicates end of input; unlike a partial
-// write, a partial read carries information the caller needs.
-kal_io_result kal_stream_read(kal_stream s, void* buf, kal_uintptr len);
-
-// Commits any buffering the implementation performs. An implementation that
-// does not buffer returns `kal_ok`.
-int kal_stream_flush(kal_stream s);
-
-}
+static_assert(sizeof(kal_stream) == sizeof(kal_uintptr),
+              "a handle occupies one machine word: clause 7.2");
 
 export namespace kal {
 
 using stream = kal_stream;
+
+// The tag exists only to distinguish this interface's capability word from
+// another's; it is never defined and never instantiated.
+struct stream_props_tag;
+using stream_props = props<stream_props_tag>;
+
+namespace stream_prop {
+// Positions in the result of kal_stream_props.
+inline constexpr stream_props interactive{KAL_STREAM_PROP_INTERACTIVE};
+}
 
 inline stream in ()  { return kal_stdin();  }
 inline stream out()  { return kal_stdout(); }
@@ -65,19 +57,11 @@ inline stream err()  { return kal_stderr(); }
 
 inline kal_io_result write(stream s, const void* p, kal_uintptr n) { return kal_stream_write(s, p, n); }
 inline kal_io_result read (stream s, void* p, kal_uintptr n)       { return kal_stream_read(s, p, n); }
-inline int           flush(stream s)                                { return kal_stream_flush(s); }
+inline int           flush(stream s)                               { return kal_stream_flush(s); }
 
-// --- Optional capabilities -------------------------------------------------
-//
-// Version 0.2 defines none. The mechanism by which an optional operation would
-// be expressed is deferred until one exists, and clause 6 of the specification
-// records the candidates together with the constraint each carries.
-//
-// An earlier draft placed a fallback overload here, to be displaced by an
-// implementation declaring its own. That arrangement requires the
-// implementation's declarations to be visible to the consumer, which requires
-// the implementation to own the module the consumer imports, which contradicts
-// the layering this specification adopts. The fallback was removed with the
-// mechanism it belonged to.
+// The properties of one stream, as a set that cannot be confused with another
+// interface's. A caller asks whether a stream is interactive before it has
+// transferred anything, because that is when the answer changes what it does.
+inline stream_props properties(stream s) { return stream_props{kal_stream_props(s)}; }
 
 }

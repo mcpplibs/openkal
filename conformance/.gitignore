@@ -1,0 +1,4 @@
+target/
+mcpp.lock
+*.tmp
+okc-conformance*

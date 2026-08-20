@@ -1,7 +1,8 @@
 # openkal
 
 openkal is a portable kernel application binary interface. This repository
-contains the normative specification and the C++ modules that declare it.
+contains the normative specification, the declarations in both of the forms it
+distributes them in, and the suite an implementation runs against itself.
 
 The specification is [`SPEC.md`](SPEC.md).
 
@@ -11,17 +12,42 @@ Declarations, and no definitions. Every function declared here is supplied by an
 implementation package; building this package alone produces a library with
 undefined references, which is the intended outcome.
 
-| Module | Interface | Class |
-| --- | --- | --- |
-| `openkal.types` | machine word, error values, transfer result | — |
-| `openkal.abort` | termination | core |
-| `openkal.stream` | byte streams | core |
-| `openkal.memory` | allocation | core |
-| `openkal.env` | the parameters a program receives at inception | standard |
-| `openkal.time` | monotonic and wall time sources | standard |
-| `openkal.fs` | directories and open files, relative throughout | standard |
-| `openkal.process` | starting a program and waiting for it | standard |
-| `openkal.task` | execution contexts, and the primitive they are built upon | standard |
+| Module | Header | Interface | Class |
+| --- | --- | --- | --- |
+| `openkal.types` | `openkal/types.h` | machine word, error values, transfer result | — |
+| `openkal.abort` | `openkal/abort.h` | termination | core |
+| `openkal.stream` | `openkal/stream.h` | byte streams | core |
+| `openkal.memory` | `openkal/memory.h` | allocation | core |
+| `openkal.env` | `openkal/env.h` | the parameters a program receives at inception | standard |
+| `openkal.time` | `openkal/time.h` | monotonic and wall time sources | standard |
+| `openkal.fs` | `openkal/fs.h` | directories and open files, relative throughout | standard |
+| `openkal.process` | `openkal/process.h` | starting a program and waiting for it | standard |
+| `openkal.task` | `openkal/task.h` | execution contexts, and the primitive they are built upon | standard |
+
+### One statement of the declarations, two ways to reach it
+
+The contract is a C application binary interface, and a C translation unit has
+no `import`. The canonical consumer of this contract — a C library ported onto
+openkal — *is* a C translation unit, so the declarations are distributed in both
+forms.
+
+The header is the statement. The module includes it in its global module
+fragment and exports the names, so a consumer that imports and a consumer that
+includes obtain the same entities rather than two declarations that agree today.
+What the module adds is not a second declaration: it is what C++ can check and C
+cannot — the layouts clause 5.3 freezes are asserted there, and the capability
+words become types that cannot be mixed.
+
+`SURFACE.txt` is normative, and both forms are compared against it:
+
+| | |
+| --- | --- |
+| `tools/check-declarations.sh` | compiles a translation unit naming every entity, with `-nostdinc` — because the consumer the header exists for is compiled that way |
+| a test in each implementation | the same list, reached through `import openkal.*` |
+| `conformance/src/declarations.c` | the same list again, compiled by every toolchain that builds the suite |
+
+The header includes nothing. openkal must be usable on a freestanding target,
+and a consumer compiled with `-nostdinc` has nothing to include.
 
 ## How a program uses openkal
 
@@ -31,10 +57,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.3.0"
+openkal = "0.5.0"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.3.0"
+openkal-linux = "0.5.0"
+
+[target.'cfg(os = "macos")'.dependencies]
+openkal-macos = "0.3.0"
+
+[target.'cfg(windows)'.dependencies]
+openkal-windows = "0.1.0"
 ```
 
 The program imports the interface and names no implementation.
@@ -49,21 +81,64 @@ int main() {
 }
 ```
 
-Changing the implementation is a change to the second dependency. The source
+Changing the implementation is a change to one line of the manifest. The source
 does not change, and this property is the reason the specification exists.
 
 ## How an implementation is written
 
-An implementation provides definitions and no modules. It imports the same
-interface a consumer imports, because it needs the declarations it is defining,
-and it exports nothing: the interface belongs to this package. The reference
-implementation is
-[`openkal-linux`](https://github.com/mcpplibs/openkal-linux), which is
-maintained as a worked example in addition to being usable.
+An implementation provides definitions and no modules. It reaches the
+declarations it is defining and exports nothing: the interface belongs to this
+package.
 
-Clause 4 of the specification states how the modules are organised, clause 6
-states how the absence of an interface is expressed, and clause 7 states the
-requirements an implementation must satisfy.
+| | |
+| --- | --- |
+| [`openkal-linux`](https://github.com/mcpplibs/openkal-linux) | on the kernel's own system-call interface |
+| [`openkal-macos`](https://github.com/mcpplibs/openkal-macos) | on the kernel's own calls, and two names no C library defines |
+| [`openkal-windows`](https://github.com/mcpplibs/openkal-windows) | on Win32 and the object manager beneath it, using no C runtime symbol |
+
+Clause 4 states how the declarations are organised, clause 6 states how the
+absence of an interface is expressed, and clause 7 states the requirements an
+implementation must satisfy.
+
+## Conformance
+
+Clause 9 has two halves, and both are here.
+
+**The artefact.** `tools/check-surface.sh` compares an implementation's exported
+names against `SURFACE.txt`. It detects the one freedom an implementation retains
+after the language has removed the others: the addition of names.
+
+**The behaviour.** [`conformance/`](conformance/) is a program an implementation
+runs against itself — 97 observations across eight interfaces, in four kinds:
+behaviour, ABI, stability and cost.
+
+```bash
+# from an implementation's working tree
+bash /path/to/openkal/tools/run-conformance.sh openkal-linux . full
+```
+
+It is composable, because openkal is: an implementation provides an interface in
+whole or not at all, so each interface is a feature and a run reports on what was
+selected. It reports three counts, and the third is the one to read —
+`97 held, 0 did not hold, 0 not observed` — because a suite that reported only
+the first two cannot distinguish an interface that behaved from one it never
+examined.
+
+It depends on openkal and the language. There is no `import std`: the suite must
+run against an implementation in a program that carries no other runtime, and a
+suite resting on facilities that implementation may be the only supplier of would
+be reporting on itself.
+
+## What is built, and by what
+
+Three compiler families across three systems, because a contract that holds only
+under the compiler its author used is a description of that compiler.
+
+| | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| gcc | ✓ | — | ✓ (PE, GNU CRT) |
+| llvm | ✓ | ✓ | ✓ (MSVC ABI) |
+| msvc | — | — | ✓ |
 
 ## License
 

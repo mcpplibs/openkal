@@ -1,24 +1,123 @@
 name: CI
 
+# What this workflow asserts about the specification.
+#
+# A specification is a claim about programs, so the claims are tested by
+# building and running programs rather than by reading the text. There are four:
+#
+#   declarations  the two forms compile, under three compiler families and on
+#                 three systems, and declare the same entities
+#   substitution  a program's source is invariant under a change of
+#                 implementation, and the check that says so fails when it should
+#   conformance   the suite in this repository runs against the implementation
+#                 for each system and every observation holds
+#   composability an implementation that provides three interfaces is examined
+#                 for three, rather than failing to link
+#
+# The three compiler families are covered because the specification is a
+# contract and a contract that holds only under the compiler its author used is
+# a description of that compiler.
+
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
 
+env:
+  # A version verified to build these packages, not a measured minimum. The pin
+  # exists for reproducibility rather than because an older mcpp is known to
+  # fail.
+  MCPP_VERSION: 2026.8.19.4
+  XLINGS_VERSION: v2026.8.17.2
+  XLINGS_NON_INTERACTIVE: '1'
+
 jobs:
-  build:
-    name: declarations compile, and substitution holds
+  # ---------------------------------------------------------------------------
+  # The declarations compile, everywhere, in both forms.
+  declarations:
+    name: declarations (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, toolchain: 'gcc@16.1.0'  }
+          - { os: ubuntu-24.04, toolchain: 'llvm@22.1.8' }
+          - { os: macos-14,     toolchain: 'llvm@20.1.7' }
+          - { os: windows-2022, toolchain: 'llvm@20.1.7' }
+          - { os: windows-2022, toolchain: 'msvc@system' }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xlings and mcpp (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/openxlings/xlings/main/tools/other/quick_install.sh \
+            | bash -s "$XLINGS_VERSION"
+          echo "$HOME/.xlings/subos/current/bin" >> "$GITHUB_PATH"
+
+      - name: Install xlings and mcpp (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          irm https://d2learn.org/xlings-install.ps1.txt | iex
+          # The installer amends the user's environment; a later step in this
+          # job reads none of it, so the directory is named here.
+          "$env:USERPROFILE\.xlings\subos\current\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install mcpp
+        run: |
+          xlings update
+          xlings install "mcpp@$MCPP_VERSION" -y -g
+          mcpp --version
+          mcpp self config --mirror GLOBAL
+
+      # The compiler family and version for this row. mcpp keeps its toolchains
+      # in a sandbox of its own, so this selects rather than installs into the
+      # system, and `mcpp test' and `mcpp run' have no flag for it --- which is
+      # why it is set once here rather than passed to each command.
+      - name: Select the toolchain
+        run: |
+          spec='${{ matrix.toolchain }}'
+          case "$spec" in
+            msvc*) mcpp toolchain default msvc ;;
+            *)     mcpp toolchain install "${spec%@*}" "${spec#*@}"
+                   mcpp toolchain default "$spec" ;;
+          esac
+          mcpp toolchain list
+
+      # The C++ form. The modules are the artefact a C++ consumer imports, and
+      # building them is what proves the compiler accepts them.
+      - name: The module form compiles
+        run: mcpp build
+
+      # The C form, with the environment's own headers excluded --- because the
+      # consumer this form exists for, a C library being ported onto openkal, is
+      # compiled that way. The tool needs a driver it can pass -nostdinc to; the
+      # toolchain that has no such spelling compiles the same declarations in
+      # the translation unit the conformance suite carries, which every row of
+      # the conformance job below builds.
+      - name: The C form compiles without the environment's headers
+        if: runner.os != 'Windows'
+        run: |
+          CC=cc bash tools/check-declarations.sh
+          command -v clang >/dev/null && CC=clang bash tools/check-declarations.sh || true
+
+  # ---------------------------------------------------------------------------
+  # The property the specification exists for.
+  substitution:
+    name: substitution holds (${{ matrix.toolchain }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      # A version verified to build this package, not a measured minimum. The
-      # package uses modules, exported extern "C" declarations and ordinary
-      # dependencies, none of which is recent; the pin exists for reproducibility
-      # rather than because an older mcpp is known to fail.
-      MCPP_VERSION: 2026.8.19.3
-      XLINGS_VERSION: v2026.8.17.2
-      XLINGS_NON_INTERACTIVE: '1'
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ['gcc@16.1.0', 'llvm@22.1.8']
     steps:
       - uses: actions/checkout@v4
 
@@ -32,11 +131,21 @@ jobs:
         run: |
           xlings update
           xlings install "mcpp@$MCPP_VERSION" -y -g
-          mcpp --version
           mcpp self config --mirror GLOBAL
 
-      - name: The declarations compile
-        run: mcpp build
+      # The compiler family and version for this row. mcpp keeps its toolchains
+      # in a sandbox of its own, so this selects rather than installs into the
+      # system, and `mcpp test' and `mcpp run' have no flag for it --- which is
+      # why it is set once here rather than passed to each command.
+      - name: Select the toolchain
+        run: |
+          spec='${{ matrix.toolchain }}'
+          case "$spec" in
+            msvc*) mcpp toolchain default msvc ;;
+            *)     mcpp toolchain install "${spec%@*}" "${spec#*@}"
+                   mcpp toolchain default "$spec" ;;
+          esac
+          mcpp toolchain list
 
       - name: Substitution holds
         working-directory: examples/substitution/app
@@ -46,12 +155,14 @@ jobs:
           # second, so that a change made by either build would be detected.
           before="$(sha256sum src/main.cpp | cut -d' ' -f1)"
 
-          mcpp run > with-fd.log 2>&1
+          mcpp build > /dev/null
+          ./target/*/*/bin/app > with-fd.log 2>&1
           grep -q 'the application produced this line' with-fd.log
 
           sed -i 's|openkal-fd = { path = "../impl-fd" }|openkal-discard = { path = "../impl-discard" }|' mcpp.toml
           rm -rf target
-          mcpp run > with-discard.log 2>&1
+          mcpp build > /dev/null
+          ./target/*/*/bin/app > with-discard.log 2>&1
           if grep -q 'the application produced this line' with-discard.log; then
             echo "the discarding implementation produced output"; exit 1
           fi
@@ -77,35 +188,104 @@ jobs:
           fi
           rm -f src/extra.cpp
 
-      # The specification is a claim about programs, and a claim about programs
-      # is tested by running one. The implementation is checked out at its own
-      # head rather than named by version, so that this step asserts what it is
-      # for: that the specification as written here and an implementation as
-      # written there agree today.
-      #
-      # Two rules in clause 7 were added because this program was written and
-      # run. Neither was visible in the specification text.
+  # ---------------------------------------------------------------------------
+  # The suite, against the implementation for each system.
+  #
+  # The implementations are checked out at the branch under test where they have
+  # one and at their default branch otherwise, so that this job asserts what it
+  # is for: that the specification as written here and the implementations as
+  # written there agree today.
+  conformance:
+    name: conformance (${{ matrix.implementation }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, toolchain: 'gcc@16.1.0',  implementation: openkal-linux   }
+          - { os: ubuntu-24.04, toolchain: 'llvm@22.1.8', implementation: openkal-linux   }
+          - { os: macos-14,     toolchain: 'llvm@20.1.7', implementation: openkal-macos   }
+          - { os: windows-2022, toolchain: 'llvm@20.1.7', implementation: openkal-windows }
+          - { os: windows-2022, toolchain: 'msvc@system', implementation: openkal-windows }
+    defaults:
+      run:
+        shell: bash
+    steps:
       - uses: actions/checkout@v4
-        with:
-          repository: mcpplibs/openkal-linux
-          path: .impl
 
-      - name: The portable program runs above an implementation
+      - name: The implementation
         run: |
-          cat > examples/portable/mcpp.toml <<'TOML'
-          [package]
-          name    = "portable"
-          version = "0.1.0"
+          git clone --quiet https://github.com/mcpplibs/${{ matrix.implementation }}.git .impl
+          branch='${{ github.head_ref || github.ref_name }}'
+          if git -C .impl rev-parse --verify --quiet "origin/$branch" > /dev/null; then
+            git -C .impl checkout --quiet "origin/$branch"
+            echo "the implementation is at $branch"
+          else
+            echo "the implementation has no $branch; its default branch is used"
+          fi
 
-          [dependencies]
-          openkal       = { path = "../.." }
-          openkal-linux = { path = "../../.impl" }
-          TOML
-          # The implementation names the specification by version; here it is
-          # the working tree that is under test, so the path is substituted.
-          sed -i 's|^openkal = ".*"$|openkal = { path = ".." }|' .impl/mcpp.toml || true
-          cd examples/portable
-          mcpp run 2>&1 | tee run.log
-          grep -q 'openkal: the portable program, above eight interfaces' run.log
-          grep -q 'openkal: observations that did not hold: 0' run.log
-          ! grep -q 'NOT HELD' run.log
+      - name: Install xlings and mcpp (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/openxlings/xlings/main/tools/other/quick_install.sh \
+            | bash -s "$XLINGS_VERSION"
+          echo "$HOME/.xlings/subos/current/bin" >> "$GITHUB_PATH"
+
+      - name: Install xlings and mcpp (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          irm https://d2learn.org/xlings-install.ps1.txt | iex
+          "$env:USERPROFILE\.xlings\subos\current\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install mcpp
+        run: |
+          xlings update
+          xlings install "mcpp@$MCPP_VERSION" -y -g
+          mcpp self config --mirror GLOBAL
+
+      # The compiler family and version for this row. mcpp keeps its toolchains
+      # in a sandbox of its own, so this selects rather than installs into the
+      # system, and `mcpp test' and `mcpp run' have no flag for it --- which is
+      # why it is set once here rather than passed to each command.
+      - name: Select the toolchain
+        run: |
+          spec='${{ matrix.toolchain }}'
+          case "$spec" in
+            msvc*) mcpp toolchain default msvc ;;
+            *)     mcpp toolchain install "${spec%@*}" "${spec#*@}"
+                   mcpp toolchain default "$spec" ;;
+          esac
+          mcpp toolchain list
+
+      # Every interface and every kind of examination. The exit status is the
+      # verdict: 0 when every observation held, 1 when one did not, and 2 when
+      # nothing was observed --- the last being the outcome a run that selected
+      # no interface would otherwise pass silently.
+      - name: Every interface, every kind of examination
+        run: |
+          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl full
+
+      # The suite is composable because openkal is: an implementation provides
+      # an interface in whole or not at all, and a suite that examined all eight
+      # unconditionally would fail to link against a conforming implementation
+      # of three. Selecting three is therefore asserted to produce a report
+      # rather than a link failure.
+      - name: A selection of three interfaces is examined, not refused
+        run: |
+          rm -rf conformance/target
+          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl core,fs,task \
+            | tee selected.log
+
+          # A report was produced, and nothing in it failed.
+          grep -qE 'observations: [0-9]+ held, 0 did not hold' selected.log
+
+          # An interface that was not selected is reported as not examined and
+          # carries the reason, rather than being absent --- a report that
+          # omitted it could not be distinguished from a report on an
+          # implementation that provides it.
+          grep -q 'openkal.process --- the interface was not selected' selected.log
+
+          # And an interface that was selected was examined.
+          grep -qE 'held +\[behaviour\].*' selected.log

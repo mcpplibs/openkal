@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "openkal"
-version     = "0.4.0"
+version     = "0.5.0"
 description = "openkal: a portable kernel ABI specification. This package carries the normative declarations; implementations are separate packages."
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -13,3 +13,20 @@ repo        = "https://github.com/mcpplibs/openkal"
 # produces a library with undefined references, which is the intended result.
 [targets.openkal]
 kind = "lib"
+
+# The C form of the declarations, clause 4.2, placed where a consumer will find
+# it. The key states where the declarations are; it does not add a dependency
+# and does not change what this package requires, which remains nothing. The
+# headers include no header of their own, name no library, and obtain the width
+# of a machine word from the compiler, so they remain usable on a target that
+# has no C library and under any toolchain. A build system that is not this one
+# reaches the same declarations by adding the directory itself; this key is how
+# this distribution channel says so, as `kind = "lib"` above is.
+#
+# The declarations are not left to an implementation to supply. Clause 4.1
+# records why: a name the consumer relies upon would then be under the control
+# of a party the specification does not govern, and a C library ported onto
+# openkal would take its declarations from whichever implementation it was
+# built against.
+[build]
+include_dirs = ["include"]
