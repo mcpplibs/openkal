@@ -20,7 +20,7 @@ void observe(kind k, bool held, const char* what);
 void unobserved(kind k, const char* what, const char* because);
 
 // A measurement. It is never a verdict; see okc.spec.
-void measure(const char* what, __UINT64_TYPE__ total_ns, int iterations);
+void measure(const char* what, kal_u64 total_ns, int iterations);
 
 // A note attached to the report: what the implementation claims about itself,
 // written out so that a reader can compare two implementations without running

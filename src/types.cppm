@@ -14,8 +14,11 @@ module;
 
 export module openkal.types;
 
-// The width of a machine word.
+// The width of a machine word, and the three fixed widths the operations use.
 export using ::kal_uintptr;
+export using ::kal_u32;
+export using ::kal_u64;
+export using ::kal_i64;
 
 // The complete set of error conditions openkal defines. The set is closed: an
 // implementation maps its environment's error values onto these and does not

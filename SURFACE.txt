@@ -50,6 +50,7 @@ kal_fs_rename
 kal_fs_preopen
 kal_fs_preopen_count
 kal_fs_seek
+kal_fs_set_modified
 kal_fs_stream
 kal_fs_truncate
 # openkal.process

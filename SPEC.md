@@ -530,6 +530,57 @@ property without doing anything; an implementation upon a scheduler of its own
 has it only if it establishes the convention, and one that does not shall report
 the position as zero rather than leave the question to be discovered.
 
+### 7.11 The inverse of an enquiry
+
+An interface that reports a property of a resource and offers no way to set it
+is incomplete wherever the property is one the environment records rather than
+derives.
+
+`kal_fs_file_info` reports the time at which a file was last modified.
+`kal_fs_set_modified` sets it. The operation was added in version 0.5 because
+three ordinary programs — one that copies a file and preserves its dates, one
+that extracts an archive, and one whose whole purpose is to mark a file as
+current — could not be written above the interface without it, and each of them
+is a program a C library above openkal is expected to host. The absence was not
+visible in the specification text; it became visible when such programs were
+compiled above an implementation.
+
+It takes the open file rather than the name, for the reason given at
+`kal_fs_file_info`: the name may since refer to something else, and setting the
+time of the wrong file is a worse outcome than not setting it.
+
+The three environments openkal has been implemented on record the time to a
+nanosecond, to a microsecond and to a hundred nanoseconds respectively. The
+interface states the value in nanoseconds and does not require that it be
+returned unchanged; the conformance procedure compares whole seconds, which is
+the resolution every environment that records the time at all agrees upon. An
+interface that required more would be requiring of every environment what one of
+them happens to provide.
+
+An implementation whose environment does not record the time at all does not
+claim `KAL_FS_PROP_MODIFIED_TIME` and reports `kal_err_not_supported`. An
+implementation that claims the position is required to perform the operation:
+clause 6.2 exists so that a claim is a claim about what can be done.
+
+### 7.12 One reserved name
+
+`openkal.fs` names things relative to a directory the program holds, and every
+operation that answers a question about a thing takes a name. A program holding
+a directory therefore had no way to ask a question about *that* directory: what
+it is, when it last changed, whether it can be written. The handle is not a
+name, and no operation took a handle alone.
+
+The remedy is one reserved word rather than five more operations. `"."` denotes
+the directory itself, wherever a name is accepted. It does not introduce a way
+to ascend, so the confinement clause 7.1 depends upon is unaffected; and every
+environment openkal has been implemented on can express it, two of them because
+their own naming already reserves the same word and the third because its
+object manager expresses the same thing as an empty name beside the directory's
+handle.
+
+`".."` remains invalid. The asymmetry is the point: the first names the thing
+the program already holds, and the second names something it does not.
+
 ## 8. Evolution
 
 Each interface is versioned independently. A revision may add declarations and

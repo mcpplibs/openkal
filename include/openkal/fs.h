@@ -26,7 +26,7 @@ enum kal_node_kind {
 
 struct kal_node_info {
     kal_uintptr     size;
-    __UINT64_TYPE__ modified_ns;   /* wall time, as openkal.time defines it */
+    kal_u64 modified_ns;   /* wall time, as openkal.time defines it */
     int             kind;
     int             writable;
 };
@@ -71,7 +71,14 @@ int         kal_fs_preopen(kal_uintptr index, struct kal_dir* out,
 
 /* Opening. A name is a single component or a sequence separated by a forward
  * slash; it shall not begin with a separator and shall not contain a
- * component that ascends. */
+ * component that ascends.
+ *
+ * One name is reserved: "." denotes the directory itself. Without it a program
+ * holding a directory has no way to ask an operation about that directory ---
+ * what it is, when it changed, whether it can be written --- and the operations
+ * that answer those questions all take a name. It is one reserved word rather
+ * than five more operations, every environment can express it, and it does not
+ * introduce a way to ascend. Clause 7.12. */
 int kal_fs_open_dir (struct kal_dir base, const char* name, kal_uintptr len,
                      struct kal_dir* out);
 int kal_fs_open_file(struct kal_dir base, const char* name, kal_uintptr len,
@@ -101,12 +108,12 @@ kal_uintptr kal_fs_stream(struct kal_file);
  * system whether a stream can be repositioned is a property of the individual
  * stream, and an interface offering it on every stream would contain an
  * operation some of its resources can never satisfy. */
-int kal_fs_seek(struct kal_file, __INT64_TYPE__ offset, int whence,
-                __UINT64_TYPE__* result);
+int kal_fs_seek(struct kal_file, kal_i64 offset, int whence,
+                kal_u64* result);
 
 /* Sets the length of an open file, extending it with zero bytes or discarding
  * what lies beyond. */
-int kal_fs_truncate(struct kal_file, __UINT64_TYPE__ size);
+int kal_fs_truncate(struct kal_file, kal_u64 size);
 
 /* Enquiry, creation and removal, all relative to a directory. Enquiry about a
  * name that does not exist succeeds and reports kal_node_absent rather than
@@ -123,6 +130,28 @@ int kal_fs_rename(struct kal_dir from, const char* a, kal_uintptr alen,
  * name a file was opened by may since have been removed or reused, and a C
  * library answering fstat from the name would answer about a different file. */
 int kal_fs_file_info(struct kal_file, struct kal_node_info* out);
+
+/* Sets the time kal_fs_file_info reports for an open file.
+ *
+ * The inverse of an enquiry that already exists, and the interface is
+ * incomplete without it: a program that copies a file and preserves its dates,
+ * or that extracts an archive, or that marks a file as current, has no way to
+ * say so. Each of those is a program a C library above openkal is expected to
+ * host, and none of them can be written from the operations above.
+ *
+ * The file rather than the name, for the reason stated at kal_fs_file_info: the
+ * name may since refer to something else, and setting the time of the wrong
+ * file is worse than not setting it.
+ *
+ * The file shall have been opened with KAL_OPEN_WRITE. One environment decides
+ * at the point of opening what may afterwards be done with the file, and cannot
+ * be asked later; requiring the intent to be stated when the file is opened is
+ * the same rule clause 7.8 states for the other three conditions.
+ *
+ * An implementation whose environment does not record a modification time does
+ * not claim KAL_FS_PROP_MODIFIED_TIME and reports kal_err_not_supported here.
+ * An implementation that claims the position shall be able to perform this. */
+int kal_fs_set_modified(struct kal_file, kal_u64 modified_ns);
 
 /* Enumeration. The iterator is owned and is released by reading past the end
  * or by closing the directory that produced it. */

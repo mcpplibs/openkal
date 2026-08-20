@@ -61,7 +61,7 @@ void unobserved(kind k, const char* what, const char* because) {
     write(what); write(" --- "); write(because); write("\n");
 }
 
-void measure(const char* what, __UINT64_TYPE__ total_ns, int iterations) {
+void measure(const char* what, kal_u64 total_ns, int iterations) {
     write("  measured     [cost] ");
     write(what);
     write(": ");

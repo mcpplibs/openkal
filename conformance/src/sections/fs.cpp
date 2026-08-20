@@ -103,6 +103,41 @@ void run() {
                 "a name that begins with a separator is refused");
     }
 
+    // Clause 7.12: the one reserved name. It is observed in both of the ways a
+    // program uses it --- asking a question about the directory it holds, and
+    // obtaining a second reference to it --- because an implementation may
+    // accept it in one operation and not in the other, and one of the three
+    // accepted it in neither until this was written.
+    {
+        const char* self = ".";
+        kal_node_info info{};
+        observe(kind::behaviour,
+                kal_fs_info(here(), self, length(self), &info) == kal_ok
+                    && info.kind == kal_node_directory,
+                "the reserved name denotes the directory itself");
+
+        kal_dir again{};
+        const int e = kal_fs_open_dir(here(), self, length(self), &again);
+        observe(kind::behaviour, e == kal_ok,
+                "the directory itself can be opened through the reserved name");
+        if (e == kal_ok) {
+            // The second reference is a directory in its own right: a name
+            // created through the original is found through it.
+            const char* probe = "okc-self.tmp";
+            put_file(probe, "x");
+            kal_node_info seen{};
+            observe(kind::behaviour,
+                    kal_fs_info(again, probe, length(probe), &seen) == kal_ok
+                        && seen.kind == kal_node_file,
+                    "the second reference reaches what the first reaches");
+            kal_fs_remove(here(), probe, length(probe));
+            kal_fs_close_dir(again);
+        } else {
+            unobserved(kind::behaviour, "the second reference reaches what the first reaches",
+                       "the directory itself could not be opened");
+        }
+    }
+
     // Clause 7.7: enquiry about a name that does not exist is answered, and
     // access to it is refused with the value that says which condition held.
     {
@@ -128,7 +163,7 @@ void run() {
                                          kal::fs::open::read | kal::fs::open::write, &f);
         observe(kind::behaviour, e == kal_ok, "the file is opened again");
         if (e == kal_ok) {
-            __UINT64_TYPE__ at = 0;
+            kal_u64 at = 0;
             observe(kind::behaviour, kal_fs_seek(f, 3, kal::fs::seek_set, &at) == kal_ok && at == 3,
                     "positioning reports where it arrived");
             char buf[8] = {};
@@ -147,6 +182,40 @@ void run() {
             observe(kind::behaviour, kal_fs_truncate(f, 4) == kal_ok
                         && kal_fs_file_info(f, &info) == kal_ok && info.size == 4,
                     "the length of an open file is set");
+
+            // The inverse of the enquiry above, and it is checked by reading
+            // back rather than by the value returned: an implementation that
+            // reported success and set nothing would satisfy the return value.
+            //
+            // Whole seconds, not nanoseconds. The three environments openkal is
+            // implemented on record a modification time to a nanosecond, to a
+            // microsecond and to a hundred nanoseconds respectively, so an
+            // observation that required the value to come back unchanged would
+            // be requiring a resolution the interface does not claim. A second
+            // is the resolution every environment that records the time at all
+            // agrees upon.
+            if (kal::fs::has(kal::fs::modified_time)) {
+                // Opened again for writing, because that is what the operation
+                // requires: one environment decides at the point of opening
+                // what may afterwards be done with a file.
+                const kal_u64 chosen = 1600000000ull * 1000000000ull;  // 2020-09-13
+                kal_file w{};
+                const int opened = kal::fs::open_file(here(), kName, length(kName),
+                                                      kal::fs::open::read | kal::fs::open::write,
+                                                      &w);
+                const int e = opened == kal_ok ? kal_fs_set_modified(w, chosen) : opened;
+                kal_node_info after{};
+                const int read_back = opened == kal_ok ? kal_fs_file_info(w, &after) : opened;
+                if (opened == kal_ok) kal_fs_close_file(w);
+                observe(kind::behaviour,
+                        e == kal_ok && read_back == kal_ok
+                            && after.modified_ns / 1000000000u == chosen / 1000000000u,
+                        "the time an open file reports as its last modification is set");
+            } else {
+                unobserved(kind::behaviour,
+                           "the time an open file reports as its last modification is set",
+                           "the implementation does not claim prop_modified_time");
+            }
             kal_fs_close_file(f);
         }
     }
@@ -170,7 +239,7 @@ void run() {
         put_file(kName, "one");
         const auto app = kal::fs::open::write | kal::fs::open::append;
         if (kal::fs::open_file(here(), kName, length(kName), app, &f) == kal_ok) {
-            __UINT64_TYPE__ at = 0;
+            kal_u64 at = 0;
             kal_fs_seek(f, 0, kal::fs::seek_set, &at);   // and it shall still append
             write_bytes(f, "two", 3);
             kal_fs_close_file(f);

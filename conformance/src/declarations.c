@@ -52,6 +52,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_fs_remove);
     (void)sizeof(&kal_fs_rename);
     (void)sizeof(&kal_fs_seek);
+    (void)sizeof(&kal_fs_set_modified);
     (void)sizeof(&kal_fs_stream);
     (void)sizeof(&kal_fs_truncate);
     (void)sizeof(&kal_process_close);

@@ -23,23 +23,23 @@ namespace {
 // would have to wake a waiter on every release, because it could not know
 // whether one existed; the third state records that one does.
 struct mutex {
-    volatile __UINT32_TYPE__ state = 0;   // 0 free, 1 held, 2 held and wanted
+    volatile kal_u32 state = 0;   // 0 free, 1 held, 2 held and wanted
 
     void lock() {
-        __UINT32_TYPE__ expected = 0;
+        kal_u32 expected = 0;
         if (__atomic_compare_exchange_n(&state, &expected, 1u, false,
                                         __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) return;
         for (;;) {
-            const __UINT32_TYPE__ previous = __atomic_exchange_n(&state, 2u, __ATOMIC_ACQUIRE);
+            const kal_u32 previous = __atomic_exchange_n(&state, 2u, __ATOMIC_ACQUIRE);
             if (previous == 0) return;
-            kal_task_wait(const_cast<const __UINT32_TYPE__*>(&state), 2u, 0);
+            kal_task_wait(const_cast<const kal_u32*>(&state), 2u, 0);
         }
     }
 
     void unlock() {
         if (__atomic_exchange_n(&state, 0u, __ATOMIC_RELEASE) == 2u) {
             kal_uintptr woken = 0;
-            kal_task_wake(const_cast<const __UINT32_TYPE__*>(&state), 1, &woken);
+            kal_task_wake(const_cast<const kal_u32*>(&state), 1, &woken);
         }
     }
 };
@@ -57,7 +57,7 @@ void increment(void*) {
     }
 }
 
-volatile __UINT32_TYPE__ g_word = 0;
+volatile kal_u32 g_word = 0;
 volatile int             g_ran  = 0;
 kal_uintptr              g_identity = 0;
 
@@ -66,7 +66,7 @@ void sets_the_word(void*) {
     __atomic_store_n(&g_ran, 1, __ATOMIC_RELEASE);
     __atomic_store_n(&g_word, 1u, __ATOMIC_RELEASE);
     kal_uintptr woken = 0;
-    kal_task_wake(const_cast<const __UINT32_TYPE__*>(&g_word), 1, &woken);
+    kal_task_wake(const_cast<const kal_u32*>(&g_word), 1, &woken);
 }
 
 thread_local int g_per_context = 0;
@@ -104,7 +104,7 @@ void run() {
             // re-examines the condition after waking, because waking is
             // permitted to be spurious.
             while (__atomic_load_n(&g_word, __ATOMIC_ACQUIRE) == 0)
-                kal_task_wait(const_cast<const __UINT32_TYPE__*>(&g_word), 0u, 0);
+                kal_task_wait(const_cast<const kal_u32*>(&g_word), 0u, 0);
             observe(kind::behaviour, __atomic_load_n(&g_ran, __ATOMIC_ACQUIRE) == 1,
                     "the started context ran");
             observe(kind::behaviour, kal_task_join(t) == kal_ok, "the context is awaited");
@@ -138,9 +138,9 @@ void run() {
 
     // A property that is claimed is a property that can be checked.
     if (kal::task::has(kal::task::wait_timeout)) {
-        volatile __UINT32_TYPE__ never = 0;
+        volatile kal_u32 never = 0;
         const kal_duration t0 = kal_time_monotonic();
-        const int e = kal_task_wait(const_cast<const __UINT32_TYPE__*>(&never), 0u,
+        const int e = kal_task_wait(const_cast<const kal_u32*>(&never), 0u,
                                     30u * 1000u * 1000u);
         const kal_duration elapsed = kal_time_monotonic() - t0;
         observe(kind::behaviour, e == kal_err_again,
@@ -182,10 +182,10 @@ void run() {
 
         // A wake of no contexts is permitted and shall report that it woke
         // none, which is what a caller uses to decide whether to try again.
-        volatile __UINT32_TYPE__ nobody = 0;
+        volatile kal_u32 nobody = 0;
         kal_uintptr woken = 99;
         observe(kind::abi,
-                kal_task_wake(const_cast<const __UINT32_TYPE__*>(&nobody), 0, &woken) == kal_ok
+                kal_task_wake(const_cast<const kal_u32*>(&nobody), 0, &woken) == kal_ok
                     && woken == 0,
                 "waking no contexts succeeds and reports that none were woken");
     }
@@ -213,11 +213,11 @@ void run() {
         }
         measure("starting and awaiting an execution context", kal_time_monotonic() - t0, rounds);
 
-        volatile __UINT32_TYPE__ w = 0;
+        volatile kal_u32 w = 0;
         const kal_duration t1 = kal_time_monotonic();
         for (int i = 0; i < cost_iterations; ++i) {
             kal_uintptr woken = 0;
-            kal_task_wake(const_cast<const __UINT32_TYPE__*>(&w), 1, &woken);
+            kal_task_wake(const_cast<const kal_u32*>(&w), 1, &woken);
         }
         measure("waking an address nothing waits upon", kal_time_monotonic() - t1, cost_iterations);
     }

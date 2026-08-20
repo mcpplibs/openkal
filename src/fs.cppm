@@ -46,6 +46,7 @@ export using ::kal_fs_seek;
 export using ::kal_fs_truncate;
 export using ::kal_fs_info;
 export using ::kal_fs_file_info;
+export using ::kal_fs_set_modified;
 export using ::kal_fs_mkdir;
 export using ::kal_fs_remove;
 export using ::kal_fs_rename;

@@ -34,6 +34,26 @@ typedef unsigned int kal_uintptr;
 #  error "openkal requires a compiler that states the width of a pointer"
 #endif
 
+/* The three fixed widths openkal's operations use, stated once here rather than
+ * at each use.
+ *
+ * They are openkal's names for openkal's types. Reaching for the compiler's
+ * spelling at each use had two defects: it reached for a spelling one of the
+ * three compilers this specification is built with does not have, and it stated
+ * in eight places a decision that belongs in one. A reader asking what width an
+ * offset has now has one place to look. */
+#if defined(__UINT64_TYPE__)
+typedef __UINT32_TYPE__ kal_u32;
+typedef __UINT64_TYPE__ kal_u64;
+typedef __INT64_TYPE__  kal_i64;
+#elif defined(_MSC_VER)
+typedef unsigned int     kal_u32;
+typedef unsigned __int64 kal_u64;
+typedef signed   __int64 kal_i64;
+#else
+#  error "openkal requires a compiler that states a sixty-four bit type"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

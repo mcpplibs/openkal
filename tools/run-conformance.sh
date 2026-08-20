@@ -19,6 +19,17 @@ implementation="${2:?usage: run-conformance.sh <package> <path> [features] [mcpp
 features="${3:-full}"
 shift 3 2>/dev/null || shift $#
 
+# A path this script hands to the build tool rather than to the shell.
+#
+# On one of the three systems the shell and the build tool disagree about what
+# a path is: the shell reports /d/a/openkal, and the tool --- which is a program
+# of the system rather than of the shell --- reads that as a directory named `d'
+# at the root of the current volume. The translation exists on that system and
+# is a no-op everywhere else.
+native() {
+    if command -v cygpath > /dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi
+}
+
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 suite="$here/conformance"
 [ -f "$suite/mcpp.toml" ] || { echo "no suite at $suite" >&2; exit 2; }
@@ -26,6 +37,9 @@ suite="$here/conformance"
 implementation="$(cd "$implementation" && pwd)"
 [ -f "$implementation/mcpp.toml" ] || {
     echo "$implementation is not a package" >&2; exit 2; }
+
+here_native="$(native "$here")"
+implementation_native="$(native "$implementation")"
 
 # The specification is taken from this working tree rather than from the version
 # the manifests name, so that a run asserts what it is for: that the
@@ -40,7 +54,7 @@ implementation="$(cd "$implementation" && pwd)"
 # Not `sed -i`: BSD sed reads the next word as a backup suffix and so the GNU
 # form fails on macOS. This form is the same on every system.
 point_at_the_specification() {
-    sed "s|^openkal = .*$|openkal = { path = \"$here\" }|" "$1" > "$1.next"
+    sed "s|^openkal = .*$|openkal = { path = \"$here_native\" }|" "$1" > "$1.next"
     mv "$1.next" "$1"
 }
 point_at_the_specification "$suite/mcpp.toml"
@@ -49,7 +63,7 @@ point_at_the_specification "$implementation/mcpp.toml"
 if ! grep -q "^$package = " "$suite/mcpp.toml"; then
     # Appended immediately after openkal, which is inside [dependencies]. A
     # plain append would land under [features].
-    awk -v line="$package = { path = \"$implementation\" }" '
+    awk -v line="$package = { path = \"$implementation_native\" }" '
         { print }
         /^openkal = / && !done { print line; done = 1 }
     ' "$suite/mcpp.toml" > "$suite/mcpp.toml.next"

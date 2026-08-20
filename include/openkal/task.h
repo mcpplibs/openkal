@@ -48,12 +48,12 @@ kal_uintptr kal_task_current(void);
  * given value, until another context wakes it or the timeout elapses. The
  * comparison and the suspension occur without an intervening opportunity for
  * the value to change unobserved. A timeout of zero denotes no timeout. */
-int kal_task_wait(const __UINT32_TYPE__* word, __UINT32_TYPE__ expected,
-                  __UINT64_TYPE__ timeout_ns);
+int kal_task_wait(const kal_u32* word, kal_u32 expected,
+                  kal_u64 timeout_ns);
 
 /* Wakes at most count contexts suspended upon the given address and reports
  * how many were woken. A count of zero wakes none and is permitted. */
-int kal_task_wake(const __UINT32_TYPE__* word, kal_uintptr count, kal_uintptr* woken);
+int kal_task_wake(const kal_u32* word, kal_uintptr count, kal_uintptr* woken);
 
 extern const kal_uintptr kal_task_props;
 

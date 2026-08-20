@@ -7,7 +7,7 @@
 /* Nanoseconds. The unit is fixed rather than reported, because a program that
  * must consult a unit before performing arithmetic acquires a branch that no
  * environment needs. */
-typedef __UINT64_TYPE__ kal_duration;
+typedef kal_u64 kal_duration;
 
 /* Positions in kal_time_props. */
 #define KAL_TIME_PROP_WALL_AVAILABLE     ((kal_uintptr)1u << 0)
