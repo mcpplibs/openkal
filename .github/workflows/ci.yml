@@ -157,16 +157,42 @@ jobs:
       # command expanded to nothing and the step died with `: command not
       # found` on four rows. mcpp resolves the toolchain for a target itself;
       # asking it is the only spelling that holds on every row.
+      # ⚠️ A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
+      #
+      # Every other row here is hosted, and every hosted target this
+      # specification serves is 64-bit. That is a structural blind spot: the C
+      # ABI this repository freezes is instantiated at two pointer widths, and
+      # only one of them was ever compiled.
+      #
+      # Measured 2026-08-20: `kal_node_info`'s frozen-layout assertion read
+      # `offsetof(modified_ns) == sizeof(kal_uintptr)`, true at 64 bits and
+      # false at 32 — the timestamp is a naturally-aligned `kal_u64`, so a
+      # 32-bit `size` is followed by four bytes of padding and the offset stays
+      # at eight. It surfaced in a CONSUMER (`mcpplibs/riscv-virt-rt`'s rv32
+      # leg), the only place the 32-bit layout existed at all.
+      #
+      # ⚠️ THE PROBE LIVES INSIDE THE CHECKOUT AND USES A RELATIVE PATH. Two
+      # earlier spellings failed for reasons that had nothing to do with the
+      # ABI: globbing the LLVM payload for `clang++` died with `: command not
+      # found` on the rows whose toolchain is gcc or msvc, and interpolating
+      # `$GITHUB_WORKSPACE` into a C++ string literal produced
+      # `"D:\a\openkal\openkal/include"`, whose backslashes the compiler read
+      # as escape sequences. A relative directory has neither problem, and
+      # `include_dir` resolves it against the package root.
       - name: The C ABI holds at thirty-two bits as well as sixty-four
         run: |
           set -euo pipefail
-          mkdir -p /tmp/abi/src
-          cat > /tmp/abi/mcpp.toml <<'EOF'
+          rm -rf .abi-probe && mkdir -p .abi-probe/src
+          cat > .abi-probe/mcpp.toml <<'EOF'
           [package]
           name    = "abi"
           version = "0.1.0"
           EOF
-          cat > /tmp/abi/src/main.cpp <<EOF
+          cat > .abi-probe/build.mcpp <<'EOF'
+          import mcpp;
+          int main() { mcpp::include_dir("../include"); return 0; }
+          EOF
+          cat > .abi-probe/src/main.cpp <<'EOF'
           #include <openkal/types.h>
           #include <openkal/fs.h>
           static_assert(__builtin_offsetof(kal_node_info, size) == 0);
@@ -176,19 +202,12 @@ jobs:
           static_assert(sizeof(kal_file) == sizeof(kal_uintptr));
           extern "C" void _start() { for (;;) {} }
           EOF
-          cat > /tmp/abi/build.mcpp <<EOF
-          import mcpp;
-          import std;
-          int main() {
-              mcpp::include_dir("$GITHUB_WORKSPACE/include");
-              return 0;
-          }
-          EOF
           for t in riscv64-none-elf riscv32-none-elf; do
-            ( cd /tmp/abi && rm -rf target && mcpp build --target "$t" ) \
+            ( cd .abi-probe && rm -rf target && mcpp build --target "$t" ) \
               || { echo "the frozen layout does not hold for $t"; exit 1; }
             echo "$t: layout holds"
           done
+          rm -rf .abi-probe
 
       - name: The module form compiles
         run: mcpp build
