@@ -1,4 +1,19 @@
+# What a build produces.
 target/
 .mcpp/
-compile_commands.json
 mcpp.lock
+compile_commands.json
+
+# What an editor or a tool leaves beside the sources. None of it describes the
+# package: a repository that carries one editor's settings has an opinion about
+# editors, and a repository that carries a compilation database has an opinion
+# about one machine's paths.
+.vscode/
+.idea/
+.cache/
+*.swp
+*~
+
+# What a system leaves behind.
+.DS_Store
+Thumbs.db
