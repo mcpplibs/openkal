@@ -1427,9 +1427,9 @@ board。所以这一对不再无条件强制,而**答案由图给**(capability �
 不是对目标的猜测。ISA 那一半同理:三元组连同整个档位在解析处重述,
 而 `clang.cppm` 不再自己拼 `--target` —— 那个职责归一处。
 
-#### ⭐⭐ 第九格:判据本身的前提不成立
+#### ⭐⭐ 第九格:判据的前提确实不成立,而修好它的是 C 库的配置
 
-改完之后,**std 模块与程序都编过了**,链接停在:
+改完第八格之后,**std 模块与程序都编过了**,链接停在:
 
 ```
 ld.lld: error: undefined symbol: kal_task_yield
@@ -1440,49 +1440,95 @@ ld.lld: error: undefined symbol: kal_fs_close_file
 
 | | 名字数 | 是什么 |
 |---|---|---|
-| `openkal-opensbi` **提供** | **11** | `core` —— abort + stream + memory |
+| `openkal-opensbi` **提供** | 11 | `core` —— abort + stream + memory |
 | `openkal-musl` **需要** | 40+ | `core` + env + fs + process + task + time,即 `hosted` |
 
 §6.1 说消费者用了实现不提供的接口就该链接失败。它正是这么做的。
 
-⇒ **「裸机上 `import std`」这个判据的前提是错的**:它假设 C 库能坐在**任何**
-裸机实现上,而 C 库要的是 `hosted` 集 —— §3.3 这一轮新加的命名束,正好是陈述
-这件事的词汇。SBI 一个提供 `core` 的实现,按 §3.1/§3.2 是**正确的**,不是不完整。
+⇒ 当时的结论是:「判据假设了 C 库能坐在任何裸机实现上,而这不成立;真正的
+下一步是写一个在裸机上提供 `hosted` 的实现。」
 
-⇒ 真正的下一步不是修任何东西,是**写一个在裸机上提供 `hosted` 的实现** ——
-文件系统、进程、执行上下文都要在没有操作系统的机器上有答案。那是与
-`openkal-llvm-runtime` 同一量级的另一件工程,而不是这条链路的收尾。
+⭐⭐ **前半句对,后半句错了,而错在只看到了一个方向。** 让两边对上有两条路:
 
-**这一格是本轮最有价值的发现:它把一个读起来像「差最后一步」的判据,
-还原成一个「假设了一件不成立的事」的判据。**
+1. 把**实现**扩到 `hosted` —— 要在没有操作系统的机器上给出文件系统、进程、
+   执行上下文。那确实是另一件大工程。
+2. 把 **C 库**按它下面实际有的东西配置 —— 因为 C 库**被编成**调用那些接口,
+   而它不必被这样编。
 
-### 附:阻塞点定位的过程(保留,因为它推翻了本节原来的判断)
+⇒ **走了第 2 条,而它是小的。** `port/src/okm_opt.h` 那道缝:同一个 musl,
+两种配置。清单在 `cfg(os="none")` 下清掉 `OKM_HAS_FS` / `OKM_HAS_PROCESS` /
+`OKM_HAS_TASK`,四十处调用点一个都不用改 —— 它们改名叫 `okm_fs_*`,而缝决定
+那是接口本身还是答案。**一个决定放在一个地方,而不是四十个 `#if`。**
 
-设计把「裸机上 `import std` 能编能链能跑」定为本条的验收判据,理由是
-「裸机没有宿主可借,不会假绿」。**已达成的是宿主上的完整链路**;裸机那一步
-本轮**没有做到**,而这一轮把它卡在哪弄清楚了 —— 卡点不是 libc++ 的 freestanding
-配置(设计以为是那个),而是**更下面一层**:
+⚠️ 而这里有一条**看起来像矛盾、其实是分层在各做各的事**的规则:
 
-| 环节 | 状态 |
-|---|---|
-| `openkal-opensbi` 为 `riscv64-none-elf` 构建 | ✅ **实测通过**(带分支依赖) |
-| `openkal-musl` 为 `riscv64-none-elf` 构建 | ❌ **不可能,今天** |
-| `openkal-llvm-runtime` 的 freestanding 配置 | 未到这一步 |
+> openkal 实现**不能**回答「不支持」,因为 openkal 的面上没有这个答案,调用者
+> 拿它做不了任何事。C 库**可以**,因为 POSIX 的面上**有** —— `ENOSYS` ——
+> 而且每个 `open` 的调用者本来就要处理失败。
 
-**实测的阻塞点**:`openkal-musl/musl/arch/` 里只有 `aarch64`、`generic`、
-`x86_64` —— vendored 的 musl 树被裁到两个架构。musl 的每个架构都需要自己的
-`bits/alltypes.h`(由 `mkalltypes.sed` 从该架构的 `.in` 生成)与
-`bits/syscall.h`,而 riscv64 的那两份**源材料就不在树里**。
+一层用「不存在」表达的缺席,到上一层变成用「一个有定义的错误」表达的缺席。
 
-⇒ 裸机那条路的下一步是**先把 musl 的 riscv64 架构目录 vendored 进来并生成
-它的头**,再谈 libc++ 的 freestanding 配置。加上 `cfg(os = "none")` 的实现
-依赖、链接脚本与裸机运行时,这是一条独立的工作线,不是本条的收尾。
+### ⭐⭐⭐ 12.4.1 裸机 `import std` —— 通过了(2026-08-23)
 
-⭐ 这个定位本身有价值:设计里「裸机 `import std`」读起来像是
-`openkal-llvm-runtime` 差的最后一步,实测表明它差的是**再下面一层的两个文件**,
-而且那两个文件的生成方式已经写在 `musl-generated/README.md` 里。
+§8.2 把它定为验收判据,理由是**裸机没有宿主可借,不会假绿**。它现在跑起来了:
 
-## 12.5 实施记录(2026-08-22 第一轮)
+```
+sorted: 2 4 7
+caught: 42
+unwound: true
+baremetal import std: ok
+```
+
+riscv64,OpenSBI 之上,没有操作系统。三条断言各要一层:容器与算法要分配器,
+格式化与输出要流,**throw/catch 加上展开期跑掉的析构函数**要 unwinder 与
+libc++abi —— 最后那条是「unwinder 能用」与「unwinder 只是链上了」的分界。
+
+#### 从「链不上」到「跑通」经过的六格,每一格都指向别处
+
+| # | 症状 | 真因 |
+|---|---|---|
+| 1 | 15 个 `kal_*` 未定义 | C 库被编成调用它下面没有的接口 ⇒ `okm_opt.h` 的缝 |
+| 2 | `use of undeclared identifier '__weak__'` | ⭐ musl 内部头的守卫用**语言**做判据,而真正的性质是**谁在编译** |
+| 3 | 20 个 `__addtf3` 类未定义 | compiler-rt 早已 vendored 却没被构建;⚠️ 这些名字**不出现在任何源码里** |
+| 4 | `undefined hidden symbol: __vdsosym` | `cache.c` 把 vDSO 使用守在**系统调用号**上而不是 `VDSO_*` 上;riscv64 第一次完整链接才暴露 |
+| 5 | `undefined symbol: main`,而 nm 里是 `_Z4mainv` | `-ffreestanding` 下 C++ 的 `main` 不是保留入口点 ⇒ 也归图决定 |
+| 6 | 启动、打印、然后 `fault_load` 在 `__cxa_throw` | 线程指针没人建立;⚠️ 而 musl 把**它自己的** tp 放在变量里,所以 musl 启动成功说明不了工具链的 TLS 能用 |
+| 7 | 全部跑通,但 `terminating due to uncaught exception` | ⭐⭐ 见下 |
+
+#### ⭐⭐ 第七格:一套不完整的展开表不会降级,它会让走栈停住
+
+这是本轮最难定位的一条,因为**中间每一步读数都指向别处**:
+
+```
+__unw_get_proc_info  -> 0  start=80200148 end=8020068c lsda=80447190
+__unw_step           -> 0   (UNW_STEP_END)
+after step           -> 8021d55e
+```
+
+帧找到了、personality 数据找到了、这一步**确实算出了返回地址** —— 而 `step`
+仍然报「栈底」。因为 libunwind 会为**调用者**重新求一次信息,而调用者是
+`__libc_start_main`:一个没有展开表的 C 函数。
+
+真因:**宿主 ELF 目标上 clang 默认给每个函数发 `.eh_frame`,裸机 ELF 目标上
+不发** —— 它假设没有人会展开。当目标侧有一个 C++ 运行时时这个假设是错的,而且
+错的方式很具体:凡是 `-fexceptions` 编的都有表,其余全都没有,在这套栈上就是
+C 库和 libunwind 自己的 C 源码(`UnwindLevel1.c` 里就住着 `_Unwind_RaiseException`)。
+
+⇒ 修法与第八格、第五格同一个形状:**由图决定**,`targetCxxRuntime` 时加上
+`-fasynchronous-unwind-tables`。代价:text 2.33 MB → 2.49 MB(+7%)。
+
+⚠️ 在此之前逐条排除过、而**每一条都是对的**:`__ehdr_start` 为 0(是真缺陷,
+已改用 libunwind 的 `_LIBUNWIND_IS_BAREMETAL` 符号约定绕开)、`.eh_frame` 边界
+符号、`.eh_frame_hdr` 的编码、FDE 覆盖范围与真实函数边界是否一致、线程指针。
+**排除一条正确的假设不会让人更接近答案,只会让人更相信剩下的假设。**
+
+#### 判据现在由 CI 执行,而不是「在某台笔记本上验过一次」
+
+`openkal-llvm-runtime` 的 CI 加了这一步。⚠️ 它需要四个还没发布的 mcpp 决定,
+所以那个 job **从 #486 的分支把工具建出来** —— 和这里每一个依赖同样的方式。
+#486 发布后删掉那一步并抬高 pin。
+
+## 12.5 实施记录(2026-08-22 第一轮)## 12.5 实施记录(2026-08-22 第一轮)
 
 已落地并验证的部分,以及过程中发现的两处既有缺陷。
 
