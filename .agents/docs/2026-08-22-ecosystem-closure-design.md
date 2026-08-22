@@ -486,6 +486,47 @@ Windows:  movl _tls_index(%rip), %eax ; movq %gs:88, %rcx
 
 ---
 
+#### ⭐⭐ 5.6.1 openarch 那一半已经做了(2026-08-23,openarch#6)
+
+§5.5 定案「指针槽进 openarch(与 `arch_cpu_percpu` 平行,但寄存器不同不能复用)」。
+这一条落地了,而且它不是照着设计写出来的 —— **是被一次实测逼出来的**。
+
+openarch 的 riscv64 后端从写下来那天起就带着这段注释:
+
+> `tp` 在这里是约定不是架构寄存器。ABI 把它留给线程局部存储 […] 内核可以拿它
+> 当 per-CPU 指针 —— 但同一个 ISA 上的宿主程序会在那里找它的线程指针。[…]
+> **这个后端不能被编进任何同时用线程指针的东西里。**
+
+⚠️ 最后那句是对**每一个消费者**的约束,写在注释里,**没有任何东西在执行它**。
+它成立只是因为在这个架构上还没有别的东西想要线程指针。
+
+⇒ 本轮出现了那个东西:`openkal-opensbi` 的启动对象要写 `tp`,好让程序的
+`thread_local` 能用。没有它,裸机上第一次 `throw` 挂在 `__cxa_get_globals` 里,
+而诊断报的是一个异常函数和一个地址,一个字都没提线程指针。
+
+**做了什么**(openarch 0.7.0):
+
+| | |
+|---|---|
+| 接口 | `arch_cpu_tls` / `arch_cpu_set_tls`,与 `arch_cpu_percpu` 平行 |
+| riscv64 | tls → `tp`;**per-CPU 指针移到 `mscratch`** —— 这个特权级为它提供的寄存器 |
+| aarch64 | tls → `TPIDR_EL0`(per-CPU 用 `TPIDR_EL1`,本来就是两个) |
+| x86_64 | tls → `IA32_FS_BASE`(per-CPU 用 `IA32_GS_BASE`,本来就是两个) |
+
+⭐ 而判据的形状值得单独记:探针断言的是「**这是两个槽**」,不是「这个槽能
+round-trip」—— 后者在两者别名的后端上照样通过。
+
+```
+riscv64:  cpu: the two slots ALIAS        ← 改之前
+aarch64:  cpu: the two slots are distinct
+x86_64:   cpu: the two slots are distinct
+```
+
+**⚠️ 剩下的一半仍未做**:把 `KAL_TASK_PROP_THREAD_LOCAL` 换成 core 里的
+「每上下文一个指针槽」。openarch 现在提供得起这个机制了,所以阻塞已经解除 ——
+但它要改 openkal 的规范面(§3.2 说 core 不长),以及五个实现。**那是一次
+规范变更,应当单独决定,不夹在本轮里。**
+
 ## 6. openkal-llvm-runtime
 
 ### 6.1 范围:runtimes 而非 tools
