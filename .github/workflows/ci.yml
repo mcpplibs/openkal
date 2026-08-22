@@ -346,11 +346,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04, toolchain: 'gcc@16.1.0',  implementation: openkal-linux   }
-          - { os: ubuntu-24.04, toolchain: 'llvm@22.1.8', implementation: openkal-linux   }
-          - { os: macos-14,     toolchain: 'llvm@20.1.7', implementation: openkal-macos   }
-          - { os: windows-2022, toolchain: 'llvm@20.1.7', implementation: openkal-windows }
-          - { os: windows-2022, toolchain: 'msvc@system', implementation: openkal-windows }
+          # `features' names the optional interfaces the implementation in that
+          # row provides, on top of `full'. It is per-row rather than global
+          # because clause 6.1 makes a missing optional interface not a
+          # deviation: a set that demanded every one of them from every
+          # implementation would report a link failure where the specification
+          # says there is nothing to report.
+          - { os: ubuntu-24.04, toolchain: 'gcc@16.1.0',  implementation: openkal-linux,   features: 'full,optional' }
+          - { os: ubuntu-24.04, toolchain: 'llvm@22.1.8', implementation: openkal-linux,   features: 'full,optional' }
+          - { os: macos-14,     toolchain: 'llvm@20.1.7', implementation: openkal-macos,   features: 'full' }
+          - { os: windows-2022, toolchain: 'llvm@20.1.7', implementation: openkal-windows, features: 'full' }
+          - { os: windows-2022, toolchain: 'msvc@system', implementation: openkal-windows, features: 'full' }
     defaults:
       run:
         shell: bash
@@ -378,13 +384,40 @@ jobs:
           # step for the seconds between one merge and the next, and the
           # compiler's report on that is a hundred errors about names a header
           # no longer has --- which names the symptom and not the cause.
+          # An implementation states which openkal it is written against in one
+          # of two forms, and the question the check asks is different in each.
+          #
+          #   openkal = "0.5.2"            a released version. The question is
+          #                                whether it is this one.
+          #   openkal = { git = …, branch = … }
+          #                                a development line. The version is
+          #                                not stated and cannot be; what makes
+          #                                the two in step is that the branch is
+          #                                this branch, and that is what to ask.
+          #
+          # The second form was not anticipated when this check was written, and
+          # the check then extracted nothing and reported a mismatch against the
+          # empty string --- which named neither the cause nor the symptom.
           here="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' mcpp.toml | head -1)"
           there="$(sed -n 's/^openkal[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' .impl/mcpp.toml | head -1)"
-          if [ "$here" != "$there" ]; then
-            echo "::error::this is openkal $here and ${{ matrix.implementation }} is written against openkal $there. Nothing is wrong with either; they are not in step. Re-run after the implementation's branch has the matching version." >&2
-            exit 1
+          if [ -n "$there" ]; then
+            if [ "$here" != "$there" ]; then
+              echo "::error::this is openkal $here and ${{ matrix.implementation }} is written against openkal $there. Nothing is wrong with either; they are not in step. Re-run after the implementation's branch has the matching version." >&2
+              exit 1
+            fi
+            echo "both describe openkal $here"
+          else
+            impl_branch="$(sed -n 's/^openkal[[:space:]]*=[[:space:]]*{.*branch[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' .impl/mcpp.toml | head -1)"
+            if [ -z "$impl_branch" ]; then
+              echo "::error::${{ matrix.implementation }} states neither a version nor a branch for openkal, so there is nothing to be in step with." >&2
+              exit 1
+            fi
+            if [ "$impl_branch" != "$branch" ]; then
+              echo "::error::this is $branch and ${{ matrix.implementation }} follows $impl_branch. They are not in step." >&2
+              exit 1
+            fi
+            echo "both follow $branch; this is openkal $here"
           fi
-          echo "both describe openkal $here"
 
       - name: Install xlings and mcpp (Unix)
         if: runner.os != 'Windows'
@@ -453,7 +486,7 @@ jobs:
       # no interface would otherwise pass silently.
       - name: Every interface, every kind of examination
         run: |
-          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl full
+          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl '${{ matrix.features }}'
 
       # The suite is composable because openkal is: an implementation provides
       # an interface in whole or not at all, and a suite that examined all eight

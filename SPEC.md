@@ -1,4 +1,4 @@
-# openkal Specification, version 0.5
+# openkal Specification, version 0.6
 
 ## 1. Scope
 
@@ -41,11 +41,11 @@ provides an interface in whole or not at all.
 | `openkal.fs` | a directory, and an open file | standard |
 | `openkal.process` | a program image that has been started | standard |
 | `openkal.task` | an execution context, and a suspension primitive | standard |
+| `openkal.exec` | a region of the address space a program may execute | optional |
 | `openkal.event` | readiness of a set of resources | reserved |
 
-Version 0.5 specifies the core and standard interfaces. The optional rows are
-specified; the reserved row is not, and its name shall not be used for other
-purposes.
+Version 0.6 specifies the core, standard and optional interfaces. The reserved
+row is not specified, and its name shall not be used for other purposes.
 
 *Core* denotes an interface every implementation provides. *Standard* denotes
 one an implementation hosting a C library provides. *Optional* denotes one it
@@ -71,7 +71,50 @@ It follows that the presence of a heap is not a property of the hardware. Any
 environment with writable memory can supply one, and the specification places
 `openkal.memory` in the core set on that basis.
 
-### 3.2 Interfaces the specification declines to define
+### 3.2 The core set does not grow
+
+An interface admitted to the core set is required of every implementation
+thereafter, including implementations of environments no one has yet written
+one for. The set is therefore closed at `openkal.abort`, `openkal.stream` and
+`openkal.memory`, and a later version shall place a new interface outside it
+even where every implementation that exists at the time would satisfy it.
+
+The asymmetry is the reason. An interface wrongly placed in the core set
+excludes environments — a bare machine, a supervisor, firmware — from
+conformance altogether, and that exclusion is discovered by whoever tries to
+write the implementation rather than by the specification. An interface wrongly
+placed outside it costs a consumer one declared dependency. The first error is
+found late and by the wrong party; the second is found at dependency resolution
+and by the party that can act on it.
+
+### 3.3 Naming a set of interfaces
+
+An interface is provided or not provided, and clause 6.1 makes that a fact a
+consumer learns from the linker. A consumer must nevertheless be able to *state*
+what it needs before it is built, and stating it one interface at a time does
+not scale: the sets a program can be written against are not arbitrary subsets,
+and an ecosystem that could only enumerate them could not say "this package
+needs an environment of such-and-such a kind".
+
+The specification therefore names sets, and the names are for stating a
+requirement rather than for measuring conformance:
+
+| Name | Interfaces |
+| --- | --- |
+| `core` | `openkal.abort`, `openkal.stream`, `openkal.memory` |
+| `hosted` | `core`, and `openkal.env`, `openkal.time`, `openkal.fs`, `openkal.process`, `openkal.task` |
+
+A name is a shorthand and confers nothing. **An implementation does not claim a
+name**; it provides interfaces, and whether it satisfies a consumer that asked
+for `hosted` follows from which interfaces it provides. Nothing in this clause
+alters clause 6.1: an interface a consumer uses and an implementation does not
+provide is an undefined symbol, whichever names either of them mentions.
+
+Optional interfaces are deliberately not gathered into a name. A set that
+required every optional interface would make *optional* mean nothing, and a
+consumer that needs one names that one.
+
+### 3.4 Interfaces the specification declines to define
 
 Naming is not factored into a separate interface. An earlier draft replaced
 `openkal.fs` and `openkal.net` with a single interface mapping names to
@@ -109,6 +152,7 @@ implementation provides neither.
 | `openkal.fs` | `openkal.fs` | `openkal/fs.h` |
 | `openkal.process` | `openkal.process` | `openkal/process.h` |
 | `openkal.task` | `openkal.task` | `openkal/task.h` |
+| `openkal.exec` | `openkal.exec` | `openkal/exec.h` |
 
 `openkal.h` includes every header, for a consumer that uses several.
 
@@ -353,7 +397,35 @@ succeeds for a regular file and fails for a pipe. An implementation could
 therefore neither claim the operation honestly nor withhold it usefully.
 Positioning accordingly belongs to `openkal.fs`, whose resource is a descriptor.
 
-### 6.5 Concurrency
+### 6.5 Availability settled by how the artifact is produced
+
+An interface may be one the environment can provide only to a program that was
+produced in a particular way. `openkal.exec` is the instance: one system grants
+a program memory it may execute only when the program carries a signed
+declaration that it will ask for such memory, and that declaration is applied
+after the link, by whoever produces the artifact.
+
+This is neither of the two partialities clause 6.2 distinguishes. The
+implementation does not lack the operation, so withholding the interface
+outright would deny it to programs for which it does work. Nor does it vary
+between the resources of the interface, which is clause 6.4's case; every region
+in a given program behaves alike.
+
+Such an interface shall be provided or withheld at **dependency resolution** —
+the first of the three times clause 6.2 tabulates, and the earliest at which the
+question can be answered, because the party that decides how the artifact is
+produced is the party that resolves its dependencies. An implementation
+expresses it as a feature of its package. A program that asks for the feature
+gets the interface and an artifact produced so that it works; a program that
+does not ask gets neither, and using the interface fails to link, which is
+clause 6.1's ordinary report.
+
+The rule this states is general: **an operation whose availability is decided by
+how the artifact is produced is not reported at run time.** Reporting it at run
+time would make every caller carry a path that most artifacts never take — and
+a path no artifact takes is a path nothing has verified.
+
+### 6.6 Concurrency
 
 An implementation shall permit concurrent operations upon distinct handles.
 
@@ -365,7 +437,7 @@ Atomicity below a threshold, which some systems guarantee for some resources, is
 not required. It is not universally implementable, and requiring it would oblige
 an implementation to introduce buffering it does not otherwise need.
 
-### 6.6 Ownership
+### 6.7 Ownership
 
 Handles obtained from the core interfaces are borrowed. They are not released,
 and no operation releases them.

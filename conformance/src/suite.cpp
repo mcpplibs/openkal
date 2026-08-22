@@ -10,6 +10,7 @@ import okc.time;
 import okc.fs;
 import okc.process;
 import okc.task;
+import okc.exec;
 
 namespace okc {
 
@@ -28,6 +29,7 @@ int run_all() {
     fs::run();
     process::run();
     task::run();
+    exec::run();
     termination::run();
 
     return summarise();
