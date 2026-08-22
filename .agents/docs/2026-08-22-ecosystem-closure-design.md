@@ -1234,7 +1234,8 @@ openkal-musl 替换掉的 `__libc_start_main` 不读辅助向量 —— 那是�
 | 5 | libc++ 的 freestanding 配置 | ✅ `llvm-generated/freestanding/` |
 | **6** | mcpp 在 configure 期拒绝 `import std` | ✅ **已改**(mcpp#486):门改问 capability |
 | **7** | mcpp 向编译器问 `std.cppm` 的位置 | ✅ **已改**(mcpp#486):包可以带自己的 std 模块源 |
-| **8** | 模块与消费方的 ISA/ABI 与异常设置不一致 | ❌ **最后一格** |
+| **8** | 模块与消费方的 ISA/ABI 与异常设置不一致 | ✅ **已改**(mcpp#486 第三提交) |
+| **9** | ⭐ **裸机上没有提供 `hosted` 集的实现** | ❌ **而这一格不在这条链路上** |
 
 **已实测**:
 - `mcpp build --target riscv64-none-elf`(openkal-musl)⇒ **1359 个对象**,
@@ -1302,7 +1303,7 @@ std-module-flags = ["--no-default-config", "-nostdinc", "-nostdinc++", "-D_GNU_S
 追加就意味着宿主的头排在包的前面,而后面任何 flag 都撤销不了。三元组因此要重述
 —— 它本来在被替换掉的那串里。
 
-#### ⚠️ 第八格:模块与消费方的编译设置不一致
+#### 第八格:模块与消费方的编译设置不一致(已改)
 
 std 模块现在**编得出来**了,卡在它与消费者的 TU 对不齐:
 
@@ -1315,10 +1316,46 @@ error: precompiled file ... was compiled for the target ABI 'lp64'
 两条同源:**freestanding 目标的 ISA/ABI flag(`-march`/`-mabi`/`-mcmodel`)
 与它对整张图强制的 `-fno-exceptions`,都没有到达 std 模块的那条命令。**
 
-⇒ 下一步是把目标自己的编译设置也带进那条命令。⚠️ 而异常那一轴要当心:
-docs/13 记着「异常开关属于 target 而非项目 cxxflags,**因为 BMI 记录了它**」——
-这正是上面第一条错误的机制,所以这一步不是加两个 flag,是让模块和消费者共用
-同一份设置。**本轮到此为止,而它现在有名字了。**
+**已做(mcpp#486 第三提交)。** 而做的时候发现,`freestanding/target.cppm` 里
+`-fno-exceptions` 上方的注释**自己预言了这一刻**,逐字:
+
+> a board that ships a target-built libc++abi and unwinder has a real case for
+> turning these back on, **and that is the point at which this becomes a
+> manifest key**.
+
+⭐ 那个点到了 —— 一个提供 `hosted-standard-library` 的包**就是**那段描述的
+board。所以这一对不再无条件强制,而**答案由图给**(capability 在依赖解析期已知),
+不是对目标的猜测。ISA 那一半同理:三元组连同整个档位在解析处重述,
+而 `clang.cppm` 不再自己拼 `--target` —— 那个职责归一处。
+
+#### ⭐⭐ 第九格:判据本身的前提不成立
+
+改完之后,**std 模块与程序都编过了**,链接停在:
+
+```
+ld.lld: error: undefined symbol: kal_task_yield
+ld.lld: error: undefined symbol: kal_fs_close_file
+```
+
+而这**不是缺陷** —— 是规范在按设计工作。实测两侧的接口面:
+
+| | 名字数 | 是什么 |
+|---|---|---|
+| `openkal-opensbi` **提供** | **11** | `core` —— abort + stream + memory |
+| `openkal-musl` **需要** | 40+ | `core` + env + fs + process + task + time,即 `hosted` |
+
+§6.1 说消费者用了实现不提供的接口就该链接失败。它正是这么做的。
+
+⇒ **「裸机上 `import std`」这个判据的前提是错的**:它假设 C 库能坐在**任何**
+裸机实现上,而 C 库要的是 `hosted` 集 —— §3.3 这一轮新加的命名束,正好是陈述
+这件事的词汇。SBI 一个提供 `core` 的实现,按 §3.1/§3.2 是**正确的**,不是不完整。
+
+⇒ 真正的下一步不是修任何东西,是**写一个在裸机上提供 `hosted` 的实现** ——
+文件系统、进程、执行上下文都要在没有操作系统的机器上有答案。那是与
+`openkal-llvm-runtime` 同一量级的另一件工程,而不是这条链路的收尾。
+
+**这一格是本轮最有价值的发现:它把一个读起来像「差最后一步」的判据,
+还原成一个「假设了一件不成立的事」的判据。**
 
 ### 附:阻塞点定位的过程(保留,因为它推翻了本节原来的判断)
 
