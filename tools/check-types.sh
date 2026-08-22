@@ -51,24 +51,47 @@ inc="${2:-include}"
 
 [ -d "$inc/openkal" ] || { echo "no $inc/openkal directory" >&2; exit 2; }
 
-tu="$(mktemp -t openkal-types-XXXXXX.c)"
-out="$(mktemp -t openkal-ast-XXXXXX.txt)"
-trap 'rm -f "$tu" "$out"' EXIT
+# ⚠️ A DIRECTORY AND A NAMED FILE, NOT `mktemp -t …c`.
+#
+# `mktemp -t PREFIX` means different things on the two systems this runs on. GNU
+# coreutils treats the argument as a template and honours a suffix after the
+# Xs; BSD treats it as a PREFIX and appends its own — so `-t x.c` produces
+# `/tmp/x.c.1a2b3c4d`, and the translation unit loses the extension that says
+# what language it is in.
+#
+# ⚠️ AND CLANG DOES NOT FAIL ON THAT. A file with an unrecognised extension is
+# taken as linker input, `-fsyntax-only` leaves nothing to do, and the compiler
+# exits ZERO having printed nothing. Measured 2026-08-22 on macos-14: the check
+# read an empty AST, and the only reason it did not report conformance is the
+# positive control below.
+dir="$(mktemp -d)"
+tu="$dir/openkal-types.c"
+out="$dir/ast.txt"
+trap 'rm -rf "$dir"' EXIT
 
 for h in "$inc"/openkal/*.h; do
     printf '#include <openkal/%s>\n' "$(basename "$h")"
 done > "$tu"
 
-"$cc" -fsyntax-only -I "$inc" -Xclang -ast-print "$tu" > "$out" 2>/dev/null || {
-    echo "the compiler could not print the AST for the headers" >&2
+# ⚠️ THE COMPILER'S OWN WORDS ARE KEPT AND SHOWN. An earlier version sent them
+# to /dev/null, and the one failure this script has had so far — the `mktemp`
+# difference above — then arrived as "the headers were not parsed" with nothing
+# to say why. A check that can fail should be able to say what it saw.
+if ! "$cc" -fsyntax-only -I "$inc" -Xclang -ast-print "$tu" > "$out" 2> "$dir/err"; then
+    echo "the compiler could not print the AST for the headers:" >&2
+    cat "$dir/err" >&2
     exit 2
-}
+fi
 
 # ⚠️ THE POSITIVE CONTROL, BEFORE THE CHECK AND NOT AFTER IT.
 #
 # The check below succeeds when it finds nothing, and an empty AST also finds
 # nothing. Every previous false green in this ecosystem had this shape, so the
 # script proves it read something before it is allowed to report success.
+#
+# ⭐ It has already earned its place. The `mktemp` difference above made this
+# script parse nothing on macOS and exit zero, finding no forbidden type — which
+# is indistinguishable from conformance except by this test.
 decls="$(grep -c 'kal_' "$out" || true)"
 if [ "$decls" -lt 40 ]; then
     echo "only $decls declarations mention kal_; the headers were not parsed" >&2
