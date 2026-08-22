@@ -904,7 +904,7 @@ picolibc 的 `vfprintf.c.o` 引用 `free`,并列会让同一块 RAM 有两个分
 
 | # | 实验 | 答「否」则 | 状态 |
 |---|---|---|---|
-| **A** | `-femulated-tls` 能否干净套上 musl(errno / pthread / locale 全量重编 + 跑 openkal-musl 现有 32 项断言) | §9.1 死;§5.6 的 TLS 改走改写汇编路线 | ✅ **通过,但带一条硬约束**,见 §10.1.2 |
+| **A** | `-femulated-tls` 能否干净套上 musl | §9.1 死;§5.6 的 TLS 改走改写汇编路线 | ✅ **通过,但带一条硬约束**,见 §10.1.2 |
 | **B** | libc++ 能否为 openkal-musl configure 出来(先在 Linux 上,不碰交叉) | **§6 死,§8 死**,C++ 交叉打折 | ✅ **全程通过** —— 建成、链成、跑成,含异常与 `import std`。见 §10.1.1(头)与 §12.4(整条) |
 | **C** | macOS 到底借了哪些符号 | §7.2 工作量变大 | ✅ **已完成:恰好 2 个**(§7.2) |
 | **D** | 不链 libSystem 的静态 Mach-O 能否被加载 | §7.2 的 macOS 部分打折 | 🟡 **已降级**:实测表明只需 2 符号的 `.tbd`,不必追求「完全不链 libSystem」。仍需 CI 验证产物能否启动 |
@@ -1185,7 +1185,46 @@ openkal-musl 替换掉的 `__libc_start_main` 不读辅助向量 —— 那是�
 第 1 步是最值钱的:**它把「我的运行时坏了」和「这个程序本来就跑不了」分开**,
 而那两件事在第一次失败时长得完全一样。
 
-### ⚠️ 裸机上的 `import std`:阻塞点已定位,而它不在设计预料的位置
+### ⭐⭐ 裸机:C++ 运行时已经建得出来,只差 mcpp 的一道门
+
+**这一节的四个阻塞点被逐个清掉了,最后停在第五个 —— 而第五个不在这条生态线里。**
+
+| # | 阻塞点 | 状态 |
+|---|---|---|
+| 1 | `openkal-musl` 的 vendored musl 树没有 riscv64 架构 | ✅ 已引入 + 生成头 |
+| 2 | `okm_setjmp.S` 只有 x86_64/aarch64 | ✅ 补 riscv64(自 musl 转写) |
+| 3 | `SYS_renameat` 在该架构上不存在 | ✅ 改成两个条件 |
+| 4 | `port/include/pthread_arch.h` 的 `MC_PC` | ✅ 补该架构的拼法 |
+| 5 | libc++ 的 freestanding 配置 | ✅ `llvm-generated/freestanding/` |
+| **6** | **mcpp 在 configure 期拒绝 `import std`** | ❌ **本轮不动** |
+
+**已实测**:
+- `mcpp build --target riscv64-none-elf`(openkal-musl)⇒ **1359 个对象**,
+  `ELF 64-bit LSB relocatable, UCB RISC-V, RVC, double-float ABI`
+- 同上(openkal-llvm-runtime)⇒ **1431 个对象**,`__cxa_throw` 与
+  `__cxa_begin_catch` 有定义
+
+**第六个的原文**(`mcpp/src/build/prepare.cppm:5519`):
+
+```
+error: `import std;` is not available on 'riscv64-none-elf'
+       --- a freestanding target has no hosted standard library.
+```
+
+⭐ **那句话陈述的前提,现在已经不成立了** —— `openkal-llvm-runtime` 就是一份
+为这种目标配置的 hosted 标准库。门问的是**目标是不是 freestanding**,
+而该问的是**hosted 标准库在不在**。
+
+⇒ 正确形状是 **capability**,不是翻转一个条件:`openkal-llvm-runtime` 声明它
+提供「hosted 标准库」,门检查有没有提供者。这与 mcpp 已有的 capability provider
+机制(`docs/13` 的 `freestanding-allocator`)同形,也与 openkal §6.2「最早可知的
+时刻是依赖解析」一致。
+
+⚠️ **本轮刻意不做**,理由记下来免得被当成遗漏:mcpp 的工作树停在使用者进行中的
+发布分支上,而这条改动要动 capability 管线 —— 仓促做出来的构建工具回归,
+比缺这个特性更糟。
+
+### 附:阻塞点定位的过程(保留,因为它推翻了本节原来的判断)
 
 设计把「裸机上 `import std` 能编能链能跑」定为本条的验收判据,理由是
 「裸机没有宿主可借,不会假绿」。**已达成的是宿主上的完整链路**;裸机那一步
@@ -1366,7 +1405,7 @@ CI 全部报 `path dependency has no mcpp.toml` —— 一条关于文件缺失�
 | **A** `-femulated-tls` | ✅ 通过(32 项断言 0 failures)。⚠️ 带出:该 flag 是 LLVM 专有,且在 openkal-musl 的清单里表达不出来 |
 | **B** libc++ configure | ✅ 全程通过 —— 建成、链成、跑成、`import std` 可用 |
 | **C** macOS 借了哪些符号 | ✅ 恰好两个 |
-| **D/E** 交叉产物真机启动 | ❌ 未做 |
+| **E** 交叉产物真机启动 | ✅ **已做**:Linux 上交叉产出 → 传到 macos-14 → ad hoc 签名 → **启动了**。argv、分配、建文件、写文件全过;一条「读回」失败,已拆成四条待下一次 CI 点名 |
 
 ### ⚠️ 明确没有做的
 
