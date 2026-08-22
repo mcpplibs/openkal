@@ -1,4 +1,4 @@
-# The C surface of openkal 0.5, one name per line.
+# The C surface of openkal 0.6, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides

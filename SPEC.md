@@ -1,4 +1,4 @@
-# openkal Specification, version 0.5
+# openkal Specification, version 0.6
 
 ## 1. Scope
 
@@ -44,9 +44,8 @@ provides an interface in whole or not at all.
 | `openkal.exec` | a region of the address space a program may execute | optional |
 | `openkal.event` | readiness of a set of resources | reserved |
 
-Version 0.5 specifies the core and standard interfaces. The optional rows are
-specified; the reserved row is not, and its name shall not be used for other
-purposes.
+Version 0.6 specifies the core, standard and optional interfaces. The reserved
+row is not specified, and its name shall not be used for other purposes.
 
 *Core* denotes an interface every implementation provides. *Standard* denotes
 one an implementation hosting a C library provides. *Optional* denotes one it

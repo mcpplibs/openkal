@@ -63,6 +63,14 @@ task     = []
 exec     = []
 
 standard = ["core", "env", "time", "fs", "process", "task"]
+
+# Deliberately not part of `full'. Clause 6.1 states that an implementation
+# provides an interface in whole or not at all and that a missing one is not a
+# deviation; a feature set named `full' that required every optional interface
+# would make "optional" mean nothing, and the report would be a link failure
+# rather than an observation that did not hold. The caller names this set for an
+# implementation that provides these interfaces, and omits it for one that does
+# not --- which is the same choice the implementation itself made.
 optional = ["exec"]
 
 # The kinds of examination. Behaviour is always performed; the other three are
@@ -83,4 +91,4 @@ stability = []
 # declared rather than assumed, so that requesting cost without time selects
 # time instead of failing to link.
 cost      = ["time"]
-full      = ["standard", "optional", "abi", "stability", "cost"]
+full      = ["standard", "abi", "stability", "cost"]

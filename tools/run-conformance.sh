@@ -74,7 +74,33 @@ echo "--- the suite's dependencies ---"
 sed -n '/^\[dependencies\]/,/^$/p' "$suite/mcpp.toml"
 
 cd "$suite"
+# ⚠️ A CHANGE OF FEATURE SET DOES NOT INVALIDATE THE BUILD.
+#
+# Measured 2026-08-22, three runs in one working tree with nothing else changed:
+#
+#     run-conformance.sh … full,optional   103 held, 0 not observed   (cold)
+#     run-conformance.sh … full            103 held, 0 not observed   ← wrong
+#     rm -rf target && … full               97 held, 1 not observed   ← right
+#
+# The second run reported on the first run's build. The feature set reaches the
+# suite's own translation units as defines, and those defines are what decide
+# which sections examine anything --- so a run that switched sets examined the
+# previous set and said so in neither its output nor its exit status.
+#
+# This matters here more than it would elsewhere, because this workflow runs the
+# suite twice in one checkout with different sets, and the second run is the
+# composability check --- whose entire purpose is to observe that a smaller set
+# is examined as a smaller set. It could not have observed that.
+#
+# The remedy is to remember which set the build in `target' was made for, and to
+# discard the build when the answer changes. Re-running the same set still
+# builds incrementally, which is what the record is for.
+stamp="target/.features"
+if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$features" ]; then
+    rm -rf target
+fi
 mcpp build --features "$features" "$@"
+mkdir -p target && printf '%s' "$features" > "$stamp"
 
 binary="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \) | head -1)"
 [ -n "$binary" ] || { echo "the suite was not produced" >&2; exit 2; }
