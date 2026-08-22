@@ -1185,11 +1185,31 @@ openkal-musl 替换掉的 `__libc_start_main` 不读辅助向量 —— 那是�
 第 1 步是最值钱的:**它把「我的运行时坏了」和「这个程序本来就跑不了」分开**,
 而那两件事在第一次失败时长得完全一样。
 
-### 尚未做到
+### ⚠️ 裸机上的 `import std`:阻塞点已定位,而它不在设计预料的位置
 
-- ⚠️ **裸机上的 `import std` 还没验**。设计把它定为本条的验收判据,理由是
-  「裸机没有宿主可借,不会假绿」。已达成的是**宿主上**的完整链路。
-  裸机那一步还需要 freestanding 目标的配置,未做。
+设计把「裸机上 `import std` 能编能链能跑」定为本条的验收判据,理由是
+「裸机没有宿主可借,不会假绿」。**已达成的是宿主上的完整链路**;裸机那一步
+本轮**没有做到**,而这一轮把它卡在哪弄清楚了 —— 卡点不是 libc++ 的 freestanding
+配置(设计以为是那个),而是**更下面一层**:
+
+| 环节 | 状态 |
+|---|---|
+| `openkal-opensbi` 为 `riscv64-none-elf` 构建 | ✅ **实测通过**(带分支依赖) |
+| `openkal-musl` 为 `riscv64-none-elf` 构建 | ❌ **不可能,今天** |
+| `openkal-llvm-runtime` 的 freestanding 配置 | 未到这一步 |
+
+**实测的阻塞点**:`openkal-musl/musl/arch/` 里只有 `aarch64`、`generic`、
+`x86_64` —— vendored 的 musl 树被裁到两个架构。musl 的每个架构都需要自己的
+`bits/alltypes.h`(由 `mkalltypes.sed` 从该架构的 `.in` 生成)与
+`bits/syscall.h`,而 riscv64 的那两份**源材料就不在树里**。
+
+⇒ 裸机那条路的下一步是**先把 musl 的 riscv64 架构目录 vendored 进来并生成
+它的头**,再谈 libc++ 的 freestanding 配置。加上 `cfg(os = "none")` 的实现
+依赖、链接脚本与裸机运行时,这是一条独立的工作线,不是本条的收尾。
+
+⭐ 这个定位本身有价值:设计里「裸机 `import std`」读起来像是
+`openkal-llvm-runtime` 差的最后一步,实测表明它差的是**再下面一层的两个文件**,
+而且那两个文件的生成方式已经写在 `musl-generated/README.md` 里。
 
 ## 12.5 实施记录(2026-08-22 第一轮)
 
