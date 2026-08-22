@@ -817,11 +817,12 @@ ld.lld: error: undefined symbol: operator new(unsigned long)
 这与本项目一路踩过的假绿教训互补:桌面环境会骗你(退路、跳过的 e2e、
 从未执行的降级分支),裸机不会 —— 它没有可以静默降级的地方。
 
-### 8.3 深嵌入式:`openkal-picolibc`(本轮纳入)
+### 8.3 深嵌入式:`openkal-picolibc`(纳入范围,而本轮不做 —— 理由变了)
 
-**定案:纳入范围。**
+**定案:纳入范围。本轮不做。** ⚠️ 而「不做」的理由不是没排上,是**本轮用另一
+条路拿到了它一半的动机**,所以剩下的一半值不值得一个新包,要先说清楚。
 
-「嵌入式」是两个世界,而 openkal-musl 只覆盖其中一个:
+「嵌入式」是两个世界:
 
 | | 目标 | C 库 |
 |---|---|---|
@@ -831,12 +832,42 @@ ld.lld: error: undefined symbol: operator new(unsigned long)
 分层允许这个替换:**openkal 是接口,openkal-musl 只是一个实现选择**。而
 `std-freestanding` 已有的 `alloc-kal` / `alloc-libc` 特性轴,正是为这条路预留的形状。
 
-⚠️ 已知的一条约束(来自 0.1 的实测):**`kal_alloc` 必须建在 libc 分配器之上** ——
-picolibc 的 `vfprintf.c.o` 引用 `free`,并列会让同一块 RAM 有两个分配器。
+#### ⭐ 本轮发生的事:动机的一半被另一条路满足了
 
-⚠️ **体积必须实测,而工具已在**:每次 freestanding 链接都打印 `Size` 行。
-`<format>` / `std::print` + 异常 + unwinder 在标准库上是几十到上百 KB 量级 ——
-**进不进得了 flash 是数出来的,不是推出来的**。
+纳入 picolibc 的动机有两条,它们经常被混着说:
+
+| 动机 | 本轮状态 |
+|---|---|
+| **A. 让 C 库能坐在只提供 `core` 的后端上** | ✅ **已达成,而且不是靠换 C 库** |
+| **B. 让镜像小到能进几十 KB 的 flash** | ❌ 未动 |
+
+A 的做法是 `port/src/okm_opt.h` 那道缝:**同一个 musl,两种配置**。清单在
+`cfg(os="none")` 下清掉 `OKM_HAS_FS` / `OKM_HAS_PROCESS` / `OKM_HAS_TASK`,C 库
+就不再被**编成**调用它下面没有的接口。实测:裸机 riscv64 全部 2718 个对象里,
+`kal_fs_*` / `kal_process_*` / `kal_task_*` 的未定义引用为 **0**。
+
+⇒ 这比「再写一个 C 库」更好的地方在于:**一个 C 库、两种配置,而不是两个 C 库
+各自演化**。而且它把「哪些接口不在」变成了清单里一行可读的声明,而不是两个包
+之间的差异。
+
+⇒ 所以 picolibc 现在**只**为 B 服务了。而 B 是一个可以先测再决定的问题:
+每次 freestanding 链接都打印 `Size` 行。本轮实测,裸机 `import std` 的镜像:
+
+```
+text 2325376  data 5792  bss 362128   ≈ 2.3 MB
+```
+
+**2.3 MB 的 text 进不了 Cortex-M 的 flash,而这跟 C 库是谁没什么关系** ——
+里面绝大部分是 `<format>`、Unicode 宽度表、异常与 unwinder。换 C 库省不下它们。
+⇒ B 的真正杠杆是**标准库的裁剪**(`std-freestanding` 那条轴),不是 C 库的替换。
+
+**这一格的价值:一个「已定案纳入」的包,在做之前先被测量降级成了「未必需要」。**
+picolibc 仍然纳入范围,但它的判据要重写成 B 的形式:**在裁剪过的标准库之上,
+picolibc 相对 musl 还能省下多少 —— 数出来,再决定**。
+
+⚠️ 已知的一条约束(来自 0.1 的实测),留给真做的时候:**`kal_alloc` 必须建在
+libc 分配器之上** —— picolibc 的 `vfprintf.c.o` 引用 `free`,并列会让同一块
+RAM 有两个分配器。
 
 ### 8.4 两条保留
 
