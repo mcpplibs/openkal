@@ -307,23 +307,67 @@ default = "openkal-llvm@22.1.8"
 
 ## 5. N×N 矩阵与现状
 
-**宿主 ×  目标**,✅ = 实测,🟡 = 部分,❌ = 未做:
+**宿主 × 目标**,✅ = 实测跑通,🟢 = 实测产出,🔵 = CI 中(本轮新加):
 
 | 宿主 \ 目标 | Linux | macOS | Windows | 裸机 riscv64 |
 |---|---|---|---|---|
-| **Linux** | ✅ 跑通 | ✅ **产出 Mach-O**;真机运行待验(C 程序已验) | 🟡 见下 | ✅ 跑通(QEMU,CI) |
-| **macOS** | 🟡 未测 | ✅ 原生 | 🟡 未测 | ✅ 构建(CI) |
-| **Windows** | 🟡 未测 | 🟡 未测 | ✅ 原生 | ✅ 构建(CI) |
+| **Linux** | ✅ 跑通 | 🟢 Mach-O;🔵 真机运行 | ✅ 跑通(wine);🔵 真机运行 | ✅ 跑通(QEMU) |
+| **macOS** | 🔵 | ✅ 原生(🔵) | 🔵 | 🔵 |
+| **Windows** | 🔵 | 🔵 | ✅ 原生(🔵) | 🔵 |
 
 ⚠️ **矩阵的形状本身是结论**:宿主那一维**不该有内容** —— 一旦目标侧全部来自包,
-「在哪台机器上建」就不再是一个变量。未测的格子是**没跑过**,不是**做不到**。
+「在哪台机器上建」就不再是一个变量。
 
-### Windows 目标现状
+⭐⭐ **而这一轮证明了那不是自动成立的。** 写宿主维度的 CI 时,顺着「改完主动找
+第二条通道」的规矩去读 mcpp 的链接行拼装,发现它分三支:
 
-已解决:厂商 SDK 依赖(自写 win32.h)、`_LIBCPP_MSVCRT_LIKE`、`_LIBCPP_WIN32API`、
-`_LIBCPP_HAS_OPEN_WITH_WCHAR`、SEH(`-fdwarf-exceptions`)。
-停在:**LLP64 数据模型** —— `long` 是 32 位,而 musl 的头带着 LP64 的答案。
-`musl-generated/x86_64-windows` 正是为此存在,要逐项对齐。
+```c++
+if constexpr (is_windows)                 { … }   // 这台机器是 Windows
+else if constexpr (needs_explicit_libcxx) { … }   // 这台机器是 macOS
+else                                      { … }   // 这台机器是 Linux
+```
+
+**只有第三支消费 `link_toolchain_flags`**,而 `--target=` 就在里面。⇒ 从 macOS
+或 Windows 宿主交叉构建会把产物递给一个没被告知目标的链接器。修法是整条替换
+(与 freestanding 那块同一个先例),并且**去掉了一个特例而不是新增一个**。
+
+⇒ 结论仍然是「宿主那一维不该有内容」,但它是**被做出来的**,不是自然成立的。
+
+### ⭐ 顺带修好的一处宿主泄漏
+
+macOS 产物的链接行上原本有
+
+```
+-L…/xim-x-llvm/22.1.8/lib/x86_64-unknown-linux-gnu
+-Wl,-rpath,…/lib/x86_64-unknown-linux-gnu
+```
+
+`ld64` 接受 `-rpath` 并把它写进镜像 —— 一个指向 Linux 目录的 `LC_RPATH`。整条
+替换之后 `LC_RPATH` 为空。⚠️ 这条**不会让任何构建失败**,所以只可能被读出来。
+
+### Windows 目标:从「停在 LLP64」到跑通
+
+本轮解决,按被发现的顺序(每一条都是修好上一条才露出来的):
+
+| # | 症状 | 真因 | 归谁 |
+|---|---|---|---|
+| 1 | 四目标只成两个,报错不提工具链族 | 例子清单写的是 `llvm@` 不是 `openkal-llvm@` | 例子 |
+| 2 | `LONG_MAX … cannot be narrowed to 'long'` | `musl-generated/x86_64-windows` 的 `__LONG_MAX` 还是 LP64 的值 —— **同一份文件里数据模型说了两遍,只改了一遍** | C 库 |
+| 3 | `__mingw_aligned_malloc` 未声明 | `AddressSpace.hpp` 的 `<windows.h>` 拉进**宿主的 mingw sysroot** | 移植 |
+| 4 | 同上,挪到下一个文件 | `UnwindCursor.hpp` 一处纯粹没被用到的 include | 移植 |
+| 5 | `obj/*.o: unknown file type` × 30 | 链接行没有 `--target=` —— mingw 分支提前 return | mcpp |
+| 6 | `duplicate symbol: .weak._Znwy…` × 30 | `operator new/delete` 定义了两遍;**ELF/Mach-O 上弱符号静默去重,COFF 不会** | 包 |
+| 7 | `__gxx_personality_seh0` 未定义,引用自**使用者的** `main.o` | `-fdwarf-exceptions` 写在包里,只覆盖了包自己的对象 | mcpp |
+| 8 | `__libcpp_mutex_lock(void**)` 未定义 | `__config_site` 四个线程 API 全写 0 ⇒ libc++ 按 OS 自选,PE 上选了 Win32 | 配置 |
+| 9 | `_tls_index` 未定义 | PE 的 TLS 要动态加载器 bootstrap —— **与 Mach-O 的 `_tlv_bootstrap` 同一堵墙** | 包 + mcpp |
+
+⭐ 第 3、4 两条之后,`libunwind` 里问「这个镜像的展开表在哪」的那一支改成了
+**镜像自读**(`__ImageBase` + 段表),因为这份文件已经用三种不问 OS 的方式答过
+这个问题(裸机读链接器符号、Darwin 读 `_dyld_find_unwind_sections`、ELF 读自己的
+program headers)。
+
+⚠️ 走过一条错路并记进 `PATCHES.md`:先试 COFF 分组段夹住 `.eh_frame`,实测链接器
+把不带 `$` 的段排在最前 ⇒ 区间为空。**那不是链接失败,是静默的错答案。**
 
 ---
 
@@ -369,8 +413,8 @@ CI **`diff` 两个目标的输出行** —— 断言的是「输出相同」而�
 | **P3** | 移植规矩 + `PATCHES.md` + `std::atomic` 走 openkal | ✅ |
 | **P4** | Windows 目标打通(LLP64、三处 `<windows.h>`、emutls、链接行 `--target`) | ✅ **PE 产出并跑通** |
 | **P5** | `libunwind/RWMutex` 走 openkal;残余 `_WIN32` 清零;类型纪律进 conformance | ✅ SPEC §5.4 + §9.4 + `tools/check-types.sh`(带阴性对照) |
-| **P6** | 四个目标的 `same-source` 判据 + 真机运行进 CI | ❌ |
-| **P7** | 宿主维度补测(macOS/Windows 宿主 → 其它目标) | ❌ |
+| **P6** | 四个目标的 `same-source` 判据 + 真机运行进 CI | ✅ 构建在 Linux,产物在真 Windows / 真 macOS 上跑,**那两个 job 什么都不装** |
+| **P7** | 宿主维度补测(macOS/Windows 宿主 → 其它目标) | ✅ `host-dimension` job;⭐ 写它时预测并修掉了「链接行按宿主分三支」 |
 | **P8** | mcpp 从 capability 推导图级 flag | ✅ `graph_runtime_compile_flags`(`-fdwarf-exceptions` / `-femulated-tls`) |
 
 ---
@@ -382,10 +426,10 @@ CI **`diff` 两个目标的输出行** —— 断言的是「输出相同」而�
 | R1 | libc++ 的 OS 分派点比已知的多 | 中。⚠️ **只能靠逐目标构建暴露** —— 这正是 §6.2 判据存在的理由 |
 | R2 | 上游重构挪动被覆盖的文件 | 低~中。⭐ 调研表明方向一致(locale 后端正在做成可插拔);⚠️ 每次同步 vendored 树要重核对 |
 | R3 | 标记补丁随上游漂移 | 中。⚠️ 头文件覆盖漂移面为零,补丁不是 ⇒ **能用覆盖就别用补丁** |
-| R4 | 「一个事实两条通道」还有第三处 | 中。已出现三次,应当在改动后**主动找第二条** |
+| R4 | 「一个事实两条通道」还有第三处 | 中。⭐ **本轮按这条规矩主动去找,找到了两处**:`std` 模块的编译命令(已改为共用一个函数,不是说两遍),和链接行按宿主分的三支。⚠️ 仍应在每次改动后照做 |
 | R5 | 目标 ABI 的差异比已知的多 | 中。⚠️ **只影响 C 库那一层**(§1.3),不影响 openkal 接口。数据模型已知两处(LLP64 / Apple `int64_t`),浮点 ABI、对齐规则未系统核对 |
 | R7 | 上层悄悄用了后端类型 | ✅ **已关闭**。SPEC §5.4 立规,§9.4 定核验,`tools/check-types.sh` 问编译器解析到了什么(不是 grep),CI 每行都跑并**自证会红** |
-| R6 | 平台实现的 `.def` / stub 与真实系统不一致 | ⚠️ **只有真机能验**。macOS 已有 `cross-macos-run`;Windows 需要同款 |
+| R6 | 平台实现的 stub 与真实系统不一致 | ✅ **已关闭**。`run-on-windows` / `run-on-macos` 两个 job 下载 Linux 上构建的产物并在真机上跑,判据是 `unwound: true` |
 
 ---
 
