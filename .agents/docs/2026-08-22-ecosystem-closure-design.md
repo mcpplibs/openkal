@@ -1313,18 +1313,28 @@ mcpp 通过 `-print-library-module-manifest-path` **向编译器问** `std.cppm`
 
 已落地并验证的部分,以及过程中发现的两处既有缺陷。
 
-### 已合入分支 `feat/openkal-closure` 的 PR
+### 分支 `feat/openkal-closure` 上的 PR(八个仓库 + 构建工具)
 
-| 仓库 | PR | 内容 |
+| 仓库 | PR | CI |
 |---|---|---|
-| `openkal` | #6 | `openkal.exec`、§6.5 新条款、版本升 0.6.0、conformance 假绿修复、CI 守卫补分支形式 |
-| `openkal-linux` | #4 | `openkal.exec` 的实现 |
-| `openkal-macos` | #4 | `port/libSystem.tbd` —— 两个名字 |
-| `openkal-musl` | #4 | 十五个间接符号的重测、`tools/probe-cross-macos.sh` |
-| `openkal-windows` | #5 | 依赖改为分支形式 |
+| `openkal` **0.6.0** | #6 | ✅ |
+| `openkal-linux` | #4 | ✅ |
+| `openkal-macos` | #4 | ✅ |
+| `openkal-musl` | #4 | ✅ |
+| `openkal-windows` | #5 | ✅ |
+| **`openkal-llvm-runtime` 0.1.0**(新建) | #1 | ✅ |
+| `openkal-uefi` | #1 | ✅(含 OVMF 启动) |
+| `openkal-opensbi` | #1 | ✅(含真 OpenSBI 启动) |
+| `mcpp-community/mcpp` | **#486** | import std 的门改问 capability |
 
-⚠️ `openkal-uefi` 与 `openkal-opensbi` 的分支**推不上去**(403,
-`speak-agent` 对这两个仓库无写权限)。两者本轮无改动,不阻塞。
+⚠️ **`openkal-uefi` / `openkal-opensbi` 的 403 是 remote 协议问题,不是权限缺失**:
+它们的 `origin` 指向 HTTPS,而这个账号在那条路径上没有写权限 —— 报出来的是
+`Permission denied`,读起来像仓库不存在。换成 SSH(其余六个仓库一直用的那种)
+即可推送。**一条读起来像「没有权限」的消息,可能只是「走错了路径」。**
+
+⭐ 而这两个仓库不是形式上的补齐:`openkal-musl` 的 `cfg(os = "none")` 依赖指向
+`openkal-opensbi`,而它的 `main` 用版本号依赖 openkal —— 两种形式冲突,
+**riscv64 的解析一直断在这里**。改过来之后,裸机那条链纯 git 依赖就能解析。
 
 ### ⭐ 发现的既有缺陷一:换 feature 集不会让 conformance 构建失效
 
