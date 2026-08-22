@@ -1232,7 +1232,8 @@ openkal-musl 替换掉的 `__libc_start_main` 不读辅助向量 —— 那是�
 | 3 | `SYS_renameat` 在该架构上不存在 | ✅ 改成两个条件 |
 | 4 | `port/include/pthread_arch.h` 的 `MC_PC` | ✅ 补该架构的拼法 |
 | 5 | libc++ 的 freestanding 配置 | ✅ `llvm-generated/freestanding/` |
-| **6** | **mcpp 在 configure 期拒绝 `import std`** | ❌ **本轮不动** |
+| **6** | mcpp 在 configure 期拒绝 `import std` | ✅ **已改**(mcpp#486):门改问 capability |
+| **7** | mcpp 向编译器问 `std.cppm` 的位置 | ❌ **新暴露的一格** |
 
 **已实测**:
 - `mcpp build --target riscv64-none-elf`(openkal-musl)⇒ **1359 个对象**,
@@ -1256,9 +1257,31 @@ error: `import std;` is not available on 'riscv64-none-elf'
 机制(`docs/13` 的 `freestanding-allocator`)同形,也与 openkal §6.2「最早可知的
 时刻是依赖解析」一致。
 
-⚠️ **本轮刻意不做**,理由记下来免得被当成遗漏:mcpp 的工作树停在使用者进行中的
-发布分支上,而这条改动要动 capability 管线 —— 仓促做出来的构建工具回归,
-比缺这个特性更糟。
+**已做(mcpp#486)**,用 git worktree 从 `origin/main` 开分支,完全不碰使用者
+进行中的工作树。改动是一行查询加一个条件 —— `capProviders` 在那一点上已经建好:
+
+```cpp
+const bool hostedStdProvided =
+    capProviders.find("hosted-standard-library") != capProviders.end();
+if (ft && ft->is_freestanding() && !hostedStdProvided) { ... }
+```
+
+三侧都验过:宿主 `import std` 不变;freestanding 无提供者仍拒绝且**消息逐字未变**;
+freestanding 有提供者放行。
+
+#### ⚠️ 放行之后暴露的第七格
+
+```
+error: source imports std but toolchain 'clang 22.1.8 (riscv64-none-elf)'
+       provides no std module source
+```
+
+mcpp 通过 `-print-library-module-manifest-path` **向编译器问** `std.cppm` 的位置,
+而那一份是**包 configure 出来的、编译器不知道的**。
+
+⇒ 让提供 capability 的包一并声明它的 std 模块源,是一件**独立的**改动:它不只是
+加一个清单字段 —— 那个模块还要用包自己的 include 路径与 `__config_site` 去编,
+而现在 `std_module_build_commands` 用的是工具链的。**本轮不做,而它现在有名字了。**
 
 ### 附:阻塞点定位的过程(保留,因为它推翻了本节原来的判断)
 
