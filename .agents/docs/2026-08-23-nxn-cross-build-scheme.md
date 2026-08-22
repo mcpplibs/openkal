@@ -139,9 +139,26 @@ okm_syscall.c:439: incompatible pointer types passing 'uint64_t *'
 > 出现 `long` / `uint64_t` / `size_t` 的地方,要么它在 C 库里(合法,那层重建
 > POSIX),要么它是一处应当修掉的后端泄漏。
 
-⚠️ 而这条判据**可以机器核验** —— `SURFACE.txt` 已经列出全部 56 个名字,
-签名里只允许出现 `kal_*`、`void`、`char`、`int` 和 openkal 自己的 struct。
-把它加进 conformance 是 P5 的一项。
+#### ✅ 实测:当前 0 处泄漏
+
+2026-08-23 核验(`include/openkal/*.h`,10 个头 618 行,`SURFACE.txt` 56 个名字):
+
+```
+$ grep -oE '\b(unsigned |signed )?(long long|long|short|size_t|uint[0-9]+_t|
+    int[0-9]+_t|intptr_t|uintptr_t|ptrdiff_t|ssize_t|float|double)\b' \
+    include/openkal/*.h | sort | uniq -c
+（无输出）
+```
+
+⚠️ **空输出要先证明不是假绿** —— 阳性对照:同一批文件里 `kal_u64` 命中 8 处,
+`types.h` 里 `__UINT64_TYPE__` 命中 2 处。⇒ grep 确实读到了文件。
+
+⇒ **整个 openkal 接口上没有任何一个裸类型。** 唯一出现 `unsigned int` 的地方是
+`types.h` 里 typedef 的右值本身,而且还在 `_MSC_VER` / 32 位的兜底分支
+—— 首选分支是 `__UINTPTR_TYPE__`,连兜底都不需要走。
+
+⚠️ 但这是**今天手跑的一次**,不是守卫。把它加进 conformance(每次 CI 都跑)
+是 P5 的一项 —— 否则下一个新接口引入 `size_t` 时,没有任何东西会说话。
 
 #### ⚠️ 那什么才是真正不该屏蔽的
 
