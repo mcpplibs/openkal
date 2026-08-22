@@ -224,6 +224,51 @@ jobs:
           CC=cc bash tools/check-declarations.sh
           command -v clang >/dev/null && CC=clang bash tools/check-declarations.sh || true
 
+      # ⭐⭐ AND NO DECLARATION NAMES A BACKEND TYPE.
+      #
+      # The job above asserts the declarations COMPILE. This asserts what they
+      # are written WITH, which is a different freedom and the one that decides
+      # whether a `kal_*` signature means the same thing on four object formats.
+      # `sizeof(long)` is 8 on x86_64 Linux and 4 on x86_64 Windows; a `long` in
+      # an interface would be one signature with two meanings.
+      #
+      # ⚠️ It runs on every row of this matrix rather than once, because a type
+      # is a claim about a TARGET and this matrix is where the targets are.
+      #
+      # ⚠️ Needs a clang-family driver (`-Xclang -ast-print`); rows whose
+      # toolchain has no such spelling are covered by the other rows, and the
+      # step says so rather than passing silently.
+      - name: No declaration names a backend type
+        if: runner.os != 'Windows'
+        run: |
+          cc="$(command -v clang || true)"
+          if [ -z "$cc" ]; then
+            echo "no clang on this row; the type check runs on the rows that have one"
+            exit 0
+          fi
+          bash tools/check-types.sh "$cc" include
+
+      # ⚠️ AND THE CHECK DETECTS WHAT IT EXISTS TO DETECT.
+      #
+      # A check that succeeds by finding nothing succeeds identically when it
+      # reads nothing, and every false green in this ecosystem has had that
+      # shape. `check-types.sh` proves it parsed the headers before reporting;
+      # this proves it would have failed.
+      - name: The type check detects a leak
+        if: runner.os != 'Windows'
+        run: |
+          cc="$(command -v clang || true)"
+          [ -n "$cc" ] || exit 0
+          cp include/openkal/env.h /tmp/env.h.orig
+          printf '\nint kal_env_probe_leak(unsigned long n);\n' >> include/openkal/env.h
+          if bash tools/check-types.sh "$cc" include; then
+            cp /tmp/env.h.orig include/openkal/env.h
+            echo "the type check accepted 'unsigned long' in an interface" >&2
+            exit 1
+          fi
+          cp /tmp/env.h.orig include/openkal/env.h
+          echo "the type check rejects a backend type, as it must"
+
   # ---------------------------------------------------------------------------
   # The property the specification exists for.
   substitution:

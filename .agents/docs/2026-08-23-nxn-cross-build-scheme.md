@@ -367,11 +367,11 @@ CI **`diff` 两个目标的输出行** —— 断言的是「输出相同」而�
 | **P1** | 谓词从「哪个 OS」改为「哪个 C 库」(libc++ 17 处) | ✅ |
 | **P2** | macOS 目标打通(Mach-O 产出) | ✅ |
 | **P3** | 移植规矩 + `PATCHES.md` + `std::atomic` 走 openkal | ✅ |
-| **P4** | Windows 的 LLP64 对齐 | 🟡 进行中 |
-| **P5** | `libunwind/RWMutex` 走 openkal;残余 `_WIN32` 清零;**类型纪律进 conformance**(§1.3 判据) | ❌ |
+| **P4** | Windows 目标打通(LLP64、三处 `<windows.h>`、emutls、链接行 `--target`) | ✅ **PE 产出并跑通** |
+| **P5** | `libunwind/RWMutex` 走 openkal;残余 `_WIN32` 清零;类型纪律进 conformance | ✅ SPEC §5.4 + §9.4 + `tools/check-types.sh`(带阴性对照) |
 | **P6** | 四个目标的 `same-source` 判据 + 真机运行进 CI | ❌ |
 | **P7** | 宿主维度补测(macOS/Windows 宿主 → 其它目标) | ❌ |
-| **P8** | mcpp 从 capability 推导 `-fdwarf-exceptions` 一类的图级 flag | ❌ |
+| **P8** | mcpp 从 capability 推导图级 flag | ✅ `graph_runtime_compile_flags`(`-fdwarf-exceptions` / `-femulated-tls`) |
 
 ---
 
@@ -384,7 +384,7 @@ CI **`diff` 两个目标的输出行** —— 断言的是「输出相同」而�
 | R3 | 标记补丁随上游漂移 | 中。⚠️ 头文件覆盖漂移面为零,补丁不是 ⇒ **能用覆盖就别用补丁** |
 | R4 | 「一个事实两条通道」还有第三处 | 中。已出现三次,应当在改动后**主动找第二条** |
 | R5 | 目标 ABI 的差异比已知的多 | 中。⚠️ **只影响 C 库那一层**(§1.3),不影响 openkal 接口。数据模型已知两处(LLP64 / Apple `int64_t`),浮点 ABI、对齐规则未系统核对 |
-| R7 | 上层悄悄用了后端类型 | 中。⚠️ 今天靠编译器偶然发现(`kal_u64` vs `uint64_t`);**判据可机器核验而尚未自动化** —— P5 |
+| R7 | 上层悄悄用了后端类型 | ✅ **已关闭**。SPEC §5.4 立规,§9.4 定核验,`tools/check-types.sh` 问编译器解析到了什么(不是 grep),CI 每行都跑并**自证会红** |
 | R6 | 平台实现的 `.def` / stub 与真实系统不一致 | ⚠️ **只有真机能验**。macOS 已有 `cross-macos-run`;Windows 需要同款 |
 
 ---

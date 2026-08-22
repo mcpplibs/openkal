@@ -306,6 +306,41 @@ version 0.3. The evolution rule of clause 8 admits new declarations and excludes
 changes to existing ones; a structure layout is not protected by that rule
 unless it is separately declared immutable, and it is so declared here.
 
+### 5.4 The interface names its own types and no others
+
+Every type that crosses this interface is one this specification declares.
+`kal_uintptr`, `kal_u32`, `kal_u64`, `kal_i64` and the structures of clause 5.3
+are the whole vocabulary, together with `void`, `char` and `int`, which have one
+meaning everywhere.
+
+A declaration does not name `long`, `size_t`, `uint64_t`, or any other type
+whose definition belongs to a C library or to a data model. This is not a
+stylistic preference. `sizeof(long)` is eight on one common target and four on
+another; a signature naming it would be one signature with two meanings, and the
+property clause 1 exists for — that a program's source is invariant under a
+change of implementation — would hold only among implementations that shared a
+data model.
+
+Clause 5.1 gives the reason the types are derived from the compiler rather than
+from a header. This clause states the consequence for everything built above:
+**a layer above openkal uses nothing from a concrete backend, including its
+types.** The question "how wide is `long` here" does not arise at this interface,
+and it does not arise because it cannot be asked.
+
+The one layer for which this does not hold is a C library being ported onto
+openkal, and it does not hold there for a reason that is not an exception: such
+a library reconstructs POSIX, and POSIX itself names `long`. Its answer is a
+property of the target rather than of openkal, and it is configured per target
+accordingly.
+
+This clause adds no declaration and alters none, so clause 8's rule is not
+engaged and the version does not advance on its account. Every declaration of
+version 0.6 already satisfies it — one hundred and one of them, examined by the
+procedure below — and what is new is that the property is now stated and
+checked rather than held by the care of whoever wrote each header.
+
+Clause 9's procedure examines this.
+
 ## 6. Capability model
 
 ### 6.1 Presence of an interface
@@ -688,6 +723,25 @@ the specification package shall verify the third.
    comparison to make; what it detects is a name the list requires and the
    header does not declare. The translation unit is compiled without the
    environment's headers, because the consumer the header exists for is.
+
+4. **Types.** The declarations shall be examined for the types they are written
+   with, and shall name none that clause 5.4 excludes. This half also belongs to
+   the specification package. It is distinct from the second: an implementation
+   may export exactly the names `SURFACE.txt` requires and still declare one of
+   them taking a `size_t`, and the surface comparison would report conformance.
+
+   The examination asks a compiler what it parsed rather than searching the
+   text, so that a type reached through a macro or an include is seen, and the
+   typedef names are read as written rather than resolved to the underlying
+   type — a declaration written `kal_u64` and one written `uint64_t` denote the
+   same type on one target and different types on another, which is the whole
+   subject of clause 5.4.
+
+   ⚠️ A check that reports conformance by finding nothing reports it identically
+   when it has read nothing. The procedure therefore establishes that the
+   declarations were parsed before it is permitted to report success, and the
+   specification package demonstrates that the check fails when an excluded type
+   is present.
 
 Behavioural conformance cannot be established exhaustively, and this
 specification does not claim otherwise. An implementation may export the correct
