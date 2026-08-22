@@ -71,7 +71,50 @@ It follows that the presence of a heap is not a property of the hardware. Any
 environment with writable memory can supply one, and the specification places
 `openkal.memory` in the core set on that basis.
 
-### 3.2 Interfaces the specification declines to define
+### 3.2 The core set does not grow
+
+An interface admitted to the core set is required of every implementation
+thereafter, including implementations of environments no one has yet written
+one for. The set is therefore closed at `openkal.abort`, `openkal.stream` and
+`openkal.memory`, and a later version shall place a new interface outside it
+even where every implementation that exists at the time would satisfy it.
+
+The asymmetry is the reason. An interface wrongly placed in the core set
+excludes environments — a bare machine, a supervisor, firmware — from
+conformance altogether, and that exclusion is discovered by whoever tries to
+write the implementation rather than by the specification. An interface wrongly
+placed outside it costs a consumer one declared dependency. The first error is
+found late and by the wrong party; the second is found at dependency resolution
+and by the party that can act on it.
+
+### 3.3 Naming a set of interfaces
+
+An interface is provided or not provided, and clause 6.1 makes that a fact a
+consumer learns from the linker. A consumer must nevertheless be able to *state*
+what it needs before it is built, and stating it one interface at a time does
+not scale: the sets a program can be written against are not arbitrary subsets,
+and an ecosystem that could only enumerate them could not say "this package
+needs an environment of such-and-such a kind".
+
+The specification therefore names sets, and the names are for stating a
+requirement rather than for measuring conformance:
+
+| Name | Interfaces |
+| --- | --- |
+| `core` | `openkal.abort`, `openkal.stream`, `openkal.memory` |
+| `hosted` | `core`, and `openkal.env`, `openkal.time`, `openkal.fs`, `openkal.process`, `openkal.task` |
+
+A name is a shorthand and confers nothing. **An implementation does not claim a
+name**; it provides interfaces, and whether it satisfies a consumer that asked
+for `hosted` follows from which interfaces it provides. Nothing in this clause
+alters clause 6.1: an interface a consumer uses and an implementation does not
+provide is an undefined symbol, whichever names either of them mentions.
+
+Optional interfaces are deliberately not gathered into a name. A set that
+required every optional interface would make *optional* mean nothing, and a
+consumer that needs one names that one.
+
+### 3.4 Interfaces the specification declines to define
 
 Naming is not factored into a separate interface. An earlier draft replaced
 `openkal.fs` and `openkal.net` with a single interface mapping names to
