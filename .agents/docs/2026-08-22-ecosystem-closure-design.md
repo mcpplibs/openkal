@@ -1233,7 +1233,8 @@ openkal-musl 替换掉的 `__libc_start_main` 不读辅助向量 —— 那是�
 | 4 | `port/include/pthread_arch.h` 的 `MC_PC` | ✅ 补该架构的拼法 |
 | 5 | libc++ 的 freestanding 配置 | ✅ `llvm-generated/freestanding/` |
 | **6** | mcpp 在 configure 期拒绝 `import std` | ✅ **已改**(mcpp#486):门改问 capability |
-| **7** | mcpp 向编译器问 `std.cppm` 的位置 | ❌ **新暴露的一格** |
+| **7** | mcpp 向编译器问 `std.cppm` 的位置 | ✅ **已改**(mcpp#486):包可以带自己的 std 模块源 |
+| **8** | 模块与消费方的 ISA/ABI 与异常设置不一致 | ❌ **最后一格** |
 
 **已实测**:
 - `mcpp build --target riscv64-none-elf`(openkal-musl)⇒ **1359 个对象**,
@@ -1279,9 +1280,45 @@ error: source imports std but toolchain 'clang 22.1.8 (riscv64-none-elf)'
 mcpp 通过 `-print-library-module-manifest-path` **向编译器问** `std.cppm` 的位置,
 而那一份是**包 configure 出来的、编译器不知道的**。
 
-⇒ 让提供 capability 的包一并声明它的 std 模块源,是一件**独立的**改动:它不只是
-加一个清单字段 —— 那个模块还要用包自己的 include 路径与 `__config_site` 去编,
-而现在 `std_module_build_commands` 用的是工具链的。**本轮不做,而它现在有名字了。**
+**已做(mcpp#486 第二个提交)。** 包用两个字段说明它:
+
+```toml
+[package]
+provides         = ["hosted-standard-library"]
+std-module       = "llvm-generated/std.cppm"
+std-module-flags = ["--no-default-config", "-nostdinc", "-nostdinc++", "-D_GNU_SOURCE", ...]
+```
+
+而**包声明不了的那一半由解析补上** —— 它下面那些包发布的 include 路径与定义:
+包在自己的清单里写不出它们,那是它依赖的东西,路径只有解析之后才知道。
+
+⭐ 用 `publicUsage` 而不是 `privateBuild`,而这个差别不是装饰性的:实测用
+`privateBuild` 时 `libcxx/src` 进了搜索路径,`std/expected.inc` 报
+`reference to 'unexpected' is ambiguous`;换成 `publicUsage` 就消失了。
+**模块编一次、被消费者 import,所以它该看见的是这个包发布的头,不是它自己
+碰巧拿来构建的那些。**
+
+⭐ 而工具链那份 sysroot flag 要被**替换**不是被追加:它们以 `-isystem` 开头,
+追加就意味着宿主的头排在包的前面,而后面任何 flag 都撤销不了。三元组因此要重述
+—— 它本来在被替换掉的那串里。
+
+#### ⚠️ 第八格:模块与消费方的编译设置不一致
+
+std 模块现在**编得出来**了,卡在它与消费者的 TU 对不齐:
+
+```
+error: exception handling was enabled in precompiled file ... but is currently disabled
+error: precompiled file ... was compiled for the target ABI 'lp64'
+       but the current translation unit is being compiled for target 'lp64d'
+```
+
+两条同源:**freestanding 目标的 ISA/ABI flag(`-march`/`-mabi`/`-mcmodel`)
+与它对整张图强制的 `-fno-exceptions`,都没有到达 std 模块的那条命令。**
+
+⇒ 下一步是把目标自己的编译设置也带进那条命令。⚠️ 而异常那一轴要当心:
+docs/13 记着「异常开关属于 target 而非项目 cxxflags,**因为 BMI 记录了它**」——
+这正是上面第一条错误的机制,所以这一步不是加两个 flag,是让模块和消费者共用
+同一份设置。**本轮到此为止,而它现在有名字了。**
 
 ### 附:阻塞点定位的过程(保留,因为它推翻了本节原来的判断)
 
