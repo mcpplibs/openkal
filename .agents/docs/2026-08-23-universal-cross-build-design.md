@@ -256,64 +256,61 @@ Resolved openkal-llvm@22.1.8 → x86_64-windows-gnu → …/clang++
 | 11 | PE 的宽字符 `fopen` | 从 #10 再推出来的 `_LIBCPP_HAS_OPEN_WITH_WCHAR` | 同上;⚠️ 它是一个**值**,撤名字撤不掉它 | ✅ |
 | 12 | ⚠️ **openkal-windows 要 `<windows.h>`** | — | **见 §5.3.2** | ❌ |
 
-### ⚠️⚠️ 5.3.2 Windows 停在一条与 C++ 运行时无关的地方
+### ⭐⭐ 5.3.2 Windows:平台实现自己声明它用的接口(2026-08-23 更正)
 
-撤回 #10 / #11 之后,std 模块编过了,而构建停在:
+⚠️ **本节先前把这件事框错了**,写成「openkal-windows 是唯一需要厂商 SDK 的平台
+实现」,并把它当成架构问题。**不是。**
+
+> openkal 是 ABI 和抽象层。上面的软件栈基于它实现,不关心 backend 具体细节
+> —— 而 backend **怎么**实现,openkal 同样不关心。
+
+⇒ 用 Win32 API 完全正当,和 openkal-linux 直接发系统调用、openkal-opensbi 发
+`ecall`、openkal-macos 借两个符号是同一件事的四种做法。**没有哪一种更「原生」。**
+
+真正的问题窄得多:**声明从哪来**。
+
+| 实现 | 它调什么 | 声明从哪来 |
+|---|---|---|
+| openkal-linux | 这个内核的系统调用 | 自写调用号 |
+| openkal-opensbi | SBI 的 `ecall` | 自写扩展号 |
+| openkal-macos | 两个名字 | 自写 `port/libSystem.tbd` |
+| **openkal-windows** | Win32 API | ~~`<windows.h>`~~ → **自写 `src/win32.h`** |
+
+⚠️ 从厂商 SDK 拿意味着它得**从某处**被找到:装了 Windows 目标载荷的机器上是
+载荷那份;装了系统级 mingw 的机器上是那份,版本随那台机器;两样都没有的机器上,
+构建失败在一个头文件的名字上而不是一个缺失的依赖上。而**装了别的 mingw 的机器
+上它可能悄悄成功于不同的声明** —— 假绿。
+
+#### ⭐ 而这个包自己早就写着这个论证
+
+`src/win.h` 从写下来那天起就自带了**整个 NT 对象管理层**,理由写着:
+
+> Declared here rather than taken from `<winternl.h>`: the header is present in
+> one toolchain's sources and partial in another's…
+
+**那从来就是同一个论证。** 它只是先前被用在「一个工具链和另一个工具链不一致」
+那一半,没有被用在「一台机器和另一台机器不一致」这一半。
+
+#### 清单怎么来的
+
+⚠️ **不是读源码。** 把 `<windows.h>` 拿掉,问编译器它解析不了什么 —— 47 个函数
+加一批类型和常量,248 行。与 openkal-macos 给它的 stub 同一个方法,理由也一样:
+读源码会读出配置过的构建根本不用的名字,编译器不会。
+
+**openkal-windows 现在不依赖任何厂商 SDK。**
+
+#### 现在停在哪
+
+`unwind.h` 的 `__SEH__` 分支已由 `-fdwarf-exceptions` 绕开(异常机制跟随**我们带
+的 unwinder**,而不是平台默认)。之后停在**数据模型**:
 
 ```
-openkal-windows/src/win.h:35 → /usr/x86_64-w64-mingw32/include/windows.h
-                             → …/xim-x-llvm/…/include/c++/v1/ctype.h
-                             → __config:13 '__config_site' file not found
+corecrt.h:106: typedef redefinition ('unsigned short' vs 'unsigned int')
+limits.h:55:   -9223372036854775808 cannot be narrowed to type 'long'
 ```
 
-⭐ **这不是 C++ 运行时的问题,是平台实现的问题,而且是本方案第一次遇到的一类。**
-
-`openkal-windows` 是**唯一一个需要厂商 SDK 头的平台实现**:
-
-| 平台实现 | 它需要目标系统的什么 |
-|---|---|
-| openkal-linux | 无 —— 直接发系统调用 |
-| openkal-macos | **两个符号**,由自写的 `port/libSystem.tbd` 声明 |
-| openkal-opensbi | 无 —— `ecall` |
-| **openkal-windows** | **`<windows.h>`** —— 一整套 SDK 头 |
-
-⚠️ 而在没有 mingw 载荷的安排里,它够到了**宿主机上碰巧存在的**
-`/usr/x86_64-w64-mingw32/include` —— 这是宿主污染,而且是**静默**的:它在一台
-装了 mingw 的机器上会成功,在没装的机器上失败,两者都不会说出原因。
-
-⇒ 两条路,与 macOS 的先例对照着看:
-
-1. **自写声明**,像 `libSystem.tbd` 那样。openkal-windows 已经在自写 `.def`
-   文件生成导入库,所以形态是现成的 —— 缺的是头文件那一半。
-   ⭐ 这条与 openkal 的命题一致:平台实现只借它真正用到的名字。
-2. **把 mingw 的头做成生态里的一个包**。省事,但它把一个厂商 SDK 引回了
-   「上面的软件栈不关心后端」应当排除的位置。
-
-**未定。** 而在定下来之前,Windows 这条在这套安排里不可用 —— 并且要注意
-**它今天在一台装了 mingw 的机器上会「碰巧成功」**,那正是本仓库反复记录的假绿。
-
-⚠️ **#8 是唯一一处清单表达不了的**:正确的判据是「驱动的运行时选择被替换过」,
-而 `cfg()` 只能条件在目标上。搬成包级会让**宿主**链接重复定义 `__muloti4`,
-因为原生链接里驱动仍然链载荷自己的归档。今天按目标格式各写一份。
-
-### ⭐⭐ 5.3.1 达成(2026-08-23):Linux 上产出 macOS 可执行程序
-
-```
-$ mcpp build --target aarch64-macos          # 在 Linux 上
-
-Mach-O 64-bit arm64 executable
-/usr/lib/libSystem.B.dylib          ← 唯一依赖
-_clock_gettime_nsec_np              ← 借的名字,仍然是那两个
-_pthread_create_from_mach_thread
-dyld_stub_binder                    ← 第三个属于格式,不属于本包
-```
-
-带着 `import std`、容器、算法、异常与展开期析构 —— **没有一个字节来自 Apple 的
-SDK**,目标侧全部来自 openkal 生态。
-
-⭐ 这是本方案第一次把命题验到「一个非 native 的 hosted 目标」上。此前
-openkal-musl 只验到了 **C**(§3.1 的真机启动是一个 C 程序);C++ 运行时这一层
-是这一轮才第一次走通。
+—— LLP64:`long` 在这里是 32 位。`musl-generated/x86_64-windows` 正是为这件事
+存在的,而这一段是与 macOS 那段同一量级的另一次逐项收敛。**未完成。**
 
 ### 5.4 链接层(🟡 已有形状,未逐格式验证)
 
