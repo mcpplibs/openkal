@@ -14,8 +14,8 @@
 |---|---|---|
 | **I** | mcpp 的交叉模型从「按载荷」改为「按图」 | ✅ 已落地(`openkal-llvm` 工具链族) |
 | **II** | C 库不再关心后端是谁 | ✅ openkal-musl 已验证(四个平台 + 只提供 `core` 的裸机) |
-| **III** | **C++ 运行时**不再关心后端是谁 | 🟡 **本方案的主体**;Linux + 裸机已通,Mach-O / PE 进行中 |
-| **IV** | 链接期的格式差异由包携带 | 🟡 已有形状(清单的 `cfg` ldflags),未逐格式验证 |
+| **III** | **C++ 运行时**不再关心后端是谁 | 🟡 Linux + 裸机 + **Mach-O 已通**;PE 进行中 |
+| **IV** | 链接期的格式差异由包携带 | ✅ Mach-O 已验证;⚠️ 而宿主的链接模型要**一处不剩**地让开(三条通道) |
 
 **核心判断三条:**
 
@@ -243,20 +243,39 @@ Resolved openkal-llvm@22.1.8 → x86_64-windows-gnu → …/clang++
 
 | # | 决策点 | upstream 的判据 | openkal 的答案 | 状态 |
 |---|---|---|---|---|
-| 1 | locale 后端 | `__APPLE__` / `_LIBCPP_MSVCRT_LIKE` / `__linux__` | `_LIBCPP_HAS_MUSL_LIBC` | ✅ 已做 |
-| 2 | Apple SDK 头 | `__APPLE__` | 自写桩(只放**被读到**的名字) | ✅ 3 个头 |
-| 3 | libc++abi guard | `__APPLE__` → mach;否则 → `SYS_futex` | openkal 的 task 接口(或单线程回落) | ❌ |
-| 4 | libunwind 段发现 | `__APPLE__` → dyld;否则 → `dl_iterate_phdr` | 链接脚本符号 / `okm_phdr` | ❌ |
-| 5 | libunwind 展开格式 | Apple → compact unwind | DWARF(Mach-O 也有 `__eh_frame`) | ❌ |
-| 6 | `refstring` 只读段判定 | `_dyld_get_image_header` | 零个镜像(桩已答) | ✅ 由 #2 覆盖 |
+| 1 | locale 后端 | `__APPLE__` / `_LIBCPP_MSVCRT_LIKE` / `__linux__` | `_LIBCPP_HAS_MUSL_LIBC` | ✅ |
+| 2 | Apple SDK 头 | `__APPLE__` | 自写桩(只放**被读到**的名字) | ✅ 3 个 |
+| 3 | libc++abi guard 的线程标识 | `__APPLE__` → Mach 端口 | 覆盖里补上平台名字;⚠️ 三个分支里只有第一个不合用,而它正是命中的 | ✅ |
+| 4 | libunwind 段发现 | `__APPLE__` → dyld | **openkal-macos 实现 `_dyld_find_unwind_sections`**,取链接器合成的段边界 | ✅ |
+| 5 | `refstring` 只读段判定 | `_dyld_get_image_header` | 零个镜像 | ✅ |
+| 6 | `dladdr` / `_GNU_SOURCE` | 按 OS | **openkal 的事实,搬到包级** | ✅ |
+| 7 | Mach-O 的 `thread_local` | 加载器 bootstrap 的描述符 | `-femulated-tls`(实验 A 已验证) | ✅ |
+| 8 | compiler-rt builtins | 驱动链载荷的归档 | 按目标格式各建一份 | ⚠️ 见下 |
+| 9 | `struct stat` 字段拼法 | `__APPLE__` → `st_mtimespec` | **openkal-musl 给别名** —— 那是 C 库的事 | ✅ |
+| 10 | PE 的同一批问题 | `_LIBCPP_MSVCRT_LIKE` | 同一个谓词 | ❌ 进行中 |
 
-⚠️ **#3 和 #4 是两条真正的设计决定,不是补桩:**
+⚠️ **#8 是唯一一处清单表达不了的**:正确的判据是「驱动的运行时选择被替换过」,
+而 `cfg()` 只能条件在目标上。搬成包级会让**宿主**链接重复定义 `__muloti4`,
+因为原生链接里驱动仍然链载荷自己的归档。今天按目标格式各写一份。
 
-- **#3**:libc++abi 的 guard 需要一个「等待 / 唤醒」原语。openkal **有** ——
-  `kal_task_wait` / `kal_task_wake`。⭐ 所以正解不是选 mach 或 futex,是
-  **让它走 openkal**,这与 openkal-musl 的 `__okm_futex` 是同一个来源。
-- **#4**:libunwind 已有 `_LIBUNWIND_IS_BAREMETAL` 走链接脚本符号,裸机那条已经
-  在用。Mach-O / PE 上要么同样走符号,要么走各自格式的段查询。
+### ⭐⭐ 5.3.1 达成(2026-08-23):Linux 上产出 macOS 可执行程序
+
+```
+$ mcpp build --target aarch64-macos          # 在 Linux 上
+
+Mach-O 64-bit arm64 executable
+/usr/lib/libSystem.B.dylib          ← 唯一依赖
+_clock_gettime_nsec_np              ← 借的名字,仍然是那两个
+_pthread_create_from_mach_thread
+dyld_stub_binder                    ← 第三个属于格式,不属于本包
+```
+
+带着 `import std`、容器、算法、异常与展开期析构 —— **没有一个字节来自 Apple 的
+SDK**,目标侧全部来自 openkal 生态。
+
+⭐ 这是本方案第一次把命题验到「一个非 native 的 hosted 目标」上。此前
+openkal-musl 只验到了 **C**(§3.1 的真机启动是一个 C 程序);C++ 运行时这一层
+是这一轮才第一次走通。
 
 ### 5.4 链接层(🟡 已有形状,未逐格式验证)
 
@@ -272,8 +291,27 @@ Resolved openkal-llvm@22.1.8 → x86_64-windows-gnu → …/clang++
 工具的表格携带。clang driver 拿到 `--target=` 之后会自己选对 lld 的形态
 (`ld.lld` / `ld64.lld` / `lld-link`)。
 
-⚠️ 未验证的:macOS 的 `--ld-path` 今天被 openkal-musl 限定为「本机构建」(注释
-里写了原因:交叉时不需要系统链接器)。交叉链接要重走一遍这条判断。
+#### ⚠️⚠️ 已验证,而且比预想的多一件:宿主的链接模型要**一处不剩**地让开
+
+macOS 的 `--ld-path=/usr/bin/ld` 已去掉 —— 它的注释早写了「交叉不需要这个系统的
+链接器」,而 mcpp 的条件在**目标**上,`cfg(os = "macos")` 在「**在** macOS 上建」
+和「**为** macOS 建」时都为真。第二种情况下那是 Linux 的 GNU ld:
+
+```
+/usr/bin/ld: Error: unable to disambiguate: -dead_strip
+```
+
+⭐ 而真正的发现是:宿主那套 C 运行时是从**三条**通道到链接线上的,
+而堵住一条会看到**一模一样的报错**:
+
+| 通道 | 是什么 |
+|---|---|
+| `link_toolchain_flags` | `lm.link_flags()` + 驱动的 C++ 运行时选择 |
+| `payload_ld` | 同一组,第二次 |
+| `atomic_ld` | 宿主的 libatomic + GNU ld 的 `push-state` 拼法 |
+
+⚠️ **只堵第一条的人会合理地得出「这条修复没生效」的结论。** 这是本轮第二次
+出现同一种误导(前一次是路径依赖的指纹缺口)。
 
 ---
 
