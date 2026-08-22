@@ -1,0 +1,325 @@
+# 任意平台 → 任意平台:mcpp / openkal / openkal-llvm 的完整方案
+
+> **命题**:一台能跑 mcpp 的机器,应当能构建出**任何已实现 openkal 的平台**上的
+> 程序 —— 而一个程序能不能在某平台上跑,只取决于**它用到的 openkal 能力是不是
+> 该平台实现的子集**。
+>
+> 2026-08-23。⚠️ 本文是完整方案;`2026-08-23-universal-cross-build-design.md` 是
+> 它的第一版,已被本文取代;`2026-08-22-ecosystem-closure-design.md` 是上游背景。
+
+---
+
+## 0. 总判断
+
+**N×N 不需要 N² 份工具链,因为其中两个维度是常数。**
+
+一次交叉构建需要三样东西,传统上每样都按 (宿主, 目标) 配对提供:
+
+| | 传统 | openkal 体系 | 维度 |
+|---|---|---|---|
+| **代码生成** | 每对一份编译器 | **clang 一个二进制发所有目标** | 常数 |
+| **目标侧**(头/C 库/C++ 运行时) | 每对一份载荷 | **图里的包,从源码建** | 常数 |
+| **链接** | 每对一份链接器 | **lld 一个二进制发所有格式** | 常数 |
+| **平台实现** | — | openkal-\<平台\>,每平台一个 | **N** |
+
+⇒ **N×N 塌成 N + 1**:N 个平台实现,一套工具链。而那个 1 已经在每台机器上了。
+
+### 三条核心判断
+
+1. ⭐ **openkal 屏蔽「下面是谁」,不屏蔽「为哪台机器」。** 前者是它存在的意义,
+   后者是交叉编译器必须如实遵守的东西。混淆这两者是本方案里最贵的错误
+   (§2.3)。
+2. ⭐ **上层不需要为 openkal 重写,只需要别走错分支。** libc++ 的 POSIX 分支
+   本来就已经在 openkal 上(经由 musl)。19 处 `<windows.h>` 里 12 处是让谓词
+   答对就自己走对(§3.1)。
+3. ⭐ **「这个程序能不能在那个平台上跑」是一次链接。** 不是运行期探测,不是清单
+   声明 —— openkal §6.1 让缺失的接口在链接期报出名字(§6.1)。
+
+---
+
+## 1. 分层:谁回答什么
+
+| 层 | 它回答的问题 | 随目标变吗 | 谁提供 |
+|---|---|---|---|
+| **应用** | — | ❌ **一份源码** | 用户 |
+| **C++ 运行时** | 标准库 | ❌ 一份源码,**按 C 库配置** | openkal-llvm-runtime |
+| **C 库** | POSIX 面 | ❌ 一份源码,**按目标 ABI 配置** | openkal-musl |
+| **openkal 接口** | 48 + 4 个函数 | ❌ **不变**(类型由编译器推导) | openkal(规范) |
+| **平台实现** | 怎么满足那 48 个 | ✅ 每平台一个 | openkal-\<平台\> |
+| **目标 ABI** | `sizeof(long)`、类型拼法、调用约定、格式 | ✅ **目标自己定义** | 编译器 |
+| **代码生成 / 链接** | 发什么 | ✅ 由 `--target=` 说出 | clang / lld |
+
+⭐ **只有两层随目标变,而它们都不需要「每对一份」**:平台实现是 N 个包,
+代码生成是一个二进制。
+
+### 1.1 为什么 openkal 的接口能不变
+
+`openkal/types.h` 的类型**全部由编译器推导**(`__UINTPTR_TYPE__` 及其同类),
+不来自任何 C 库的头。
+
+⇒ 后果是决定性的:**平台实现内部用什么头文件都跨不过那道边界**。
+openkal-windows 调 Win32、openkal-linux 发系统调用、openkal-opensbi 发 `ecall`
+—— 它们编译时看见的世界完全不同,而 `kal_*` 的签名逐字节一致。
+
+**这就是 musl 能坐在 ELF / Mach-O / PE / 裸机四种格式上的原因。**
+
+### 1.2 平台实现怎么做,openkal 不管
+
+| 实现 | 它调什么 | 声明从哪来 |
+|---|---|---|
+| openkal-linux | 系统调用 | 自写调用号 |
+| openkal-opensbi | SBI `ecall` | 自写扩展号 |
+| openkal-macos | 两个名字 | 自写 `port/libSystem.tbd` |
+| openkal-windows | Win32 API | 自写 `src/win32.h`(47 函数,248 行) |
+
+⚠️ **四种做法都正当。** 唯一的规矩是**声明要属于这个包**,不能从厂商 SDK 现找
+—— 那意味着不同机器上找到不同的东西,而**装了别的 SDK 的机器上可能悄悄成功于
+不同的声明**。
+
+⚠️ 清单怎么来:**不读源码,把头拿掉问编译器**。openkal-macos 的 tbd(2 个名字)
+和 openkal-windows 的 win32.h(47 个)都是这么数出来的。
+
+### 1.3 ⭐⭐ openkal 屏蔽什么、不屏蔽什么
+
+这是本方案里最容易搞错的一条,而它有一个干净的判据:
+
+> **能填进「upstream 在这里问『这是哪个 OS』」的,该屏蔽。
+> 填不进去的,是目标自己的定义,不该也不能屏蔽。**
+
+| 例子 | 是什么 | 该屏蔽? |
+|---|---|---|
+| libc++ 按 `__APPLE__` 选 locale 后端 | 上层在问「下面是谁」 | ✅ |
+| libc++ 按 `_WIN32` 选 CRT | 同上 | ✅ |
+| `std::atomic` 按 OS 选挂起原语 | 同上 | ✅ |
+| **`sizeof(long)` = 4 还是 8** | **目标 ABI** | ❌ |
+| **`int64_t` 拼作 `long` 还是 `long long`** | **目标 ABI** | ❌ |
+| **对象格式、调用约定** | **目标 ABI** | ❌ |
+
+⚠️ **一个藏起 `sizeof(long)` 的抽象层是在对编译器说谎。** 要与目标 ABI 一致的
+那一层是 **C 库** —— `musl-generated/` 按 (arch, os) 分档正是为此:
+`x86_64-windows`(LLP64)、`aarch64-macos`(`int64_t` 拼作 `long long`)。
+**那不是 openkal 在漏,那是 musl 在正确地做一个目标的 C 库。**
+
+---
+
+## 2. 三个被问错的问题
+
+本方案遇到的**每一个**障碍都能归进这三条。全部实测。
+
+### 2.1 「哪个 OS」→ 应当问「哪个 C 库」
+
+**在**:libc++ / libc++abi / libunwind。
+**为什么错**:OS 和它的 C 库在别处总是一起来的,在这里不是 —— `__APPLE__` 是
+关于**格式和 ABI** 的陈述,而底下是 musl。
+
+```
+bsd_like.h:203   no member named 'asprintf_l'        ← Apple 的 locale 扩展
+windows.h        no type named '_locale_t'           ← 微软的 CRT
+cxa_guard_impl.h use of undeclared 'mach_port_t'     ← Mach
+unwind.h → corecrt.h  typedef redefinition           ← SEH
+```
+
+**答案**:`_LIBCPP_HAS_MUSL_LIBC` —— 由本包的 `__config_site` 生成,是**配置出来
+的事实**而不是猜测。
+
+⚠️ **判据必须是「哪个 C 库」,不是「哪个 C 库,在 Apple 上」。** 第一版写成后者,
+第二个目标立刻以同样形状失败。收窄到一个平台就意味着每个平台再写一遍。
+
+### 2.2 「有没有载荷」→ 应当问「clang 能不能发这个格式」
+
+**在**:mcpp 的 `host_can_serve()` 与目标表的 toolchain pin。
+
+`registry.cppm` 自己写着判据:
+
+> clang and lld are cross-compilers by construction … so a freestanding target
+> needs **NO per-host cross payload**, unlike every hosted case above, **which
+> needs a C library that only exists for some (host, target) pairs**.
+
+⭐ openkal 改变的正是**那个前提** —— C 库是图里的包。
+
+**答案**:`Family::OpenkalLlvm`(§4.1)。
+
+### 2.3 「目标是什么」→ 必须说出来
+
+**在**:编译线和链接线。
+
+每一个 mcpp 能做的 hosted 交叉,都由一个 **driver 只有一个目标**的载荷伺候
+(`x86_64-w64-mingw32-g++` 不需要 `--target`,因为它没得选)。所以
+freestanding 之外没有任何地方发过 `--target`。
+
+```
+编译时缺 → okm_float_assert.c: LDBL_DIG '33 == 18'   ← 一条命令里两台机器
+链接时缺 → ld.lld: obj/main.o: unknown file type     ← ELF 链接器拿到 Mach-O
+```
+
+⚠️ 而**宿主的目标侧要一处不剩地让开**,它从**三条**通道到链接线上,
+堵一条会看到一模一样的报错(§4.2)。
+
+---
+
+## 3. 机制清单
+
+### 3.1 mcpp 侧
+
+| # | 机制 | 作用 |
+|---|---|---|
+| 1 | `Family::OpenkalLlvm` | **不是第四个编译器**,是同一份 llvm 载荷被问了不同的问题;目标覆盖 = clang 能发的每个三元组 |
+| 2 | `family_serves_every_target()` | 载荷门放行。⚠️ **不查图** —— 实现在不在由 §6.1 在链接期答,那比「这台机器产不出」准确 |
+| 3 | 目标表 pin 不覆盖它 | 否则 windows-gnu 一行钉死 gcc,`--toolchain` 也覆盖不掉 |
+| 4 | `Triple::llvm_triple()` | mcpp 的词汇 ≠ 编译器吃的拼写 |
+| 5 | `Toolchain::crossTargetFlag` | 在同时知道请求和编译器的地方定下,编译线 + 链接线都用 |
+| 6 | 目标侧替换(三通道) | `link_toolchain_flags` / `payload_ld` / `atomic_ld` + 编译侧的 `host_compile_tokens` |
+| 7 | capability 决定 flag | `hosted-standard-library` ⇒ 异常/RTTI/`-ffreestanding`/展开表 |
+| 8 | `std-module` / `std-compat-module` | 一个包带自己的 std 模块,**两个一起带** |
+
+**项目侧一句话:**
+
+```toml
+[toolchain]
+default = "openkal-llvm@22.1.8"
+```
+
+### 3.2 运行时侧(openkal-llvm-runtime)
+
+两种形态,**有偏好**:
+
+| | 放哪 | 漂移面 |
+|---|---|---|
+| **头文件**里的平台分派 | `port/include/` 覆盖 + `include_next` | **零** |
+| **源码**里的平台分派 | 原地标记 + `llvm/PATCHES.md` 记录 | 被标记的那几十行 |
+
+⚠️ **能用覆盖就别用补丁。**
+
+已落地:`__config`(撤回 `_LIBCPP_MSVCRT_LIKE`/`WIN32API`/`HAS_OPEN_WITH_WCHAR`)、
+`__locale_dir/locale_base_api.h`、`__thread/support.h`、`__atomic/contention_t.h`、
+`__atomic/atomic_waitable_traits.h`、`mach-o/dyld.h`、`AvailabilityMacros.h`;
+`llvm/libcxx/src/atomic.cpp`(标记补丁)。
+
+### 3.3 平台侧
+
+每个 openkal-\<平台\> 自写它调的那套声明(§1.2),并通过 `build.mcpp` 把**目标侧
+输入**放上消费者的链接线(openkal-macos 的 `link_search("port")`)。
+
+### 3.4 ⭐ 移植规矩(与 openkal-musl 一致,记在 `llvm/PATCHES.md`)
+
+1. **可以动源码。** 移植就是动源码;假装不动只会把差异藏进别处。
+2. **动过的地方标注清楚。** `// ─── openkal ─── BEGIN/END`,`grep` 一次数完。
+3. **能不动的就不动。** 先问「上游有没有一条路已经通向 openkal」。
+
+---
+
+## 4. 两条反复出现的陷阱
+
+### 4.1 一个事实走两条通道 —— 堵一条,报错一字不变
+
+出现了**三次**,每次都让人合理地得出「这条修复没生效」:
+
+| 场次 | 通道 A | 通道 B |
+|---|---|---|
+| 链接线的宿主 C 运行时 | `link_toolchain_flags` | `payload_ld` + `atomic_ld` |
+| `std::atomic` 的等待宽度 | `__cxx_contention_t` | `_LIBCPP_NATIVE_PLATFORM_WAIT_SIZES` |
+| mcpp 的依赖指纹 | 根的编译输入 | ⚠️ 依赖的 **从来没进过** |
+
+⇒ **教训:改完看到同样的报错,先假设有第二条通道,不要假设修复无效。**
+
+### 4.2 「碰巧成功」比失败更糟
+
+- 厂商 SDK 从宿主机找到 ⇒ 装了的机器上成功,没装的失败,**装了别版本的悄悄用了
+  不同的声明**
+- 本机绝对路径进清单 ⇒ 别的机器 CI 挂在一条只存在于一台笔记本上的路径
+- 路径依赖的清单变更不进指纹 ⇒ **改了像没改**
+
+⇒ 所有目标侧输入必须来自**被解析的包**。
+
+---
+
+## 5. N×N 矩阵与现状
+
+**宿主 ×  目标**,✅ = 实测,🟡 = 部分,❌ = 未做:
+
+| 宿主 \ 目标 | Linux | macOS | Windows | 裸机 riscv64 |
+|---|---|---|---|---|
+| **Linux** | ✅ 跑通 | ✅ **产出 Mach-O**;真机运行待验(C 程序已验) | 🟡 见下 | ✅ 跑通(QEMU,CI) |
+| **macOS** | 🟡 未测 | ✅ 原生 | 🟡 未测 | ✅ 构建(CI) |
+| **Windows** | 🟡 未测 | 🟡 未测 | ✅ 原生 | ✅ 构建(CI) |
+
+⚠️ **矩阵的形状本身是结论**:宿主那一维**不该有内容** —— 一旦目标侧全部来自包,
+「在哪台机器上建」就不再是一个变量。未测的格子是**没跑过**,不是**做不到**。
+
+### Windows 目标现状
+
+已解决:厂商 SDK 依赖(自写 win32.h)、`_LIBCPP_MSVCRT_LIKE`、`_LIBCPP_WIN32API`、
+`_LIBCPP_HAS_OPEN_WITH_WCHAR`、SEH(`-fdwarf-exceptions`)。
+停在:**LLP64 数据模型** —— `long` 是 32 位,而 musl 的头带着 LP64 的答案。
+`musl-generated/x86_64-windows` 正是为此存在,要逐项对齐。
+
+---
+
+## 6. 判据
+
+### 6.1 「能不能跑在那个平台上」= 一次链接
+
+openkal §6.1:实现不提供的接口,作为链接期定义是缺席的,用了它的消费者链接失败。
+
+⇒ **不需要新机制。** §3.3 的命名束(`core` / `hosted`)是把这句话说成人话的
+词汇:「这个程序要 `hosted`」对上「这块板给 `core`」。
+
+⚠️ 两个方向都实测过:裸机 `import std` 首链 15 个 `kal_*` 未定义(要 `hosted`,
+给 `core`);C 库按目标配置后 0 个。以及本轮 `std::atomic` 走 openkal 之后,
+裸机链接停在 `kal_task_wait` —— **同一条判据,第三次工作**。
+
+### 6.2 交付判据:同一份源码 + 不同 `--target` = **同样的输出**
+
+`openkal-llvm-runtime/examples/same-source` 一个目录、一个 `src/main.cpp`。
+CI **`diff` 两个目标的输出行** —— 断言的是「输出相同」而不是「两边都有输出」。
+
+**做完的定义:四个目标,输出相同,且都在真机/模拟器上跑过。**
+
+### 6.3 反假绿
+
+| 要验证的 | ❌ 不能用 | ✅ 必须用 |
+|---|---|---|
+| 产物是那个格式 | 构建成功 | `llvm-readobj` + **真机启动** |
+| 用的是 openkal 的目标侧 | 链接成功 | ⭐ 命令行上**没有**宿主 sysroot |
+| C++ 运行时是本包的 | `import std` 编过 | ⭐ 在**没有系统 libc++ 的目标**上跑通 |
+| 谓词是「C 库」不是「平台」 | 一个平台过 | ⭐ **两个不同目标格式**都过 |
+| 声明属于本包 | 编译通过 | ⭐ 在**没装那个 SDK 的机器**上编译通过 |
+
+---
+
+## 7. 执行计划
+
+| 阶段 | 内容 | 状态 |
+|---|---|---|
+| **P0** | 工具链族 + `--target` 两条线 + 目标侧替换 | ✅ |
+| **P1** | 谓词从「哪个 OS」改为「哪个 C 库」(libc++ 17 处) | ✅ |
+| **P2** | macOS 目标打通(Mach-O 产出) | ✅ |
+| **P3** | 移植规矩 + `PATCHES.md` + `std::atomic` 走 openkal | ✅ |
+| **P4** | Windows 的 LLP64 对齐 | 🟡 进行中 |
+| **P5** | `libunwind/RWMutex` 走 openkal;残余 `_WIN32` 清零 | ❌ |
+| **P6** | 四个目标的 `same-source` 判据 + 真机运行进 CI | ❌ |
+| **P7** | 宿主维度补测(macOS/Windows 宿主 → 其它目标) | ❌ |
+| **P8** | mcpp 从 capability 推导 `-fdwarf-exceptions` 一类的图级 flag | ❌ |
+
+---
+
+## 8. 风险
+
+| # | 风险 | 评估 |
+|---|---|---|
+| R1 | libc++ 的 OS 分派点比已知的多 | 中。⚠️ **只能靠逐目标构建暴露** —— 这正是 §6.2 判据存在的理由 |
+| R2 | 上游重构挪动被覆盖的文件 | 低~中。⭐ 调研表明方向一致(locale 后端正在做成可插拔);⚠️ 每次同步 vendored 树要重核对 |
+| R3 | 标记补丁随上游漂移 | 中。⚠️ 头文件覆盖漂移面为零,补丁不是 ⇒ **能用覆盖就别用补丁** |
+| R4 | 「一个事实两条通道」还有第三处 | 中。已出现三次,应当在改动后**主动找第二条** |
+| R5 | 目标 ABI 的差异比已知的多 | 中。数据模型已知两处(LLP64 / Apple `int64_t`),⚠️ 浮点 ABI、对齐规则未系统核对 |
+| R6 | 平台实现的 `.def` / stub 与真实系统不一致 | ⚠️ **只有真机能验**。macOS 已有 `cross-macos-run`;Windows 需要同款 |
+
+---
+
+## 9. 与既有文档的关系
+
+- `2026-08-22-ecosystem-closure-design.md` §9.1 定了**验收目标**,本文是它第 1 与
+  第 3 条的完整实现方案。
+- `2026-08-23-universal-cross-build-design.md` 是本文的第一版,**已被本文取代**。
+- 本文**不涉及**「一个二进制跑遍所有 OS」(统一格式 / 安装期物化)。那是另一件事:
+  这里做的是「**同一份源码**建给不同实现」,不是「**同一个二进制**在不同 OS 上跑」。
