@@ -14,7 +14,7 @@
 |---|---|---|
 | **I** | mcpp 的交叉模型从「按载荷」改为「按图」 | ✅ 已落地(`openkal-llvm` 工具链族) |
 | **II** | C 库不再关心后端是谁 | ✅ openkal-musl 已验证(四个平台 + 只提供 `core` 的裸机) |
-| **III** | **C++ 运行时**不再关心后端是谁 | 🟡 Linux + 裸机 + **Mach-O 已通**;PE 进行中 |
+| **III** | **C++ 运行时**不再关心后端是谁 | 🟡 Linux + 裸机 + **Mach-O 已通**;PE 的 C++ 运行时已通,⚠️ 而**平台实现**卡住(§5.3.2) |
 | **IV** | 链接期的格式差异由包携带 | ✅ Mach-O 已验证;⚠️ 而宿主的链接模型要**一处不剩**地让开(三条通道) |
 
 **核心判断三条:**
@@ -252,7 +252,45 @@ Resolved openkal-llvm@22.1.8 → x86_64-windows-gnu → …/clang++
 | 7 | Mach-O 的 `thread_local` | 加载器 bootstrap 的描述符 | `-femulated-tls`(实验 A 已验证) | ✅ |
 | 8 | compiler-rt builtins | 驱动链载荷的归档 | 按目标格式各建一份 | ⚠️ 见下 |
 | 9 | `struct stat` 字段拼法 | `__APPLE__` → `st_mtimespec` | **openkal-musl 给别名** —— 那是 C 库的事 | ✅ |
-| 10 | PE 的同一批问题 | `_LIBCPP_MSVCRT_LIKE` | 同一个谓词 | ❌ 进行中 |
+| 10 | PE 的 C 运行时与 OS API | `_WIN32` → `_LIBCPP_MSVCRT_LIKE` / `_LIBCPP_WIN32API` | 同一个谓词,在 `__config` 覆盖里撤回 | ✅ |
+| 11 | PE 的宽字符 `fopen` | 从 #10 再推出来的 `_LIBCPP_HAS_OPEN_WITH_WCHAR` | 同上;⚠️ 它是一个**值**,撤名字撤不掉它 | ✅ |
+| 12 | ⚠️ **openkal-windows 要 `<windows.h>`** | — | **见 §5.3.2** | ❌ |
+
+### ⚠️⚠️ 5.3.2 Windows 停在一条与 C++ 运行时无关的地方
+
+撤回 #10 / #11 之后,std 模块编过了,而构建停在:
+
+```
+openkal-windows/src/win.h:35 → /usr/x86_64-w64-mingw32/include/windows.h
+                             → …/xim-x-llvm/…/include/c++/v1/ctype.h
+                             → __config:13 '__config_site' file not found
+```
+
+⭐ **这不是 C++ 运行时的问题,是平台实现的问题,而且是本方案第一次遇到的一类。**
+
+`openkal-windows` 是**唯一一个需要厂商 SDK 头的平台实现**:
+
+| 平台实现 | 它需要目标系统的什么 |
+|---|---|
+| openkal-linux | 无 —— 直接发系统调用 |
+| openkal-macos | **两个符号**,由自写的 `port/libSystem.tbd` 声明 |
+| openkal-opensbi | 无 —— `ecall` |
+| **openkal-windows** | **`<windows.h>`** —— 一整套 SDK 头 |
+
+⚠️ 而在没有 mingw 载荷的安排里,它够到了**宿主机上碰巧存在的**
+`/usr/x86_64-w64-mingw32/include` —— 这是宿主污染,而且是**静默**的:它在一台
+装了 mingw 的机器上会成功,在没装的机器上失败,两者都不会说出原因。
+
+⇒ 两条路,与 macOS 的先例对照着看:
+
+1. **自写声明**,像 `libSystem.tbd` 那样。openkal-windows 已经在自写 `.def`
+   文件生成导入库,所以形态是现成的 —— 缺的是头文件那一半。
+   ⭐ 这条与 openkal 的命题一致:平台实现只借它真正用到的名字。
+2. **把 mingw 的头做成生态里的一个包**。省事,但它把一个厂商 SDK 引回了
+   「上面的软件栈不关心后端」应当排除的位置。
+
+**未定。** 而在定下来之前,Windows 这条在这套安排里不可用 —— 并且要注意
+**它今天在一台装了 mingw 的机器上会「碰巧成功」**,那正是本仓库反复记录的假绿。
 
 ⚠️ **#8 是唯一一处清单表达不了的**:正确的判据是「驱动的运行时选择被替换过」,
 而 `cfg()` 只能条件在目标上。搬成包级会让**宿主**链接重复定义 `__muloti4`,
