@@ -299,6 +299,45 @@ Resolved openkal-llvm@22.1.8 → x86_64-windows-gnu → …/clang++
 
 **openkal-windows 现在不依赖任何厂商 SDK。**
 
+#### ⭐⭐ 5.3.3 openkal 屏蔽了什么,没屏蔽什么 —— 两条剩余项恰好各占一边
+
+Windows 现在剩两条,而它们**不是同一类**,分清楚它们就是回答「openkal 到底屏蔽
+了没有」:
+
+```
+libcxx/src/atomic.cpp:52 → <windows.h>          ← 又一次「哪个 OS」
+llvm/libc/.../FPBits.h   → <limits.h>:55        ← LLP64:long 是 32 位
+```
+
+| | 这是什么 | openkal 该不该屏蔽 |
+|---|---|---|
+| `atomic.cpp` 拉 `<windows.h>` | **上层在问「下面是谁」** | ✅ **该** —— 第 14 处同一形状 |
+| `limits.h` 的 `long` 宽度 | **目标 ABI 自己的定义** | ❌ **不该,也不能** |
+
+⭐ **openkal 屏蔽的是「下面是谁」。它不屏蔽、也不该屏蔽「为哪台机器」。**
+
+- `kal_*` 接口的类型全部由**编译器**推导(`__UINTPTR_TYPE__` 及其同类),所以
+  openkal-windows 内部用什么头文件都**跨不过**那道边界 —— 这正是 musl 能坐在
+  Mach-O 和 PE 上的原因,也是 `examples/same-source` 的源码能一字不改跨三个
+  目标的原因。
+- 而 `sizeof(long)`、`int64_t` 的拼法、目标格式、调用约定 —— 那些是**目标自己的
+  定义**。交叉编译器的职责是**如实遵守**它们,不是把它们藏起来。一个藏起
+  `sizeof(long)` 的抽象层是在对编译器说谎。
+
+⇒ 所以要与目标 ABI 一致的那一层不是 openkal,是 **C 库**。`musl-generated/` 下
+按 (arch, os) 分档的目录正是为此存在:`x86_64-windows`(LLP64)、
+`aarch64-macos`(`int64_t` 拼作 `long long`)。**那不是 openkal 在漏,那是 musl
+在正确地做一个目标的 C 库。**
+
+#### ⚠️ 一个新的类别:第 14 处在**源码**里,不在头文件里
+
+前 13 处都在头文件,所以 `port/` 覆盖目录够用 —— 靠 include 顺序遮蔽。
+`atomic.cpp` 是 libc++ 的一个 **`.cpp`**,消费者不会 include 它,遮蔽不了。
+
+⇒ 可用的手段变了,而生态里已有先例:**openkal-musl 排除了 musl 的九个源码并在
+`port/src/` 供给替代**。同一形状适用于此。⚠️ 代价也同一:一份源码拷贝会随上游
+漂移,而一份头文件覆盖不会 —— 这是本方案第一次要付这个代价,值得单独记下。
+
 #### 现在停在哪
 
 `unwind.h` 的 `__SEH__` 分支已由 `-fdwarf-exceptions` 绕开(异常机制跟随**我们带
