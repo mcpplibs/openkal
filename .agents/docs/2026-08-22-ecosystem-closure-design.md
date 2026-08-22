@@ -1294,6 +1294,42 @@ CI 全部报 `path dependency has no mcpp.toml` —— 一条关于文件缺失�
 实现、第一个交叉目标)时,预期的不是「加一个东西」,而是**把所有默认了它不存在
 的地方一次性暴露出来**。这一轮六处里有四处是这样来的。
 
+## 12.6 本轮结束时的状态
+
+### 已交付并验证
+
+| 仓库 | PR | 内容 | CI |
+|---|---|---|---|
+| `openkal` | #6 | `openkal.exec`、§6.5、§3.2 core 封闭、§3.3 命名束、版本 0.6.0、四处工具缺陷 | ✅ |
+| `openkal-linux` | #4 | `openkal.exec` 实现 | ✅ |
+| `openkal-macos` | #4 | `port/libSystem.tbd`(两个名字) | ✅ |
+| `openkal-musl` | #4 | 十五个符号重测 + 交叉探针 + C++ 消费者规则 + `okm_phdr.c` | ✅ |
+| `openkal-windows` | #5 | 分支依赖 | ✅ |
+| **`openkal-llvm-runtime`** | **#1** | **libc++/libc++abi/libunwind 在 openkal 之上,含 `import std`** | ✅ |
+
+### 四个承重实验
+
+| | 结论 |
+|---|---|
+| **A** `-femulated-tls` | ✅ 通过(32 项断言 0 failures)。⚠️ 带出:该 flag 是 LLVM 专有,且在 openkal-musl 的清单里表达不出来 |
+| **B** libc++ configure | ✅ 全程通过 —— 建成、链成、跑成、`import std` 可用 |
+| **C** macOS 借了哪些符号 | ✅ 恰好两个 |
+| **D/E** 交叉产物真机启动 | ❌ 未做 |
+
+### ⚠️ 明确没有做的
+
+1. **裸机上的 `import std`** —— §8.2 把它定为 `openkal-llvm-runtime` 的验收判据
+   (理由:裸机没有宿主可借,不会假绿)。已达成的是**宿主上**的完整链路;
+   裸机那一步要 freestanding 目标的配置,未做。**所以本轮的验证是有退路的那种。**
+2. **`openkal-picolibc`**(§8.3,目标 G5)—— 未开始。
+3. **TLS 依赖倒置**(§5.6)—— 未开始。实验 A 表明它今天不阻塞任何东西
+   (emutls 那条链已通),但 `KAL_TASK_PROP_THREAD_LOCAL` 仍是可选属性。
+   它要动一个已发布的 openarch 接口和五个实现。
+4. **mcpp 的 Darwin target**(§7.1)—— 未做。交叉链接是手工调 clang 与
+   `ld64.lld` 完成的,没有变成 `mcpp build --target arm64-apple-macos14`。
+5. **`openkal-uefi` / `openkal-opensbi`** —— 分支推不上去(403,无写权限)。
+   两者本轮无改动。
+
 ## 13. 已定案的八项(2026-08-22 review)
 
 | # | 问题 | 定案 | 落在 |
