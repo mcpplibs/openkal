@@ -26,9 +26,11 @@
 
 ### 三条核心判断
 
-1. ⭐ **openkal 屏蔽「下面是谁」,不屏蔽「为哪台机器」。** 前者是它存在的意义,
-   后者是交叉编译器必须如实遵守的东西。混淆这两者是本方案里最贵的错误
-   (§2.3)。
+1. ⭐ **ABI 由 openkal 保证,上层不使用任何后端的东西 —— 包括类型。**
+   `openkal/types.h` 的类型全部由**编译器**推导,所以「`sizeof(long)` 是几」
+   在 openkal 接口上**不存在**。目标 ABI 的差异只落在两个地方,而两个都不在
+   openkal 之上:C 库重建 POSIX 时(POSIX 自己命名了 `long`),和编译器发码时。
+   实测证明纪律有效:是 `kal_u64` 对、musl 的 `uint64_t` 错(§1.3)。
 2. ⭐ **上层不需要为 openkal 重写,只需要别走错分支。** libc++ 的 POSIX 分支
    本来就已经在 openkal 上(经由 musl)。19 处 `<windows.h>` 里 12 处是让谓词
    答对就自己走对(§3.1)。
@@ -79,28 +81,81 @@ openkal-windows 调 Win32、openkal-linux 发系统调用、openkal-opensbi 发 
 ⚠️ 清单怎么来:**不读源码,把头拿掉问编译器**。openkal-macos 的 tbd(2 个名字)
 和 openkal-windows 的 win32.h(47 个)都是这么数出来的。
 
-### 1.3 ⭐⭐ openkal 屏蔽什么、不屏蔽什么
+### 1.3 ⭐⭐ ABI 由 openkal 保证:上层不使用任何后端的东西,包括类型
 
-这是本方案里最容易搞错的一条,而它有一个干净的判据:
+**这是本方案的地基,而不是一条注意事项。**
 
-> **能填进「upstream 在这里问『这是哪个 OS』」的,该屏蔽。
-> 填不进去的,是目标自己的定义,不该也不能屏蔽。**
+`openkal/types.h` 的每一个类型都**由编译器推导**,不来自任何 C 库的头:
 
-| 例子 | 是什么 | 该屏蔽? |
+```c
+#if defined(__UINTPTR_TYPE__)
+typedef __UINTPTR_TYPE__ kal_uintptr;
+```
+
+它自己写着为什么:
+
+> The width of a machine word, obtained from the **compiler** rather than from a
+> header … Taking it from that compiler's own header instead would give this
+> file an include, and **the consumer this file exists for has none.**
+
+⇒ **规则**:openkal 之上的软件栈**不直接使用任何具体后端的东西 —— 包括类型**。
+要一个 64 位无符号数就写 `kal_u64`,不写 `unsigned long`、不写 `uint64_t`、
+不写 `size_t`。
+
+⇒ **后果**:「`sizeof(long)` 是 4 还是 8」这个问题**在 openkal 接口上不存在**。
+它不是被屏蔽了,是**根本没有被问出来的机会**。这就是同一个 `kal_*` 签名能在
+ELF / Mach-O / PE / 裸机四种格式上逐字节一致的原因。
+
+#### ⭐⭐ 实测:类型纪律抓出了 C 库的错,而不是相反
+
+2026-08-23,从 Linux 交叉构建到 `arm64-apple-macos`:
+
+```
+okm_syscall.c:439: incompatible pointer types passing 'uint64_t *'
+  (aka 'unsigned long *') to parameter of type 'kal_u64 *'
+  (aka 'unsigned long long *')
+```
+
+两个 64 位类型,**同样的宽度,不同的类型,不能转换**。而哪一边是对的:
+
+| | 来自 | 对不对 |
 |---|---|---|
-| libc++ 按 `__APPLE__` 选 locale 后端 | 上层在问「下面是谁」 | ✅ |
-| libc++ 按 `_WIN32` 选 CRT | 同上 | ✅ |
-| `std::atomic` 按 OS 选挂起原语 | 同上 | ✅ |
-| **`sizeof(long)` = 4 还是 8** | **目标 ABI** | ❌ |
-| **`int64_t` 拼作 `long` 还是 `long long`** | **目标 ABI** | ❌ |
-| **对象格式、调用约定** | **目标 ABI** | ❌ |
+| `kal_u64` = `unsigned long long` | **编译器**(`__UINT64_TYPE__`) | ✅ Apple 的 ABI 就是这样 |
+| `uint64_t` = `unsigned long` | musl 的 `bits/alltypes.h` | ❌ 那是 Linux 的答案 |
 
-⚠️ **一个藏起 `sizeof(long)` 的抽象层是在对编译器说谎。** 要与目标 ABI 一致的
-那一层是 **C 库** —— `musl-generated/` 按 (arch, os) 分档正是为此:
-`x86_64-windows`(LLP64)、`aarch64-macos`(`int64_t` 拼作 `long long`)。
-**那不是 openkal 在漏,那是 musl 在正确地做一个目标的 C 库。**
+⭐ **是 openkal 的类型对,C 库的错。** 修的是 musl(新增
+`musl-generated/aarch64-macos`,差一行),不是 openkal。
 
----
+⇒ 这条实测同时说明两件事:
+1. **类型纪律有效** —— openkal 的类型跨过目标格式仍然正确,而不带纪律的那一侧
+   悄悄错了,靠编译器才发现。
+2. **C 库是唯一必须知道目标 ABI 的那一层** —— 因为它重建的是 POSIX,而
+   **POSIX 自己命名了 `long`**。`musl-generated/` 按 (arch, os) 分档正是为此:
+   `x86_64-windows`(LLP64)、`aarch64-macos`(`int64_t` 拼作 `long long`)。
+
+#### 判据
+
+> **上层的每一个跨越 openkal 边界的类型,都必须是 `kal_*`。**
+> 出现 `long` / `uint64_t` / `size_t` 的地方,要么它在 C 库里(合法,那层重建
+> POSIX),要么它是一处应当修掉的后端泄漏。
+
+⚠️ 而这条判据**可以机器核验** —— `SURFACE.txt` 已经列出全部 56 个名字,
+签名里只允许出现 `kal_*`、`void`、`char`、`int` 和 openkal 自己的 struct。
+把它加进 conformance 是 P5 的一项。
+
+#### ⚠️ 那什么才是真正不该屏蔽的
+
+分层仍然存在,只是边界比我先前写的更靠外:
+
+| | 谁的事 |
+|---|---|
+| **openkal 接口上的类型** | ✅ openkal 保证,由编译器推导 |
+| **openkal 之上的软件栈** | ✅ 只用 `kal_*`,不碰后端的任何东西 |
+| **C 库重建 POSIX 时的 `long`** | ⚠️ 目标 ABI,C 库必须按 (arch, os) 配置 |
+| **对象格式、调用约定、指令集** | ⚠️ 编译器由 `--target=` 如实遵守 |
+
+⇒ 最后两行不是「openkal 屏蔽不了」,是**它们根本不在 openkal 之上** ——
+一个在 C 库里,一个在编译器里。上层两行才是 openkal 的辖区,而它保证得住。
 
 ## 2. 三个被问错的问题
 
@@ -296,7 +351,7 @@ CI **`diff` 两个目标的输出行** —— 断言的是「输出相同」而�
 | **P2** | macOS 目标打通(Mach-O 产出) | ✅ |
 | **P3** | 移植规矩 + `PATCHES.md` + `std::atomic` 走 openkal | ✅ |
 | **P4** | Windows 的 LLP64 对齐 | 🟡 进行中 |
-| **P5** | `libunwind/RWMutex` 走 openkal;残余 `_WIN32` 清零 | ❌ |
+| **P5** | `libunwind/RWMutex` 走 openkal;残余 `_WIN32` 清零;**类型纪律进 conformance**(§1.3 判据) | ❌ |
 | **P6** | 四个目标的 `same-source` 判据 + 真机运行进 CI | ❌ |
 | **P7** | 宿主维度补测(macOS/Windows 宿主 → 其它目标) | ❌ |
 | **P8** | mcpp 从 capability 推导 `-fdwarf-exceptions` 一类的图级 flag | ❌ |
@@ -311,7 +366,8 @@ CI **`diff` 两个目标的输出行** —— 断言的是「输出相同」而�
 | R2 | 上游重构挪动被覆盖的文件 | 低~中。⭐ 调研表明方向一致(locale 后端正在做成可插拔);⚠️ 每次同步 vendored 树要重核对 |
 | R3 | 标记补丁随上游漂移 | 中。⚠️ 头文件覆盖漂移面为零,补丁不是 ⇒ **能用覆盖就别用补丁** |
 | R4 | 「一个事实两条通道」还有第三处 | 中。已出现三次,应当在改动后**主动找第二条** |
-| R5 | 目标 ABI 的差异比已知的多 | 中。数据模型已知两处(LLP64 / Apple `int64_t`),⚠️ 浮点 ABI、对齐规则未系统核对 |
+| R5 | 目标 ABI 的差异比已知的多 | 中。⚠️ **只影响 C 库那一层**(§1.3),不影响 openkal 接口。数据模型已知两处(LLP64 / Apple `int64_t`),浮点 ABI、对齐规则未系统核对 |
+| R7 | 上层悄悄用了后端类型 | 中。⚠️ 今天靠编译器偶然发现(`kal_u64` vs `uint64_t`);**判据可机器核验而尚未自动化** —— P5 |
 | R6 | 平台实现的 `.def` / stub 与真实系统不一致 | ⚠️ **只有真机能验**。macOS 已有 `cross-macos-run`;Windows 需要同款 |
 
 ---
