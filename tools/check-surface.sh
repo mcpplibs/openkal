@@ -54,14 +54,44 @@ while read -r name; do
     fi
 done <<< "$found"
 
+# --complete, and what it means once the specification has an optional tier.
+#
+# It used to mean "every name in the list is exported", which is the claim of an
+# implementation that provides the whole specification. That claim stopped being
+# the right one the moment an interface became optional: an implementation that
+# declines an optional interface is not incomplete, and clause 6.1 says so.
+#
+# So --complete is checked GROUP BY GROUP, which is the rule SURFACE.txt's own
+# header already states --- "an implementation provides an interface in whole or
+# not at all, so the absence of a group below denotes an interface the
+# implementation does not provide and is not a deviation". A group none of whose
+# names is exported is an interface not provided. A group SOME of whose names
+# are exported is the thing this check exists to catch: half an interface.
 if [ "$complete" -eq 1 ]; then
-    while read -r name; do
-        [ -n "$name" ] || continue
-        if ! printf '%s\n' "$found" | grep -qx "$name"; then
-            echo "specified name is not exported: $name" >&2
+    group=''; want=''
+    check_group() {
+        [ -n "$group" ] && [ -n "$want" ] || return 0
+        local present=0 absent=0 missing=''
+        while read -r name; do
+            [ -n "$name" ] || continue
+            if printf '%s\n' "$found" | grep -qx "$name"; then present=$((present+1))
+            else absent=$((absent+1)); missing="$missing $name"; fi
+        done <<< "$want"
+        if [ "$present" -gt 0 ] && [ "$absent" -gt 0 ]; then
+            echo "$group is provided in part: $absent of $((present+absent)) names are not exported --" >&2
+            for m in $missing; do echo "    $m" >&2; done
             status=1
         fi
-    done <<< "$spec"
+    }
+    while IFS= read -r line; do
+        case "$line" in
+            '# openkal.'*) check_group; group="${line#\# }"; want='' ;;
+            '#'*|'') ;;
+            *) want="$want$line
+" ;;
+        esac
+    done < "$list"
+    check_group
 fi
 
 if [ "$status" -eq 0 ]; then

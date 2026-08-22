@@ -870,7 +870,7 @@ picolibc 的 `vfprintf.c.o` 引用 `free`,并列会让同一块 RAM 有两个分
 | # | 实验 | 答「否」则 | 状态 |
 |---|---|---|---|
 | **A** | `-femulated-tls` 能否干净套上 musl(errno / pthread / locale 全量重编 + 跑 openkal-musl 现有 32 项断言) | §9.1 死;§5.6 的 TLS 改走改写汇编路线 | 待做 |
-| **B** | libc++ 能否为 openkal-musl configure 出来(先在 Linux 上,不碰交叉) | **§6 死,§8 死**,C++ 交叉打折 | 待做,**优先级 1** |
+| **B** | libc++ 能否为 openkal-musl configure 出来(先在 Linux 上,不碰交叉) | **§6 死,§8 死**,C++ 交叉打折 | ✅ **第一里已通过**,见 §10.1.1 |
 | **C** | macOS 到底借了哪些符号 | §7.2 工作量变大 | ✅ **已完成:恰好 2 个**(§7.2) |
 | **D** | 不链 libSystem 的静态 Mach-O 能否被加载 | §7.2 的 macOS 部分打折 | 🟡 **已降级**:实测表明只需 2 符号的 `.tbd`,不必追求「完全不链 libSystem」。仍需 CI 验证产物能否启动 |
 | **E** | ⭐ **新增**:交叉产出的 Mach-O 在真机上能否启动(含 ad-hoc 签名) | §7.1 的结论从「链接成功」升不到「能用」 | 待做,走 CI macOS runner |
@@ -892,6 +892,61 @@ GitHub Actions 的 `macos-14` / `macos-15` runner 是 Apple Silicon,足以回答
 ⚠️ 实验设计的通则(来自 0.4 的教训):**判据程序不能有无界失败模式,
 尤其不能由它要找的缺陷来触发。** 先在 Linux 上跑通同一份代码,再上目标环境,
 否则「被环境拒了」和「代码写错了」分不开。
+
+### 10.1.1 ⭐ 实验 B 的第一里:通过,而且指出了两个独立变量
+
+**问的是**:libc++ 的头能不能在 openkal-musl 的 C 头之上编译。
+**用什么问的**:`#include <vector> <string> <algorithm>` 的一个程序,
+`-nostdinc -nostdinc++`,搜索路径里只有 libc++ 的头和 openkal-musl 的头,
+`--no-default-config`(否则载荷的 `clang++.cfg` 会把 glibc 的头塞回来)。
+
+**结果(clang 22.1.8,本机)**:
+
+| | `_LIBCPP_HAS_MUSL_LIBC` | 含 `musl/src/include` | 错误数 |
+|---|---|---|---|
+| A | **1**(自己改的) | 否 | **0** ✅ |
+| B | 1 | **是** | 4 |
+| C | **0**(载荷自带) | 否 | 20 |
+
+**两个变量各自独立生效,而且都必须处理。**
+
+#### 变量一:`__config_site` 必须重新生成 —— 设计文档预判的那件事被证实了
+
+载荷里 libc++ 的 configure 产物在
+`include/x86_64-unknown-linux-gnu/c++/v1/__config_site`,**是按目标三元组分目录的**
+—— 正是 §6.2 提议的 `llvm-generated/<config>/` 的形状。它写着
+`_LIBCPP_HAS_MUSL_LIBC 0`,而 C 行的 20 个错误正是它预测的:
+
+```
+__locale:439: error: unknown rune table for this platform
+              -- do you mean to define _LIBCPP_PROVIDES_DEFAULT_RUNE_TABLE?
+```
+
+把那一个宏改成 1,20 个错误全消。⇒ **`openkal-llvm-runtime` 的
+`llvm-generated/` 是必需的,而不是可选的整洁;决定性的开关就是这一个。**
+
+#### ⚠️ 变量二:openkal-musl 把 musl 的内部头覆盖层发布给了消费者
+
+`mcpp.toml` 的 `include_dirs` 含 `musl/src/include`,注释明说这是有意的:
+*「These directories reach a program above this package as well… the alternative
+--- two paths --- is a second place where the set of headers is configured.」*
+
+那是 musl **自己构建用的内部覆盖层**。C 消费者不受影响;**C++ 消费者会撞上**:
+
+```
+musl/src/include/time.h:10:65: error: redefinition of parameter 'restrict'
+```
+
+这个取舍此前没有代价,现在有了:**它挡住整条 C++ 运行时的线**。
+⇒ 需要重开那个决定 —— 「构建用的路径」与「发布给消费者的路径」是两件事,
+而证据现在站在分开这一侧。
+
+#### 边界
+
+这是**第一里,不是实验 B 的全部**。已证:头能编。未证:libc++ 能不能**建出来**
+(那要 `LLVM_ENABLE_RUNTIMES` 真跑一次)、能不能**链**(要 libc++abi 与
+libunwind 的静态注册)、`import std` 能不能用(要为这套配置编 `std.cppm`)。
+**「编过了」不是判据**,这一点在 §10.2 已经说过一次。
 
 ### 10.2 反假绿判据
 
