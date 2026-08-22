@@ -739,6 +739,38 @@ llvm-objdump -p t.exe                                           → DLL Name: ke
 **⇒ §7.2 的两条路径在机制上都已验证。** 剩下的是规模问题(把 45 个原型
 和完整的 `.def` 写出来),不是可行性问题。
 
+#### ⚠️ 把测量接进 CI 之后,它立刻纠正了测量本身
+
+`tools/probe-cross-macos.sh` 变成 openkal-musl 的一个 CI job 之后,第一次运行
+就红了 —— **而且前两条断言都是绿的**:
+
+```
+probe: indirect symbols = 0 (recorded: 0)        ✅
+probe: names this system supplies:
+  _clock_gettime_nsec_np                          ✅
+  _pthread_create_from_mach_thread                ✅
+ld64.lld: error: undefined symbol: dyld_stub_binder
+>>> referenced by lazy binding (normally in libSystem.dylib)
+FAIL: link with the stub did not succeed
+```
+
+⭐ **`dyld_stub_binder`是第三个名字,而且它是另一种。** 前两个是这个实现
+**调用**的;它**没有任何源文件写它** —— 链接器为自己发出的惰性绑定引用它。
+它属于**目标格式的要求**,不属于这个包。
+
+⚠️ **而它是否出现取决于链接器的版本**:本机的 `ld64.lld` 22.1.8 不需要它,
+CI 上的 `ld64.lld` 18 需要。**第一次测量用的是一个版本,而一个版本不是关于
+一种格式的证据** —— 这与账本上「两个实现意见一致等于零证据」是同一条,
+只是这次两个「实现」是同一个程序的两个版本。
+
+⇒ 两处改动,而且它们表达的是**两个问题不是一个**:
+- `.tbd` 里加上第三个名字(格式要求的那个)
+- 探针的枚举把它**滤掉**(它不是「这个 port 调用了什么」的答案),
+  而链接那一步照常包含 stub —— 那一步才是「stub 够不够」的判据
+
+**这一条本身就是「把测量接进 CI」的理由**:一个只在作者机器上跑过的测量,
+不知道自己依赖了那台机器的什么。
+
 ⚠️ Windows 有一条不能照 Linux 办:**Windows 没有稳定的 syscall ABI**,
 `ntdll` 就是最低的稳定层,绕不过去。所以 Windows 永远是「零第三方文件」
 而不是「零外部符号」。
