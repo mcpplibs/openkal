@@ -1800,6 +1800,70 @@ mcpp run --target riscv64-none-elf   riscv64,OpenSBI 之上,没有操作系统
    标准库裁剪而不是换 C 库。
 4. **制品的「统一格式」**(§9.1.3)—— 安装期物化仍是首选,前提已由 E 证明成立。
 
+## 12.7 ⭐⭐ 实测:`mcpp build --target` 现在到底能产出什么(2026-08-23)
+
+上一节把第 3 条记成「能力已证,但 macOS 那条还没走受支持路径」。**这个记法把
+Windows 一并算进了「能证」,而实测表明它也走不通。** 逐个跑一遍,在 Linux 上:
+
+| `--target` | 结果 |
+|---|---|
+| `x86_64-linux-gnu` | ✅ |
+| `riscv64-none-elf` | ✅ 而且在 QEMU 里跑得起来(§12.4.1) |
+| `x86_64-windows-gnu` | ❌ **对这套栈不行**,见下 |
+| `aarch64-apple-macos14` | ❌ mcpp 直接拒绝 |
+
+### ⚠️ Windows:mcpp 的交叉是通的,而**这套图**过不去
+
+分开测才看得出来:
+
+```
+A. 一个普通程序(不含 openkal)  Linux → Windows   ✅ 通过
+B. same-source(openkal 栈)     Linux → Windows   ❌ 失败
+   即使显式 --toolchain llvm@22.1.8,仍然解析到
+   x86_64-w64-mingw32-g++,而它编不了 libc++ 的 std 模块
+```
+
+真因:`toolchain/triple.cppm` 的目标表里,`x86_64-windows-gnu` 这一行钉着
+`"gcc@16.1.0"`,而**行上的工具链钉选优先于命令行的 `--toolchain`** ——
+openkal-opensbi 的 CI 注释早就记过同一机制的另一面(裸机三元组钉 llvm,
+`--toolchain gcc` 覆盖不掉)。
+
+⇒ 这是一条**可以修的缺陷**,而不是一件没做的工程:图里有一个包为这个目标提供
+`hosted-standard-library`,那个包知道自己要哪个编译器族 —— 与 §12.4 那三处
+「由图决定」是同一个形状。**本轮没修。**
+
+### ❌ macOS:mcpp 明说它做不到
+
+```
+error: target 'aarch64-macos' cannot be built on this host —
+       no toolchain payload exists that runs here and produces it.
+```
+
+⭐ 这条错误信息本身是对的、而且有用 —— 它没有假装。能跑通的那条是
+`openkal-musl/tools/cross-build-macos.sh`,手工调 clang 与 `ld64.lld`,并且
+在 CI 里跑到了**真机启动**(§10.1.3)。**但它不是 `mcpp build --target`。**
+§7.1 记着为什么这不是加一个三元组:目标侧输入(stub、启动文件、库搜索)要先
+有归属,而本轮给出了那个归属的形状(capability),没有实现它。
+
+### ❌ 「一个文件跑遍所有 OS」不存在
+
+§9.1.3 把它拆成两半,而只有一半闭环了:
+
+| | 状态 |
+|---|---|
+| **能力**:应用用到的接口 ⊆ 后端实现的接口 | ✅ 闭环,判据是一次链接 |
+| **装载**:那个 OS 的内核认不认这个文件头 | ❌ **未做**,安装期物化仍是首选形状 |
+
+⇒ 今天能做到的是「**同一份源码**,不改一行,建给不同的 openkal 实现」
+(`examples/same-source` 是它的演示)。**不是**「同一个**二进制**在不同 OS 上跑」。
+
+### 这一节存在的理由
+
+⚠️ 上一轮的自述里,这三条分别被写成「🟡 能力已证」「还没走受支持路径」和
+「未做」。三个说法单独看都不假,**合起来读会让人以为只差最后一步**。
+实测之后它们是:一条可修的缺陷、一件没做的工程、一件明确不做的事。
+**把它们分开说,是这一节的全部内容。**
+
 ## 13. 已定案的八项(2026-08-22 review)
 
 | # | 问题 | 定案 | 落在 |
