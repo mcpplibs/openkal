@@ -67,3 +67,8 @@ kal_task_start
 kal_task_wait
 kal_task_wake
 kal_task_yield
+# openkal.exec
+kal_exec_alloc
+kal_exec_free
+kal_exec_props
+kal_exec_publish

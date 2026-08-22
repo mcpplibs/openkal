@@ -18,7 +18,8 @@ repo        = "https://github.com/mcpplibs/openkal"
 # What it depends upon is therefore openkal and the language. The formatting in
 # okc.report is the price of that, and it is sixty lines.
 [dependencies]
-openkal = "0.5.1"
+openkal = { path = "/home/speak/workspace/github/mcpplibs/openkal" }
+openkal-linux = { path = "/home/speak/workspace/github/mcpplibs/openkal-linux" }
 
 # The implementation under examination is not named here.
 #
