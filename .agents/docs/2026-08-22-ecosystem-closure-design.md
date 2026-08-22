@@ -1714,66 +1714,52 @@ CI 全部报 `path dependency has no mcpp.toml` —— 一条关于文件缺失�
 实现、第一个交叉目标)时,预期的不是「加一个东西」,而是**把所有默认了它不存在
 的地方一次性暴露出来**。这一轮六处里有四处是这样来的。
 
-## 12.6 本轮结束时的状态
+## 12.6 本轮结束时的状态(2026-08-23 更新)
 
 ### 已交付并验证
 
-| 仓库 | PR | 内容 | CI |
-|---|---|---|---|
-| `openkal` | #6 | `openkal.exec`、§6.5、§3.2 core 封闭、§3.3 命名束、版本 0.6.0、四处工具缺陷 | ✅ |
-| `openkal-linux` | #4 | `openkal.exec` 实现;模块清单改为从 `SURFACE.txt` 推导 | ✅ |
-| `openkal-macos` | #4 | `port/libSystem.tbd`(三个名字,第三个属于格式而非本包) | ✅ |
-| `openkal-musl` | #4 | 十五个符号重测 + 交叉探针 + C++ 消费者规则 + `okm_phdr.c` + riscv64 + 交叉 CI 两个 job | ✅ |
-| `openkal-windows` | #5 | 分支依赖 | ✅ |
-| **`openkal-llvm-runtime`** | **#1** | **libc++/libc++abi/libunwind 在 openkal 之上,含 `import std` 与异常** | ✅ |
-| `openkal-uefi` | #1 | 分支依赖(远端改 SSH 后推上) | ✅ |
-| `openkal-opensbi` | #1 | 分支依赖(同上) | ✅ |
-| **`mcpp`** | **#486** | **`import std` 的门改为问 capability;包可带自己的 std 模块;异常/RTTI 与 ISA 由图决定** | ✅ |
+| 仓库 | PR | 内容 |
+|---|---|---|
+| `openkal` | #6 | `openkal.exec`、§6.5、§3.2 core 封闭、§3.3 命名束、0.6.0、四处工具缺陷 |
+| `openkal-linux` | #4 | `openkal.exec` 实现;模块清单改为从 `SURFACE.txt` 推导 |
+| `openkal-macos` | #4 | `port/libSystem.tbd`(三个名字,第三个属于格式而非本包) |
+| `openkal-musl` | #4 | 交叉探针 + `okm_phdr.c` + riscv64 + 交叉 CI 两个 job + **`okm_opt.h` 那道缝** + **判据从「语言」改为「谁在编译」** |
+| `openkal-windows` | #5 | 分支依赖 |
+| **`openkal-llvm-runtime`** | **#1** | **libc++/libc++abi/libunwind 上到 openkal;compiler-rt builtins;裸机 unwind 约定;`examples/baremetal`** |
+| `openkal-uefi` / `openkal-opensbi` | #1 | 分支依赖;**opensbi 补上 `time`/`env`/启动对象/线程指针/堆由脚本给** |
+| **`openarch`** | **#6** | **0.7.0:两个指针槽,riscv64 per-CPU 移到 `mscratch`** |
+| **`mcpp`** | **#486** | **`import std` 的门问 capability;包可带自己的 std 模块;异常/RTTI/`-ffreestanding`/展开表由图决定;依赖指纹缺口** |
 
-### 四个承重实验
+### 五个承重实验
 
 | | 结论 |
 |---|---|
-| **A** `-femulated-tls` | ✅ 通过(32 项断言 0 failures)。⚠️ 带出:该 flag 是 LLVM 专有,且在 openkal-musl 的清单里表达不出来 |
+| **A** `-femulated-tls` | ✅ 通过。⚠️ 带出:该 flag 是 LLVM 专有,且在 openkal-musl 的清单里表达不出来 |
 | **B** libc++ configure | ✅ 全程通过 —— 建成、链成、跑成、`import std` 可用 |
-| **C** macOS 借了哪些符号 | ✅ 恰好两个(第三个是链接器版本相关的格式要求,不是本包的) |
-| **E** 交叉产出真机启动 | ✅ **完成**:Linux 上交叉产出 → 传到 macos-14 → ad hoc 签名 → **启动并全部通过**。见 §10.1.3 |
+| **C** macOS 借了哪些符号 | ✅ 恰好两个(第三个是链接器版本相关的格式要求) |
+| **E** 交叉产出真机启动 | ✅ Linux 上交叉产出 → macos-14 → ad hoc 签名 → **启动并全部通过** |
+| **⭐ F** 裸机 `import std` | ✅ **通过**(§12.4.1):`sorted: 2 4 7` / `caught: 42` / `unwound: true` |
 
-### ⭐ 裸机 `import std`:从「差一步」变成「判据的前提不对」
+### ⭐ 验收目标(§9.1)对照
 
-§8.2 把它定为 `openkal-llvm-runtime` 的验收判据,理由是裸机没有宿主可借、
-不会假绿。本轮把 mcpp 一侧的**八格阻塞全部改完**(§12.4),之后:
-
-- ✅ std 模块编得出来
-- ✅ 消费者 TU 编得出来
-- ❌ 链接停在 `kal_task_yield` / `kal_fs_close_file`
-
-⭐ **而这不是缺陷。** 实测两侧接口面:`openkal-opensbi` 提供 **11 个名字 =
-`core` 集**,`openkal-musl` 需要 **`hosted` 集**。§6.1 说消费者用了实现不提供的
-接口就该链接失败 —— 它正是这么做的。
-
-⇒ 判据假设了「C 库能坐在任何裸机实现上」,而这件事不成立。SBI 一个只提供
-`core` 的实现按 §3.1/§3.2 是**正确的**。真正缺的是一个**在裸机上提供 `hosted`
-的实现** —— 那是与 `openkal-llvm-runtime` 同一量级的另一个包,不是这条链路的收尾。
-
-**§3.3 这一轮新加的命名束,正好是把这句话说清楚的词汇。** 判据本身应改写为:
-「在一个提供 `hosted` 的裸机实现上,`import std` 能编能链能跑。」
+| # | 目标 | 状态 |
+|---|---|---|
+| 1 | 构建时不关心 openkal 后端是谁 | ✅ 同一份源码,底下从 openkal-linux 换到 openkal-opensbi,不改一行 |
+| 2 | 「能不能跑」= 应用用到的接口 ⊆ 后端实现的接口 | ✅ **判据是一次链接**,两个方向都实测过 |
+| 3 | 每个平台交叉构建出每个平台 | 🟡 能力已证(四个方向),**但 macOS 那条还没走 `mcpp build --target`** |
+| 4 | mcpp 自己建在 openkal 上 | ❌ 方向;前置是它用到的接口面落进某个命名束 |
 
 ### ⚠️ 明确没有做的
 
-1. **提供 `hosted` 的裸机实现** —— 见上。它是裸机 `import std` 的真正前置,
-   而不是本轮以为的「mcpp 的一道门」。
-2. **`openkal-picolibc`**(§8.3,目标 G5)—— 未开始。它与第 1 条方向相反:
-   picolibc 是把 C 库**缩到** freestanding 能满足的那一面,而不是把裸机
-   实现**扩到** `hosted`。两条都成立,选哪条是设计决定,本轮未定。
-3. **TLS 依赖倒置**(§5.6)—— 未开始。实验 A 表明它今天不阻塞任何东西
-   (emutls 那条链已通),但 `KAL_TASK_PROP_THREAD_LOCAL` 仍是可选属性。
-   它要动一个已发布的 openarch 接口和五个实现,**而 openarch 在 GitCode,
-   是另一条带凭据的推送流程,本轮没有碰**。
-4. **mcpp 的 Darwin target**(§7.1)—— 未做。交叉链接由 `tools/cross-build-macos.sh`
-   手工调 clang 与 `ld64.lld` 完成并在 CI 里跑,**没有**变成
-   `mcpp build --target arm64-apple-macos14`。§7.1 记录了为什么这不是加一个
-   三元组:目标侧输入(stub、启动文件、库搜索)要先有归属。
+1. **mcpp 的 Darwin target**(§7.1)—— 交叉链接仍由 `tools/cross-build-macos.sh`
+   手工完成。⭐ 而本轮给出了归属的形状:`hosted-standard-library` 那一类
+   capability;Darwin 的 stub 与启动文件是同一种东西的另一个实例。
+2. **`KAL_TASK_PROP_THREAD_LOCAL` → core 的每上下文指针槽**(§5.6)——
+   openarch 那一半做了,机制阻塞解除;剩下的是规范变更 + 五个实现,单独决定。
+3. **`openkal-picolibc`**(§8.3)—— 纳入范围,本轮不做,**而理由变了**:
+   它的动机有一半被 `okm_opt.h` 那道缝满足了,剩下的一半(体积)真正的杠杆是
+   标准库裁剪而不是换 C 库。
+4. **制品的「统一格式」**(§9.1.3)—— 安装期物化仍是首选,前提已由 E 证明成立。
 
 ## 13. 已定案的八项(2026-08-22 review)
 
