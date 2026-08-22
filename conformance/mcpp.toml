@@ -60,8 +60,10 @@ time     = []
 fs       = []
 process  = ["fs"]     # a program is started relative to a directory
 task     = []
+exec     = []
 
 standard = ["core", "env", "time", "fs", "process", "task"]
+optional = ["exec"]
 
 # The kinds of examination. Behaviour is always performed; the other three are
 # selected, because each costs time that a reader running the suite to answer
@@ -81,4 +83,4 @@ stability = []
 # declared rather than assumed, so that requesting cost without time selects
 # time instead of failing to link.
 cost      = ["time"]
-full      = ["standard", "abi", "stability", "cost"]
+full      = ["standard", "optional", "abi", "stability", "cost"]

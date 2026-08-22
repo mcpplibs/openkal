@@ -13,7 +13,7 @@
 // declaration that it will ask. That is settled at dependency resolution, which
 // clause 6.2's table already names as the earliest time such a question can be
 // answered, and it is expressed as a feature of the implementation package
-// rather than as anything visible here. Clause 6.6 records the arrangement.
+// rather than as anything visible here. Clause 6.5 records the arrangement.
 module;
 #include <openkal/exec.h>
 
@@ -25,10 +25,22 @@ export using ::kal_exec_publish;
 export using ::kal_exec_free;
 export using ::kal_exec_props;
 
-export namespace kal {
+export namespace kal::exec {
 
-inline void* exec_alloc(kal_uintptr size) { return kal_exec_alloc(size); }
-inline int   exec_publish(void* p, kal_uintptr size) { return kal_exec_publish(p, size); }
-inline void  exec_free(void* p, kal_uintptr size) { kal_exec_free(p, size); }
+struct props_tag;
+using props = kal::props<props_tag>;
+
+// A published region may be reserved for writing again. Where the position is
+// zero, a caller that must change published bytes reserves a second region and
+// abandons the first, so a caller that generates code more than once reads this
+// before deciding how to hold what it has generated.
+inline constexpr props republish{KAL_EXEC_PROP_REPUBLISH};
+
+inline props properties() { return props{kal_exec_props}; }
+inline bool  has(props p) { return properties().has(p); }
+
+inline void* alloc(kal_uintptr size) { return kal_exec_alloc(size); }
+inline int   publish(void* p, kal_uintptr size) { return kal_exec_publish(p, size); }
+inline void  free(void* p, kal_uintptr size) { kal_exec_free(p, size); }
 
 }
