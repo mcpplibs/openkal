@@ -979,6 +979,66 @@ GitHub Actions 的 `macos-14` / `macos-15` runner 是 Apple Silicon,足以回答
 
 ---
 
+## 12.5 实施记录(2026-08-22 第一轮)
+
+已落地并验证的部分,以及过程中发现的两处既有缺陷。
+
+### 已合入分支 `feat/openkal-closure` 的 PR
+
+| 仓库 | PR | 内容 |
+|---|---|---|
+| `openkal` | #6 | `openkal.exec`、§6.5 新条款、版本升 0.6.0、conformance 假绿修复、CI 守卫补分支形式 |
+| `openkal-linux` | #4 | `openkal.exec` 的实现 |
+| `openkal-macos` | #4 | `port/libSystem.tbd` —— 两个名字 |
+| `openkal-musl` | #4 | 十五个间接符号的重测、`tools/probe-cross-macos.sh` |
+| `openkal-windows` | #5 | 依赖改为分支形式 |
+
+⚠️ `openkal-uefi` 与 `openkal-opensbi` 的分支**推不上去**(403,
+`speak-agent` 对这两个仓库无写权限)。两者本轮无改动,不阻塞。
+
+### ⭐ 发现的既有缺陷一:换 feature 集不会让 conformance 构建失效
+
+同一个工作树里三次运行,别的什么都没改:
+
+```
+run-conformance.sh … full,optional   103 held, 0 not observed   (冷)
+run-conformance.sh … full            103 held, 0 not observed   ← 错的
+rm -rf target && … full               97 held, 1 not observed   ← 对的
+```
+
+**第二次报的是第一次那次构建。** feature 集以 define 的形式到达 suite 自己的
+翻译单元,而那些 define 正是决定哪些节会检查东西的开关 —— 换了集合的那次
+检查的是上一个集合,输出和退出码都不说。
+
+⚠️ **这让 CI 的 composability 检查一直是假绿**:它在同一个检出里跑第二次
+suite、用更小的集合,而它存在的全部理由就是观察「小集合被当成小集合检查」。
+修复后 `core,fs,task` 报 **50 held / 7 not observed** —— 那正是它此前拿不到
+的观察。
+
+修法:记住 target 是为哪个集合建的,答案变了就丢弃;同一集合重跑仍然增量。
+
+**这条的教训值得单独记**:一个 A/B 判据,如果 A 和 B 共用同一个构建目录,
+那它测的可能是「先跑的那个」而不是「参数说的那个」。本项目账本上同型的条目
+已经有三条。
+
+### ⭐ 发现的既有缺陷二:`full` 要求每个可选接口,与 §6.1 冲突
+
+把 `optional` 放进 `full` 后,不提供 `openkal.exec` 的实现会**链接失败**,
+而 §6.1 明说「一个实现整个提供或整个不提供某接口,缺一个不是偏差」。
+一个叫 `full` 却要求每个可选接口都在的集合,会让「可选」不成立,
+而且报出来的是链接失败而不是一条没有成立的观察。
+
+修法:`optional` 退出 `full`;CI 矩阵**逐行声明该实现提供哪些可选接口** ——
+这与实现自己做的那个选择是同一个选择。
+
+### 发现的既有缺陷三:CI 的「在同一版」守卫认不出分支依赖
+
+守卫用正则从实现的 `mcpp.toml` 取 `openkal = "x.y.z"`。改成
+`openkal = { git = …, branch = … }` 之后取到空串,拿空串去比对版本,
+**报出来的既不是原因也不是症状**。
+
+修法:补上分支形式 —— 那时该问的不是版本,是**分支是不是同一条**。
+
 ## 13. 已定案的八项(2026-08-22 review)
 
 | # | 问题 | 定案 | 落在 |

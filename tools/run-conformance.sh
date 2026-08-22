@@ -57,6 +57,29 @@ point_at_the_specification() {
     sed "s|^openkal = .*$|openkal = { path = \"$here_native\" }|" "$1" > "$1.next"
     mv "$1.next" "$1"
 }
+# ⚠️ THE REWRITE IS UNDONE ON THE WAY OUT, AND THAT IS NOT TIDINESS.
+#
+# Both manifests are rewritten to name this working tree by an absolute path,
+# which is right for the run and wrong for everything after it. Before this
+# trap the rewrite was permanent: the tree was left holding a path from the
+# machine that ran the script, and whoever committed next published it.
+#
+# Measured 2026-08-22: that is what happened. `conformance/mcpp.toml' reached a
+# pull request naming /home/<user>/... and continuous integration failed on
+# every row with `path dependency has no mcpp.toml' --- a message about a
+# missing file, on a machine where nothing was missing.
+#
+# A local absolute path in a public repository is also the thing a standing
+# constraint forbids, so the remedy is not to remember to revert.
+restore_the_manifests() {
+    [ -f "$suite/mcpp.toml.orig" ] && mv "$suite/mcpp.toml.orig" "$suite/mcpp.toml"
+    [ -f "$implementation/mcpp.toml.orig" ] && mv "$implementation/mcpp.toml.orig" "$implementation/mcpp.toml"
+    return 0
+}
+cp "$suite/mcpp.toml" "$suite/mcpp.toml.orig"
+cp "$implementation/mcpp.toml" "$implementation/mcpp.toml.orig"
+trap restore_the_manifests EXIT INT TERM
+
 point_at_the_specification "$suite/mcpp.toml"
 point_at_the_specification "$implementation/mcpp.toml"
 
