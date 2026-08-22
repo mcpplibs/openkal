@@ -19,11 +19,14 @@
 
 这份方案覆盖三件事,它们的瓶颈类型完全不同,**不该被当成一条线排优先级**:
 
-| | 内容 | 瓶颈 | 风险类型 | 能否估量 |
+| | 内容 | 瓶颈 | 风险类型 | 状态(2026-08-22) |
 |---|---|---|---|---|
-| **I** | 兑现现有分层:C++ 运行时上到 openkal、交叉建三个 OS、嵌入式 C++23 | 工程量 | 技术,已知 | ✅ |
-| **II** | 规范补齐:profile、能力三态、可执行内存、每上下文指针槽 | 设计,不可逆 | 设计 | ❌ |
-| **III** | 制品可移植(统一格式 / 安装期物化) | 输入尚未定义 | 依赖 I+II | ❌ |
+| **I** | 兑现现有分层:C++ 运行时上到 openkal、交叉建三个 OS、嵌入式 C++23 | 工程量 | 技术,已知 | 🟡 **主线已交付**(§12.4);交叉链接已实证(§7.1/§7.2);裸机未做 |
+| **II** | 规范补齐:可执行内存、命名束、每上下文指针槽 | 设计,不可逆 | 设计 | 🟡 `openkal.exec` + §6.5 已落地;命名束与指针槽未做 |
+| **III** | 制品可移植(统一格式 / 安装期物化) | 输入尚未定义 | 依赖 I+II | ❌ 未开始 |
+
+**四个承重实验的结论(全部实测)**:A 通过(带一条把 clang 从偏好变成约束的
+发现)、B 全程通过、C 完成(恰好两个名字)、D 降级 + 新增 E(真机启动)未做。
 
 **核心判断三条:**
 
@@ -869,8 +872,8 @@ picolibc 的 `vfprintf.c.o` 引用 `free`,并列会让同一块 RAM 有两个分
 
 | # | 实验 | 答「否」则 | 状态 |
 |---|---|---|---|
-| **A** | `-femulated-tls` 能否干净套上 musl(errno / pthread / locale 全量重编 + 跑 openkal-musl 现有 32 项断言) | §9.1 死;§5.6 的 TLS 改走改写汇编路线 | 待做 |
-| **B** | libc++ 能否为 openkal-musl configure 出来(先在 Linux 上,不碰交叉) | **§6 死,§8 死**,C++ 交叉打折 | ✅ **第一里已通过**,见 §10.1.1 |
+| **A** | `-femulated-tls` 能否干净套上 musl(errno / pthread / locale 全量重编 + 跑 openkal-musl 现有 32 项断言) | §9.1 死;§5.6 的 TLS 改走改写汇编路线 | ✅ **通过,但带一条硬约束**,见 §10.1.2 |
+| **B** | libc++ 能否为 openkal-musl configure 出来(先在 Linux 上,不碰交叉) | **§6 死,§8 死**,C++ 交叉打折 | ✅ **全程通过** —— 建成、链成、跑成,含异常与 `import std`。见 §10.1.1(头)与 §12.4(整条) |
 | **C** | macOS 到底借了哪些符号 | §7.2 工作量变大 | ✅ **已完成:恰好 2 个**(§7.2) |
 | **D** | 不链 libSystem 的静态 Mach-O 能否被加载 | §7.2 的 macOS 部分打折 | 🟡 **已降级**:实测表明只需 2 符号的 `.tbd`,不必追求「完全不链 libSystem」。仍需 CI 验证产物能否启动 |
 | **E** | ⭐ **新增**:交叉产出的 Mach-O 在真机上能否启动(含 ad-hoc 签名) | §7.1 的结论从「链接成功」升不到「能用」 | 待做,走 CI macOS runner |
@@ -947,6 +950,46 @@ musl/src/include/time.h:10:65: error: redefinition of parameter 'restrict'
 (那要 `LLVM_ENABLE_RUNTIMES` 真跑一次)、能不能**链**(要 libc++abi 与
 libunwind 的静态注册)、`import std` 能不能用(要为这套配置编 `std.cppm`)。
 **「编过了」不是判据**,这一点在 §10.2 已经说过一次。
+
+### 10.1.2 ⭐ 实验 A:通过,而且带出一条把编译器选择变成硬约束的发现
+
+**做法**:给 `openkal-musl` 的 `cflags` 加 `-femulated-tls`,全量重编,
+跑 `examples/posix`(32 项断言,含 `errno`、四个执行上下文做 80000 次增量、
+分配与重分配、启动另一个程序并等待)。
+
+**结果(clang 22.1.8,本机)**:构建通过,**32 项断言 0 failures**。
+
+⇒ 那条四层链条是通的:
+`-femulated-tls` → compiler-rt 的 `__emutls_get_address` → pthread key →
+musl 的 pthread → openkal 的 task。**§9.1「一份代码段」的 TLS 前提成立**,
+不必走 Cosmopolitan 那条改写汇编的路。
+
+#### ⚠️ 但发现了两条约束,第二条把编译器选择从偏好变成了硬约束
+
+**① `-femulated-tls` 是 LLVM 专有的。** 实测:
+
+```
+gcc: error: unrecognized command-line option '-femulated-tls'
+gcc --help=common | grep emulated-tls   →  (无此选项)
+clang --help     | grep emulated-tls    →  -femulated-tls  Use emutls functions…
+```
+
+此前「C++ 侧走 clang」是两条独立推理指向的**选择**;现在它是**约束**:
+统一 TLS 这条路 GCC 走不了,而统一 TLS 是「一份代码段」的四个前提之一。
+
+**② 这个 flag 在 openkal-musl 的清单里表达不出来。** 它的 `cflags` 是无条件的,
+放进去会让所有 gcc 构建立刻失败(实测:整棵树每个 TU 都报错)。而 mcpp 的清单
+能按 **target** 条件化(`[target.'cfg(...)']`),**不能按工具链族条件化**。
+
+⇒ 三条出路,都不是本轮能定的:
+(a) openkal-musl 声明自己只支持 clang —— 但它现在的 CI 有 gcc 行,那是它的
+    覆盖面;
+(b) mcpp 增加按工具链族条件化 flags 的能力;
+(c) 把 `-femulated-tls` 留给**上层**(需要一份代码段的那个消费者)去加,
+    而不是写进 C 库 —— 这条最像对的,因为「要不要一份代码段」是程序的属性,
+    不是 C 库的属性,和 `cxx_runtime` 归程序声明是同一条理由。
+
+⚠️ 本轮**没有**把 `-femulated-tls` 落进任何清单,实验后已还原。
 
 ### 10.2 反假绿判据
 
@@ -1033,6 +1076,88 @@ libunwind 的静态注册)、`import std` 能不能用(要为这套配置编 `st
 落到可选能力,代价小得多。**取舍时向小的一侧倾斜。**
 
 ---
+
+## 12.4 ⭐⭐ 主线已交付:C++ 运行时上到 openkal(2026-08-22)
+
+**`mcpplibs/openkal-llvm-runtime` 0.1.0 已建成、已验证、已开 PR。**
+§6 从设计变成实物,§8 的两条阻塞理由中的第二条被消掉。
+
+### 交付形态与设计的差异
+
+| | 设计(§6.2) | 实际 |
+|---|---|---|
+| vendored 范围 | 四个 runtimes 子树 | ✅ 加上 `llvm/libc`(libc++ 复用 llvm-libc 的浮点工具,不是可选的) |
+| 上游 revision | 与工具链一致 | ✅ `ca7933e4`,与 `clang --version` 自报的**逐字一致** |
+| 配置产物 | `llvm-generated/<config>/` | ✅ `__config_site` + 配好的 `std.cppm` |
+| 编译器改动 | 零 | ✅ 零 |
+| 构建耗时 | 分钟级 | ✅ 冷构建约 3 分钟,1447 个对象 |
+
+### 配置只决定两位
+
+```c
+#define _LIBCPP_HAS_MUSL_LIBC     1   /* 底下的 C 库是 musl 的 */
+#define _LIBCPP_HAS_RANDOM_DEVICE 0   /* openkal 没有熵源 */
+```
+
+### 判据全过
+
+`examples/cxx` 五项,`examples/import-std` 一项:
+
+- `std::vector` + `std::sort`、字符串、跨帧返回 ✅
+- **异常跨三层栈帧抛出并接住** ✅
+- **栈展开时析构函数运行** ✅
+- ⭐ **`import std;` + `std::ranges::sort` + `std::println`** ✅
+
+### ⭐⭐ 那条构建做不到的观察,真的发生了
+
+设计里 §6.3 写着:*「漏注册的表现是抛异常直接 terminate,零诊断,而且编译、
+链接、正常路径全绿。判据必须是『跨多层栈帧真抛一次并接住』。」*
+
+**它逐字发生了。** 第一次跑,示例打印完第一行就
+
+```
+libc++abi: terminating due to uncaught exception of type std::runtime_error
+```
+
+而 `_Unwind_Backtrace` 走 **0 帧**。编译绿、链接绿、所有不抛的路径绿。
+
+⚠️ **但真因不是设计预判的那个。** 设计说这条只在 Windows/macOS 上出现
+(那里没有 `PT_GNU_EH_FRAME`)。实际它**在 Linux 上就出现了**,而且原因更深:
+
+```
+dl_iterate_phdr → 一个对象,dlpi_phnum = 0
+```
+
+openkal-musl 替换掉的 `__libc_start_main` 不读辅助向量 —— 那是它为了可移植
+**有意**做的 —— 于是 `dl_iterate_phdr` 拿不到程序头。而它**把缺席报成了答案**:
+调用方分不出「这个程序没有段」和「我没被告知」,于是 unwinder 断定没有帧描述。
+
+⇒ 这是 §7.7「Absence as an answer」那条规则的一个**未被应用**的实例:
+规范要求 `kal_fs_info` 把不存在报成 `kal_ok` + `absent` 而不是错误,
+理由正是「调用方分不出来就没法正确行动」。同一条推理适用于这里,而这里
+分不出来的后果是**一个抛异常的程序静默死掉**。
+
+修法:`openkal-musl/port/src/okm_phdr.c` 从链接器提供的 `__ehdr_start` 回答,
+弱引用以便没有定义它的链接回落到 musl 的答案。只对 ELF,另两种格式排除它 ——
+和它们原本排除 musl 那份同理。
+
+**诊断路径值得记下**,因为它四步就到底,而每一步都排掉了一个更贵的猜想:
+
+| 步 | 问什么 | 答案 | 排掉了什么 |
+|---|---|---|---|
+| 1 | 同一份源码用现成工具链跑 | **5/5 全过** | 程序和判据都是对的 |
+| 2 | 二进制里有几个 `_Unwind_RaiseException` | 1 个,是自己的 | 不是链错了别人的 unwinder |
+| 3 | `_Unwind_Backtrace` 能走几帧 | **0** | 不是 personality / libc++abi 的事,unwinder 起不来 |
+| 4 | `dl_iterate_phdr` 报了什么 | `phnum = 0` | 到底 |
+
+第 1 步是最值钱的:**它把「我的运行时坏了」和「这个程序本来就跑不了」分开**,
+而那两件事在第一次失败时长得完全一样。
+
+### 尚未做到
+
+- ⚠️ **裸机上的 `import std` 还没验**。设计把它定为本条的验收判据,理由是
+  「裸机没有宿主可借,不会假绿」。已达成的是**宿主上**的完整链路。
+  裸机那一步还需要 freestanding 目标的配置,未做。
 
 ## 12.5 实施记录(2026-08-22 第一轮)
 
