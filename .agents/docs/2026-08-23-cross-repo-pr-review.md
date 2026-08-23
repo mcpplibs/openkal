@@ -313,6 +313,27 @@ git 一个字都没说 —— 那是连接在传输中途断掉的样子。同�
 3. 八个 PR 的 CI 全绿,且新增的测试**能够失败** —— 每个都以「注入缺陷 → 断言变红」
    核验过。
 
+### 结果
+
+按 **head SHA** 汇总该提交上的全部检查(而不是「最后一次 run」,理由见 §5.4):
+
+| 仓库 | PR | 检查 |
+|---|---|---|
+| openkal | #6 | 12 success |
+| openkal-llvm-runtime | #1 | 10 success |
+| openkal-musl | #4 | 6 success |
+| openkal-windows | #5 | 4 success |
+| openkal-macos | #4 | 2 success |
+| openkal-opensbi | #1 | 3 success |
+| openarch | #6 | 8 success |
+| mcpp | #486 | 27 success |
+| | | **72,零失败** |
+
+⚠️ `openkal-llvm-runtime` 一度在同一个 SHA 上同时挂着一次失败和一次成功 —— 前者是
+被网络瞬时故障打断的 run。**重新触发工作流会新建一次 run 而不取代旧的**,所以旧的
+结论仍然挂在 PR 上;把失败的那次 run 本身重跑,它的结论才被更新。⇒ 这也是 §5.3 那条
+修复要存在的理由:一次瞬时故障不该留下一个需要人去解释的红点。
+
 ### ⭐ 这两轮里最值得留下的三条
 
 1. **本次 review 自己出错过两次**,而两次是同一类:一个查询给出的答案,和这个查询
