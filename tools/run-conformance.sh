@@ -83,10 +83,35 @@ trap restore_the_manifests EXIT INT TERM
 point_at_the_specification "$suite/mcpp.toml"
 point_at_the_specification "$implementation/mcpp.toml"
 
+# ⭐ THE FEATURES THE IMPLEMENTATION NEEDS WHEN NOTHING ELSE IS BENEATH THE
+# PROGRAM.
+#
+# An implementation of a hosted system is reached through a C library, and the
+# hand-over from the image's first instruction to `main` is that library's. An
+# implementation of a bare machine is the only thing there, so it has to perform
+# the hand-over itself — establish a stack, run the initialiser arrays, set the
+# thread pointer — and every implementation in this ecosystem puts that behind a
+# feature rather than in its default build, because a program that DOES have a C
+# library would then have two.
+#
+# The suite cannot know which arrangement it is in; whoever runs it does. Named
+# in the environment for the same reason the runner is, and empty by default so
+# that a hosted run is unchanged.
+#
+# ⚠️ Measured 2026-08-23: without it the suite builds for `riscv64-none-elf` and
+# produces an image whose entry point is 0x0, because nothing defined `_start`.
+# A build that succeeds and cannot start is the failure this variable exists to
+# prevent.
+impl_features="${OPENKAL_CONFORMANCE_IMPL_FEATURES:-}"
+impl_line="$package = { path = \"$implementation_native\" }"
+if [ -n "$impl_features" ]; then
+    impl_line="$package = { path = \"$implementation_native\", features = [\"$impl_features\"] }"
+fi
+
 if ! grep -q "^$package = " "$suite/mcpp.toml"; then
     # Appended immediately after openkal, which is inside [dependencies]. A
     # plain append would land under [features].
-    awk -v line="$package = { path = \"$implementation_native\" }" '
+    awk -v line="$impl_line" '
         { print }
         /^openkal = / && !done { print line; done = 1 }
     ' "$suite/mcpp.toml" > "$suite/mcpp.toml.next"

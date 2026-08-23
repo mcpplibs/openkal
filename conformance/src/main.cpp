@@ -24,7 +24,28 @@
 import okc.suite;
 import okc.child;
 
-int main() {
+// ⚠️ C LINKAGE, BECAUSE ON A MACHINE WITH NO OPERATING SYSTEM `main` IS AN
+// ORDINARY FUNCTION.
+//
+// A hosted implementation makes `main` the reserved entry point, and a startup
+// object that refers to it by that name finds it whatever language the program
+// is written in. A freestanding one does not: `-ffreestanding` says the library
+// is absent, so `main` loses its special status and is mangled like anything
+// else. Measured 2026-08-23, building this suite for `riscv64-none-elf` against
+// `openkal-opensbi`:
+//
+//     ld.lld: error: undefined symbol: main
+//     >>> referenced by start.cpp:204 … obj/…/start.o:(__okb_start_c)
+//     >>> did you mean to declare main() as extern "C"?
+//
+// while `nm` on this file's object showed `_Z4mainv`.
+//
+// ⇒ The declaration says what is true of this program rather than working
+// around something. It is harmless where `main` is reserved, because there the
+// two spellings are the same symbol; and clause 9's behavioural half is
+// required of every implementation, including one of a machine with no
+// operating system, so this program has to be linkable in both arrangements.
+extern "C" int main() {
     // Two of the specification's requirements end the program that satisfies
     // them, so they are observed in a copy this program starts. A copy is told
     // what to do through its argument vector and answers through its status.

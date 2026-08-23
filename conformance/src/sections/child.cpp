@@ -57,6 +57,28 @@ namespace {
 // Something the specification requires shall NOT run after kal_exit. A static
 // object whose destructor writes is the shortest thing that would betray an
 // implementation calling a C library's exit instead of terminating.
+//
+// ⚠️ GUARDED ON `openkal.process`, WHICH IS THE INTERFACE THAT MAKES THE
+// OBSERVATION RATHER THAN THE ONE THE OBJECT USES.
+//
+// The object is armed only by a copy this program starts, and only
+// `okc.abort`'s section starts one. Where `openkal.process` is absent no copy
+// is ever started, the object can never be armed, and its destructor is
+// unreachable — while still costing the program a `__cxa_atexit`, which is a
+// facility of the C++ ABI rather than of openkal.
+//
+// ⚠️ Measured 2026-08-23, building this suite for `riscv64-none-elf` against
+// `openkal-opensbi` — the only thing standing between the suite and a machine
+// with no operating system:
+//
+//     ld.lld: error: undefined symbol: __cxa_atexit
+//     >>> referenced by child.cpp:36 … obj/child.o:(__cxx_global_var_init)
+//
+// ⇒ The observation is not lost by this guard. It is already conditional on a
+// copy being startable, and `okc.abort` reports it as not observed when one
+// cannot be — which is the same answer, arrived at by the interface inventory
+// rather than by a link failure.
+#ifdef MCPP_FEATURE_PROCESS
 struct after {
     bool armed = false;
     ~after() {
@@ -66,6 +88,7 @@ struct after {
     }
 };
 after g_after;
+#endif
 }  // namespace
 
 [[noreturn]] void perform(errand e) {
@@ -91,7 +114,9 @@ after g_after;
             // destructor's: an implementation that terminated by way of a C
             // library's exit would run the destructor, and clause 7.8 says it
             // shall not.
+#ifdef MCPP_FEATURE_PROCESS
             g_after.armed = true;
+#endif
 #ifdef MCPP_FEATURE_CORE
             kal_stream_write(kal_stdout(), "BEFORE EXIT\n", 12);
 #endif
