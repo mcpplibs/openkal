@@ -130,6 +130,8 @@ openkal-macos · openkal-opensbi · openarch · mcpp(#486)
 | 09 | A | 板子的加载地址被每个程序抄一份 ⇒ 归 `openkal-opensbi/board.ld` | ✅ 两个例子都删掉了自己那份;四目标复验 |
 | 10 | H | `dist::format_for` 从 lambda 提成函数,兜底成为参数 | ✅ 三组断言,注入验证会红 |
 | 11 | B | e2e 267 选的目标在 macOS 上无载荷(我写的是假设不是实测) | ✅ 改用宿主自己的三元组 |
+| 12 | F | Windows 分支把「保留模块名」抑制绑在 `.ixx` 上 ⇒ 每次构建一条警告 | ✅ 改为无条件,与另一分支一致 |
+| 13 | B | Windows 宿主 + clang 无 include 依赖追踪 | ⏸ 记录不修,见 §4.4(爆炸半径:CI 不受影响,增量开发受影响) |
 
 ---
 
@@ -186,7 +188,45 @@ ld.lld: error: section .debug_str file range overlaps with .eh_frame_hdr
 「量的是改完之后的状态」**。上一轮已经因为同一个原因给出过一次错误结论(改 path
 依赖的 manifest 不让消费者的 plan 失效)。
 
-### 4.4 ⭐ H(扩展性):加第五个平台要动三处,而它们都是表
+### 4.4 ⚠️ B(稳定性):Windows 宿主上没有 include 依赖追踪 —— 记录而不修
+
+mcpp 自己在这个组合上打印一条诚实的诊断:
+
+> this toolchain and platform combination emits no GNU depfile
+> impact: editing a file `#include`'d inside a module interface purview … will
+> not trigger a rebuild, so the build may reuse a stale BMI or object
+
+原因写在 `ninja_backend.cppm` 里:GNU 的 depfile 过滤需要 `awk`,Windows 上没有;
+`cl.exe` 走 `deps = msvc` 不受影响,受影响的是 **Windows 宿主 + clang/mingw**。
+
+⚠️ **爆炸半径**:CI 每次都是干净检出,不受影响;受影响的是 Windows 上的**增量开发
+构建**。而本轮新加的 3×3 工作流恰好把这个组合变成了常规路径,所以它从「一个少见的
+组合」变成了「一台宿主的默认状态」。
+
+⇒ **不在本轮修**:修它需要一条不依赖 `awk` 的 depfile 过滤,那是它自己的一次改动。
+记在此处,连同它的爆炸半径,因为一条诊断如果没人记下它影响什么,下一个人只会把它
+当噪声关掉。
+
+### 4.5 ⭐ 同一个函数里的三处不对称,而它们是被逐个撞出来的
+
+`clang.cppm` 的 `std` 模块命令有一条 `#if defined(_WIN32)` 分支,本轮在它里面找到
+三处缺陷,每一处都要一次完整的 CI 轮次:
+
+| # | 症状 | 缺的是什么 |
+|---|---|---|
+| 1 | `std.cppm:16: '__config' file not found`(命令只有五个 token) | `extraFlags` —— 包自己的头、`-nostdinc`、目标三元组 |
+| 2 | `module file 'pcm.cache\std.pcm' not found` | 绝对路径(`cd X && …` 在 cmd.exe 不换盘符) |
+| 3 | `'std' is a reserved name for a module` | `-Wno-reserved-module-identifier`(被绑在 `.ixx` 上) |
+
+⚠️ 三处的共同原因是同一个:**这条分支写在「Windows 宿主只为自己构建、对着 MSVC
+STL」的年代**,而它此后一直没有被那个假设之外的输入跑过。
+
+⇒ 一个只在一种平台上编译的分支,是这台机器无法检查的分支。本轮在 `std.compat` 那侧
+写了这样一条分支又撤回了,改成两边共用的单一形式;`std` 这条还在,因为它有真实的
+理由(cmd.exe 会剥掉前导引号)。⚠️ **那个理由留下了一处只能靠 CI 检查的代码**,这一
+条记在这里而不是当作已经解决。
+
+### 4.6 ⭐ H(扩展性):加第五个平台要动三处,而它们都是表
 
 本轮引入的按 os 分支的判据集中在三个函数里:
 
