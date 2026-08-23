@@ -134,6 +134,48 @@ resting on facilities that implementation may be the only supplier of.
 
 The price is the formatting in `okc.report`, and it is sixty lines.
 
+## It runs on a machine with no operating system, and that is not an aside
+
+Clause 9 makes the behavioural half a property of **every** implementation, and
+an implementation of a bare machine is not exempt. This suite is written so that
+it can be one: it depends on `openkal` and on the language, it does not
+`import std`, and it therefore links in a program that carries no other runtime.
+
+Three things such a run needs that a hosted one does not, and each was found by
+trying rather than by reading:
+
+| | supplied by |
+| --- | --- |
+| the memory map | the implementation, through its own build program — where firmware hands control over is a fact about a machine and not about this suite |
+| the hand-over from the image's first instruction to `main` | the implementation's own startup, selected with `OPENKAL_CONFORMANCE_IMPL_FEATURES=standalone`, because every implementation here puts it behind a feature rather than in its default build |
+| an entry symbol | this suite: `src/main.cpp` declares `main` as `extern "C"`, because `-ffreestanding` makes `main` an ordinary function and the startup object refers to it by name |
+
+⚠️ **One observation is not made there, and the suite says so rather than
+skipping it.** The requirement that `kal_exit` run no static destructor is
+observed in a copy the suite starts, which needs `openkal.process`; where that
+interface is absent, `okc.abort` reports it as not observed. The static object
+the observation uses is guarded on the same interface — it would otherwise cost
+the program a `__cxa_atexit`, which is a facility of the C++ ABI rather than of
+openkal, for an observation that can never be made.
+
+Measured 2026-08-23 against `openkal-opensbi` under QEMU with real OpenSBI
+firmware, selected to `core`: twelve observations held, none failed, nine were
+not observed.
+
+## The types the declarations are written with
+
+Clause 9 gained a fourth half in version 0.6: `tools/check-types.sh` examines
+what the declarations are written **with**, which is a different freedom from the
+names they export. An implementation can match `SURFACE.txt` exactly and still
+declare one of those names taking a `size_t`, and the surface comparison would
+report conformance.
+
+It asks a compiler what it parsed rather than searching the text, so a type
+reached through a macro or an include is seen and typedef names are read as
+written. ⚠️ And it proves it parsed something before it is allowed to report
+success: a check that succeeds by finding nothing succeeds identically when it
+has read nothing.
+
 ## Layout
 
 One module per concern, interface and implementation separated, as the mcpp

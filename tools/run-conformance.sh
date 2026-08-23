@@ -57,13 +57,61 @@ point_at_the_specification() {
     sed "s|^openkal = .*$|openkal = { path = \"$here_native\" }|" "$1" > "$1.next"
     mv "$1.next" "$1"
 }
+# ⚠️ THE REWRITE IS UNDONE ON THE WAY OUT, AND THAT IS NOT TIDINESS.
+#
+# Both manifests are rewritten to name this working tree by an absolute path,
+# which is right for the run and wrong for everything after it. Before this
+# trap the rewrite was permanent: the tree was left holding a path from the
+# machine that ran the script, and whoever committed next published it.
+#
+# Measured 2026-08-22: that is what happened. `conformance/mcpp.toml' reached a
+# pull request naming /home/<user>/... and continuous integration failed on
+# every row with `path dependency has no mcpp.toml' --- a message about a
+# missing file, on a machine where nothing was missing.
+#
+# A local absolute path in a public repository is also the thing a standing
+# constraint forbids, so the remedy is not to remember to revert.
+restore_the_manifests() {
+    [ -f "$suite/mcpp.toml.orig" ] && mv "$suite/mcpp.toml.orig" "$suite/mcpp.toml"
+    [ -f "$implementation/mcpp.toml.orig" ] && mv "$implementation/mcpp.toml.orig" "$implementation/mcpp.toml"
+    return 0
+}
+cp "$suite/mcpp.toml" "$suite/mcpp.toml.orig"
+cp "$implementation/mcpp.toml" "$implementation/mcpp.toml.orig"
+trap restore_the_manifests EXIT INT TERM
+
 point_at_the_specification "$suite/mcpp.toml"
 point_at_the_specification "$implementation/mcpp.toml"
+
+# ⭐ THE FEATURES THE IMPLEMENTATION NEEDS WHEN NOTHING ELSE IS BENEATH THE
+# PROGRAM.
+#
+# An implementation of a hosted system is reached through a C library, and the
+# hand-over from the image's first instruction to `main` is that library's. An
+# implementation of a bare machine is the only thing there, so it has to perform
+# the hand-over itself — establish a stack, run the initialiser arrays, set the
+# thread pointer — and every implementation in this ecosystem puts that behind a
+# feature rather than in its default build, because a program that DOES have a C
+# library would then have two.
+#
+# The suite cannot know which arrangement it is in; whoever runs it does. Named
+# in the environment for the same reason the runner is, and empty by default so
+# that a hosted run is unchanged.
+#
+# ⚠️ Measured 2026-08-23: without it the suite builds for `riscv64-none-elf` and
+# produces an image whose entry point is 0x0, because nothing defined `_start`.
+# A build that succeeds and cannot start is the failure this variable exists to
+# prevent.
+impl_features="${OPENKAL_CONFORMANCE_IMPL_FEATURES:-}"
+impl_line="$package = { path = \"$implementation_native\" }"
+if [ -n "$impl_features" ]; then
+    impl_line="$package = { path = \"$implementation_native\", features = [\"$impl_features\"] }"
+fi
 
 if ! grep -q "^$package = " "$suite/mcpp.toml"; then
     # Appended immediately after openkal, which is inside [dependencies]. A
     # plain append would land under [features].
-    awk -v line="$package = { path = \"$implementation_native\" }" '
+    awk -v line="$impl_line" '
         { print }
         /^openkal = / && !done { print line; done = 1 }
     ' "$suite/mcpp.toml" > "$suite/mcpp.toml.next"
@@ -74,7 +122,33 @@ echo "--- the suite's dependencies ---"
 sed -n '/^\[dependencies\]/,/^$/p' "$suite/mcpp.toml"
 
 cd "$suite"
+# ⚠️ A CHANGE OF FEATURE SET DOES NOT INVALIDATE THE BUILD.
+#
+# Measured 2026-08-22, three runs in one working tree with nothing else changed:
+#
+#     run-conformance.sh … full,optional   103 held, 0 not observed   (cold)
+#     run-conformance.sh … full            103 held, 0 not observed   ← wrong
+#     rm -rf target && … full               97 held, 1 not observed   ← right
+#
+# The second run reported on the first run's build. The feature set reaches the
+# suite's own translation units as defines, and those defines are what decide
+# which sections examine anything --- so a run that switched sets examined the
+# previous set and said so in neither its output nor its exit status.
+#
+# This matters here more than it would elsewhere, because this workflow runs the
+# suite twice in one checkout with different sets, and the second run is the
+# composability check --- whose entire purpose is to observe that a smaller set
+# is examined as a smaller set. It could not have observed that.
+#
+# The remedy is to remember which set the build in `target' was made for, and to
+# discard the build when the answer changes. Re-running the same set still
+# builds incrementally, which is what the record is for.
+stamp="target/.features"
+if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$features" ]; then
+    rm -rf target
+fi
 mcpp build --features "$features" "$@"
+mkdir -p target && printf '%s' "$features" > "$stamp"
 
 binary="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \) | head -1)"
 [ -n "$binary" ] || { echo "the suite was not produced" >&2; exit 2; }

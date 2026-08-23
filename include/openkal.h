@@ -20,5 +20,6 @@
 #include "openkal/fs.h"
 #include "openkal/process.h"
 #include "openkal/task.h"
+#include "openkal/exec.h"
 
 #endif /* OPENKAL_H */

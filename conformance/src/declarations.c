@@ -34,6 +34,10 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_env_var);
     (void)sizeof(&kal_env_var_at);
     (void)sizeof(&kal_env_var_count);
+    (void)sizeof(&kal_exec_alloc);
+    (void)sizeof(&kal_exec_free);
+    (void)sizeof(&kal_exec_props);
+    (void)sizeof(&kal_exec_publish);
     (void)sizeof(&kal_exit);
     (void)sizeof(&kal_free);
     (void)sizeof(&kal_fs_close_dir);
