@@ -307,13 +307,19 @@ default = "openkal-llvm@22.1.8"
 
 ## 5. N×N 矩阵与现状
 
-**宿主 × 目标**,✅ = 实测跑通,🟢 = 实测产出,🔵 = CI 中(本轮新加):
+⭐⭐ **3×3 全部实测通过**(mcpp `openkal-cross.yml`,九次构建、九次运行):
 
-| 宿主 \ 目标 | Linux | macOS | Windows | 裸机 riscv64 |
-|---|---|---|---|---|
-| **Linux** | ✅ 跑通 | 🟢 Mach-O;🔵 真机运行 | ✅ 跑通(wine);🔵 真机运行 | ✅ 跑通(QEMU) |
-| **macOS** | 🔵 | ✅ 原生(🔵) | 🔵 | 🔵 |
-| **Windows** | 🔵 | 🔵 | ✅ 原生(🔵) | 🔵 |
+| 运行 \ 构建于 | Linux | macOS | Windows |
+|---|---|---|---|
+| **Linux** | ✅ | ✅ | ✅ |
+| **macOS** | ✅ | ✅ | ✅ |
+| **Windows** | ✅ | ✅ | ✅ |
+
+三个构建 job 各产出三个目标的产物;三个运行 job 各执行**三个宿主**为它产出的那一个,
+判据是四行输出全对,含 `unwound: true`。⚠️ **那三个运行 job 什么都不装** —— 不装
+mcpp、不装编译器、不装 C 运行时。
+
+裸机 riscv64 由 `openkal-llvm-runtime` 自己的 CI 在 qemu 上跑(这里没有对应 runner)。
 
 ⚠️ **矩阵的形状本身是结论**:宿主那一维**不该有内容** —— 一旦目标侧全部来自包,
 「在哪台机器上建」就不再是一个变量。
@@ -333,17 +339,44 @@ else                                      { … }   // 这台机器是 Linux
 
 ⇒ 结论仍然是「宿主那一维不该有内容」,但它是**被做出来的**,不是自然成立的。
 
+### ⭐⭐ 宿主维度挖出七处,而它们是同一个形状
+
+写 `host-dimension` job 之前,「宿主那一维不该有内容」是一句**断言**。跑起来之后
+它是一句被做出来的话 —— 代价是七处修复,每一处都是**由「哪台机器在构建」分的支**:
+
+| # | 症状 | 分支按什么分的 | 归谁 |
+|---|---|---|---|
+| 1 | `obj/*.o: unknown file type` ×30 | 链接行三支按**宿主**分,只有 Linux 那支消费 `--target=` | mcpp |
+| 2 | `std.cppm:16: '__config' file not found`(5 个 token) | std 模块的命令有 Windows 分支,**不带 `extraFlags`** | mcpp |
+| 3 | `module file 'pcm.cache\std.pcm' not found` | `cd X && …` 在 cmd.exe 里**不换盘符**,缓存在 C: 而检出在 D: | mcpp |
+| 4 | `unable to find library -load_hidden`,宿主的 `libc++.a` 上了 ELF 的链接线 | 格式判据里 `apple`/`darwin` 匹配不到 mcpp 自己的 `aarch64-macos` ⇒ **落到问宿主** | mcpp |
+| 5 | `library not found for -lc++` | 契约的三个答案都在点名一个**要链的**运行时,而它已经在对象里 | mcpp |
+| 6 | `mach_time.h:55: unknown type name '__MAC_10_10'` ×19 | `chrono.cpp` 的 `__has_include` 是**一个关于机器的问题**;包缺 `-nostdinc` | 包 |
+| 7 | `unable to find library -lgcc` | `-lgcc` 是 GCC 的运行时,而编译器是 clang;Linux 是最后一个还在借的目标 | 包 |
+
+⚠️ **第 4 条在遮蔽第 5 条**:`aarch64-macos` 一直落到 `Elf`,而契约块在 ELF 上什么
+都不贡献 —— 把格式判对,才露出契约也判错了。**一个问题的错答案在遮蔽另一个问题的
+错答案。**
+
+⭐ 第 5 条的修法值得单记:第一版是「整块跳过」,而那说错了话 —— 那一块还负责产物
+格式和分发信息。正确的陈述在同一块里本来就有先例(`mi.freestanding`:「裸机短路
+整张表:下面找到的归档是**宿主的**」),图供给运行时是它的 hosted 形态。答案不是
+「在这里改挑 openkal 的那个」—— openkal 的那个**就是那些对象**,没有库可点名,
+诚实的 flag 是 `-nostdlib++`,它**阻止**驱动自作主张,而不是沉默。
+
 ### ⭐ 顺带修好的一处宿主泄漏
+### ⭐⭐ 真机运行挖出两处,而它们只有真机能挖
 
-macOS 产物的链接行上原本有
+`run-on-windows` / `run-on-macos` 把 Linux 上构建的产物下载到真机上跑,**两个 job
+什么都不装**。Windows 一次就过;macOS 连挖两处,都是**链接成功、签名合法、一跑就崩**:
 
-```
--L…/xim-x-llvm/22.1.8/lib/x86_64-unknown-linux-gnu
--Wl,-rpath,…/lib/x86_64-unknown-linux-gnu
-```
+| 症状 | 真因 |
+|---|---|
+| `EXC_BAD_ACCESS address=0x0`,PC=0,**一个栈帧都没有** | 镜像里 1238 个 `__stubs`、1335 个 `__got` 槽,而未定义符号只有**三个** —— stub 的名字是它自己的 libc++ 内部符号。Mach-O 上「默认可见 + 弱链接」由**动态加载器**合并,ELF 上这是链接期的事。⇒ `-fvisibility=hidden`,`__stubs` 0x3a08 → 0x6c |
+| `ios_base::Init::Init()` → `__stdinbuf<char>(FILE*)` 崩 | ⭐ **Mach-O 把顺序倒过来了**:加载器在**交给入口之前**跑构造器,于是 libc++ 在这个 C 库还没启动时就去构造它的标准流。⇒ 把「带起来」提成带一次性守卫的函数,加载器那侧也能调 |
 
-`ld64` 接受 `-rpath` 并把它写进镜像 —— 一个指向 Linux 目录的 `LC_RPATH`。整条
-替换之后 `LC_RPATH` 为空。⚠️ 这条**不会让任何构建失败**,所以只可能被读出来。
+⚠️ 诊断本身也用了两轮:`bt` 在 PC=0 时只会把症状重述一遍(没有帧可展开),要的是
+`lr`;而 lldb 的 `--batch -o` 在第一个报错之后就不往下走了,要用 `-k`(崩溃时执行)。
 
 ### Windows 目标:从「停在 LLP64」到跑通
 
