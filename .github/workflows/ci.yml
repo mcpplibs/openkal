@@ -28,7 +28,7 @@ env:
   # A version verified to build these packages, not a measured minimum. The pin
   # exists for reproducibility rather than because an older mcpp is known to
   # fail.
-  MCPP_VERSION: 2026.8.19.4
+  MCPP_VERSION: 2026.8.24.4
   XLINGS_VERSION: v2026.8.17.2
   XLINGS_NON_INTERACTIVE: '1'
 
