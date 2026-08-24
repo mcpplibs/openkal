@@ -153,6 +153,7 @@ implementation provides neither.
 | `openkal.fs` | `openkal.fs` | `openkal/fs.h` |
 | `openkal.process` | `openkal.process` | `openkal/process.h` |
 | `openkal.task` | `openkal.task` | `openkal/task.h` |
+| `openkal.random` | `openkal.random` | `openkal/random.h` |
 | `openkal.exec` | `openkal.exec` | `openkal/exec.h` |
 
 `openkal.h` includes every header, for a consumer that uses several.
