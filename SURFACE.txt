@@ -33,6 +33,9 @@ kal_time_monotonic_granularity
 kal_time_props
 kal_time_sleep
 kal_time_wall
+# openkal.random
+kal_random_fill
+kal_random_props
 # openkal.fs
 kal_fs_close_dir
 kal_fs_close_file

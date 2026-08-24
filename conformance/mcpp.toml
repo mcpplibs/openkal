@@ -56,6 +56,7 @@ default  = ["core"]
 core     = []
 env      = []
 time     = []
+random   = []
 fs       = []
 process  = ["fs"]     # a program is started relative to a directory
 task     = []
@@ -64,7 +65,7 @@ exec     = []
 # The specification names this set `hosted' (clause 3.3). Both spellings are
 # here because the workflows and the older invocations use `standard', and a
 # rename that broke them would be a rename of the wrong thing.
-hosted   = ["core", "env", "time", "fs", "process", "task"]
+hosted   = ["core", "env", "time", "random", "fs", "process", "task"]
 standard = ["hosted"]
 
 # Deliberately not part of `full'. Clause 6.1 states that an implementation

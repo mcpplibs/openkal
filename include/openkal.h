@@ -17,6 +17,7 @@
 #include "openkal/memory.h"
 #include "openkal/env.h"
 #include "openkal/time.h"
+#include "openkal/random.h"
 #include "openkal/fs.h"
 #include "openkal/process.h"
 #include "openkal/task.h"

@@ -38,6 +38,7 @@ provides an interface in whole or not at all.
 | `openkal.memory` | a region of the address space | core |
 | `openkal.env` | the parameters a program receives at inception | standard |
 | `openkal.time` | a time source | standard |
+| `openkal.random` | a source of unpredictable bytes | standard |
 | `openkal.fs` | a directory, and an open file | standard |
 | `openkal.process` | a program image that has been started | standard |
 | `openkal.task` | an execution context, and a suspension primitive | standard |

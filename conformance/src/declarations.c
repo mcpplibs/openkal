@@ -64,6 +64,8 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_process_spawn);
     (void)sizeof(&kal_process_terminate);
     (void)sizeof(&kal_process_wait);
+    (void)sizeof(&kal_random_fill);
+    (void)sizeof(&kal_random_props);
     (void)sizeof(&kal_stderr);
     (void)sizeof(&kal_stdin);
     (void)sizeof(&kal_stdout);
