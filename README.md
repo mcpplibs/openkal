@@ -23,6 +23,8 @@ undefined references, which is the intended outcome.
 | `openkal.fs` | `openkal/fs.h` | directories and open files, relative throughout | standard |
 | `openkal.process` | `openkal/process.h` | starting a program and waiting for it | standard |
 | `openkal.task` | `openkal/task.h` | execution contexts, and the primitive they are built upon | standard |
+| `openkal.random` | `openkal/random.h` | a source of unpredictable bytes | optional |
+| `openkal.exec` | `openkal/exec.h` | a region of the address space a program may execute | optional |
 
 ### One statement of the declarations, two ways to reach it
 
