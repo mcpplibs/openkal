@@ -65,7 +65,7 @@ exec     = []
 # The specification names this set `hosted' (clause 3.3). Both spellings are
 # here because the workflows and the older invocations use `standard', and a
 # rename that broke them would be a rename of the wrong thing.
-hosted   = ["core", "env", "time", "random", "fs", "process", "task"]
+hosted   = ["core", "env", "time", "fs", "process", "task"]
 standard = ["hosted"]
 
 # Deliberately not part of `full'. Clause 6.1 states that an implementation
@@ -75,7 +75,23 @@ standard = ["hosted"]
 # rather than an observation that did not hold. The caller names this set for an
 # implementation that provides these interfaces, and omits it for one that does
 # not --- which is the same choice the implementation itself made.
-optional = ["exec"]
+# ⚠️ `random` IS HERE AND NOT IN `hosted`, AND THE NOTE ABOVE ALREADY SAID WHY.
+#
+# It was put in `hosted` first, and the suite then failed to LINK against every
+# backend that had not yet implemented it:
+#
+#     lld-link: error: undefined symbol: kal_random_fill
+#
+# — which is exactly the outcome the paragraph above warns about: a report that
+# is a link failure rather than an observation that did not hold. Clause 6.1
+# makes an absent interface not a deviation, so a set that demands it turns a
+# permitted choice into a build error.
+#
+# `random` has the same shape as `exec`: every hosted platform provides it, a
+# bare-metal one provides it only if its board has a source, and neither is a
+# deviation. The caller names this set for an implementation that provides
+# these interfaces and omits it for one that does not.
+optional = ["exec", "random"]
 
 # The kinds of examination. Behaviour is always performed; the other three are
 # selected, because each costs time that a reader running the suite to answer
