@@ -1,4 +1,4 @@
-# openkal Specification, version 0.6
+# openkal Specification, version 0.7
 
 ## 1. Scope
 
@@ -38,13 +38,14 @@ provides an interface in whole or not at all.
 | `openkal.memory` | a region of the address space | core |
 | `openkal.env` | the parameters a program receives at inception | standard |
 | `openkal.time` | a time source | standard |
+| `openkal.random` | a source of unpredictable bytes | optional |
 | `openkal.fs` | a directory, and an open file | standard |
 | `openkal.process` | a program image that has been started | standard |
 | `openkal.task` | an execution context, and a suspension primitive | standard |
 | `openkal.exec` | a region of the address space a program may execute | optional |
 | `openkal.event` | readiness of a set of resources | reserved |
 
-Version 0.6 specifies the core, standard and optional interfaces. The reserved
+Version 0.7 specifies the core, standard and optional interfaces. The reserved
 row is not specified, and its name shall not be used for other purposes.
 
 *Core* denotes an interface every implementation provides. *Standard* denotes
@@ -152,6 +153,7 @@ implementation provides neither.
 | `openkal.fs` | `openkal.fs` | `openkal/fs.h` |
 | `openkal.process` | `openkal.process` | `openkal/process.h` |
 | `openkal.task` | `openkal.task` | `openkal/task.h` |
+| `openkal.random` | `openkal.random` | `openkal/random.h` |
 | `openkal.exec` | `openkal.exec` | `openkal/exec.h` |
 
 `openkal.h` includes every header, for a consumer that uses several.

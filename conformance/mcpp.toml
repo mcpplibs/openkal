@@ -18,7 +18,7 @@ repo        = "https://github.com/mcpplibs/openkal"
 # What it depends upon is therefore openkal and the language. The formatting in
 # okc.report is the price of that, and it is sixty lines.
 [dependencies]
-openkal = "0.6.0"
+openkal = "0.7.0"
 
 # The implementation under examination is not named here.
 #
@@ -56,6 +56,7 @@ default  = ["core"]
 core     = []
 env      = []
 time     = []
+random   = []
 fs       = []
 process  = ["fs"]     # a program is started relative to a directory
 task     = []
@@ -74,7 +75,23 @@ standard = ["hosted"]
 # rather than an observation that did not hold. The caller names this set for an
 # implementation that provides these interfaces, and omits it for one that does
 # not --- which is the same choice the implementation itself made.
-optional = ["exec"]
+# ⚠️ `random` IS HERE AND NOT IN `hosted`, AND THE NOTE ABOVE ALREADY SAID WHY.
+#
+# It was put in `hosted` first, and the suite then failed to LINK against every
+# backend that had not yet implemented it:
+#
+#     lld-link: error: undefined symbol: kal_random_fill
+#
+# — which is exactly the outcome the paragraph above warns about: a report that
+# is a link failure rather than an observation that did not hold. Clause 6.1
+# makes an absent interface not a deviation, so a set that demands it turns a
+# permitted choice into a build error.
+#
+# `random` has the same shape as `exec`: every hosted platform provides it, a
+# bare-metal one provides it only if its board has a source, and neither is a
+# deviation. The caller names this set for an implementation that provides
+# these interfaces and omits it for one that does not.
+optional = ["exec", "random"]
 
 # The kinds of examination. Behaviour is always performed; the other three are
 # selected, because each costs time that a reader running the suite to answer

@@ -7,6 +7,7 @@ import okc.stream;
 import okc.memory;
 import okc.env;
 import okc.time;
+import okc.random;
 import okc.fs;
 import okc.process;
 import okc.task;
@@ -26,6 +27,7 @@ int run_all() {
     memory::run();
     env::run();
     time::run();
+    random::run();
     fs::run();
     process::run();
     task::run();
