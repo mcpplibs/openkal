@@ -148,6 +148,11 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
+            # ⭐ `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built and there is no earlier fingerprint directory
+            # to pick by mistake. `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use — one of the runners
+            # that reaches this line is macOS.
             built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
@@ -412,6 +417,11 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
+            # ⭐ `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built and there is no earlier fingerprint directory
+            # to pick by mistake. `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use — one of the runners
+            # that reaches this line is macOS.
             built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
@@ -649,6 +659,11 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
+            # ⭐ `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built and there is no earlier fingerprint directory
+            # to pick by mistake. `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use — one of the runners
+            # that reaches this line is macOS.
             built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
