@@ -148,12 +148,18 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
-            # ⭐ `$src` is a FRESH clone each run, so `target/` holds exactly what
-            # this step just built and there is no earlier fingerprint directory
-            # to pick by mistake. `-printf` would be the safer form on a cached
-            # tree and is a GNU extension this must not use — one of the runners
-            # that reaches this line is macOS.
-            built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
+            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # macOS runners too: on Windows the artefact is `mcpp.exe`, and
+            # `-perm -u+x` is not a question that filesystem answers the way this
+            # expects. Measured: `Finished release [optimized] in 173.44s`
+            # followed by "mcpp did not build" — the build had succeeded and the
+            # search was looking for the wrong name.
+            #
+            # `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built; `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use.
+            built=$(find "$src/target" -type f \
+                    \( -name mcpp -o -name mcpp.exe \) | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
             # ⚠️ Reported, because a PATH entry that does not win looks exactly
@@ -417,12 +423,18 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
-            # ⭐ `$src` is a FRESH clone each run, so `target/` holds exactly what
-            # this step just built and there is no earlier fingerprint directory
-            # to pick by mistake. `-printf` would be the safer form on a cached
-            # tree and is a GNU extension this must not use — one of the runners
-            # that reaches this line is macOS.
-            built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
+            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # macOS runners too: on Windows the artefact is `mcpp.exe`, and
+            # `-perm -u+x` is not a question that filesystem answers the way this
+            # expects. Measured: `Finished release [optimized] in 173.44s`
+            # followed by "mcpp did not build" — the build had succeeded and the
+            # search was looking for the wrong name.
+            #
+            # `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built; `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use.
+            built=$(find "$src/target" -type f \
+                    \( -name mcpp -o -name mcpp.exe \) | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
             # ⚠️ Reported, because a PATH entry that does not win looks exactly
@@ -659,12 +671,18 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
-            # ⭐ `$src` is a FRESH clone each run, so `target/` holds exactly what
-            # this step just built and there is no earlier fingerprint directory
-            # to pick by mistake. `-printf` would be the safer form on a cached
-            # tree and is a GNU extension this must not use — one of the runners
-            # that reaches this line is macOS.
-            built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
+            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # macOS runners too: on Windows the artefact is `mcpp.exe`, and
+            # `-perm -u+x` is not a question that filesystem answers the way this
+            # expects. Measured: `Finished release [optimized] in 173.44s`
+            # followed by "mcpp did not build" — the build had succeeded and the
+            # search was looking for the wrong name.
+            #
+            # `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built; `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use.
+            built=$(find "$src/target" -type f \
+                    \( -name mcpp -o -name mcpp.exe \) | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
             # ⚠️ Reported, because a PATH entry that does not win looks exactly
