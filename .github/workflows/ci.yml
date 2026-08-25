@@ -23,12 +23,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-
+    inputs:
+      mcpp_ref:
+        description: "Branch of mcpp-community/mcpp to build and test against (empty = the released pin)"
+        required: false
+        default: ""
 env:
+  MCPP_SOURCE_REF: ${{ github.event.inputs.mcpp_ref || vars.MCPP_SOURCE_REF }}
   # A version verified to build these packages, not a measured minimum. The pin
   # exists for reproducibility rather than because an older mcpp is known to
   # fail.
-  MCPP_VERSION: 2026.8.25.1
+  MCPP_VERSION: 2026.8.25.2
   XLINGS_VERSION: v2026.8.17.2
   XLINGS_NON_INTERACTIVE: '1'
 
@@ -103,6 +108,33 @@ jobs:
           done
           mcpp --version
           mcpp self config --mirror GLOBAL
+          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          #
+          # Empty in the ordinary run, so this job keeps testing the RELEASED
+          # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
+          # repository variable — and the same job runs against that source.
+          #
+          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # releases went out green and only then turned this ecosystem red: the
+          # engine's own CI cannot see a defect that appears only in a real
+          # dependency graph, and this repository could not see the engine until
+          # it had been published. Validating before the release closes that gap.
+          #
+          # The released mcpp installed just above is the bootstrap that compiles
+          # it; mcpp builds itself and there is no other compiler for it here.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            src="$RUNNER_TEMP/mcpp-src"
+            [ -d "$src" ] || git clone --quiet --depth 1 \
+              --branch "$MCPP_SOURCE_REF" \
+              https://github.com/mcpp-community/mcpp.git "$src"
+            ( cd "$src" && mcpp build --release )
+            built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
+            [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
+            echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
+            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # like one that does until something built with the wrong engine.
+            echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
+          fi
 
       # The compiler family and version for this row. mcpp keeps its toolchains
       # in a sandbox of its own, so this selects rather than installs into the
@@ -320,6 +352,33 @@ jobs:
             sleep 60
           done
           mcpp self config --mirror GLOBAL
+          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          #
+          # Empty in the ordinary run, so this job keeps testing the RELEASED
+          # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
+          # repository variable — and the same job runs against that source.
+          #
+          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # releases went out green and only then turned this ecosystem red: the
+          # engine's own CI cannot see a defect that appears only in a real
+          # dependency graph, and this repository could not see the engine until
+          # it had been published. Validating before the release closes that gap.
+          #
+          # The released mcpp installed just above is the bootstrap that compiles
+          # it; mcpp builds itself and there is no other compiler for it here.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            src="$RUNNER_TEMP/mcpp-src"
+            [ -d "$src" ] || git clone --quiet --depth 1 \
+              --branch "$MCPP_SOURCE_REF" \
+              https://github.com/mcpp-community/mcpp.git "$src"
+            ( cd "$src" && mcpp build --release )
+            built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
+            [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
+            echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
+            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # like one that does until something built with the wrong engine.
+            echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
+          fi
 
       # The compiler family and version for this row. mcpp keeps its toolchains
       # in a sandbox of its own, so this selects rather than installs into the
@@ -510,6 +569,33 @@ jobs:
             sleep 60
           done
           mcpp self config --mirror GLOBAL
+          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          #
+          # Empty in the ordinary run, so this job keeps testing the RELEASED
+          # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
+          # repository variable — and the same job runs against that source.
+          #
+          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # releases went out green and only then turned this ecosystem red: the
+          # engine's own CI cannot see a defect that appears only in a real
+          # dependency graph, and this repository could not see the engine until
+          # it had been published. Validating before the release closes that gap.
+          #
+          # The released mcpp installed just above is the bootstrap that compiles
+          # it; mcpp builds itself and there is no other compiler for it here.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            src="$RUNNER_TEMP/mcpp-src"
+            [ -d "$src" ] || git clone --quiet --depth 1 \
+              --branch "$MCPP_SOURCE_REF" \
+              https://github.com/mcpp-community/mcpp.git "$src"
+            ( cd "$src" && mcpp build --release )
+            built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
+            [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
+            echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
+            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # like one that does until something built with the wrong engine.
+            echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
+          fi
 
       # The compiler family and version for this row. mcpp keeps its toolchains
       # in a sandbox of its own, so this selects rather than installs into the
