@@ -23,12 +23,17 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-
+    inputs:
+      mcpp_ref:
+        description: "Branch of mcpp-community/mcpp to build and test against (empty = the released pin)"
+        required: false
+        default: ""
 env:
+  MCPP_SOURCE_REF: ${{ github.event.inputs.mcpp_ref || vars.MCPP_SOURCE_REF }}
   # A version verified to build these packages, not a measured minimum. The pin
   # exists for reproducibility rather than because an older mcpp is known to
   # fail.
-  MCPP_VERSION: 2026.8.19.4
+  MCPP_VERSION: 2026.8.25.2
   XLINGS_VERSION: v2026.8.17.2
   XLINGS_NON_INTERACTIVE: '1'
 
@@ -93,7 +98,15 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+          # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
+          # from whatever the index has; the step below replaces it with the
+          # build under review, and the pin is what an ordinary run tests.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            xlings install mcpp -y -g
+          else
+            xlings install "mcpp@$MCPP_VERSION" -y -g
+          fi; then break; fi
             if [ "$attempt" = 6 ]; then
               echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
               exit 1
@@ -103,6 +116,56 @@ jobs:
           done
           mcpp --version
           mcpp self config --mirror GLOBAL
+          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          #
+          # Empty in the ordinary run, so this job keeps testing the RELEASED
+          # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
+          # repository variable — and the same job runs against that source.
+          #
+          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # releases went out green and only then turned this ecosystem red: the
+          # engine's own CI cannot see a defect that appears only in a real
+          # dependency graph, and this repository could not see the engine until
+          # it had been published. Validating before the release closes that gap.
+          #
+          # The released mcpp installed just above is the bootstrap that compiles
+          # it; mcpp builds itself and there is no other compiler for it here.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            src="$RUNNER_TEMP/mcpp-src"
+            [ -d "$src" ] || git clone --quiet --depth 1 \
+              --branch "$MCPP_SOURCE_REF" \
+              https://github.com/mcpp-community/mcpp.git "$src"
+            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
+            # compiles mcpp, and that pin does not move when mcpp is released —
+            # so a build inside the checkout obeys it and tries to install a
+            # version the index may no longer carry:
+            #
+            #     [error] xlings: version '2026.8.17.1' not found for 'mcpp'
+            #       available: 2026.8.25.1
+            #
+            # What is wanted here is the source compiled by the mcpp installed
+            # above, which is exactly what removing the file leaves.
+            rm -f "$src/.xlings.json"
+            ( cd "$src" && mcpp build --release )
+            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # macOS runners too: on Windows the artefact is `mcpp.exe`, and
+            # `-perm -u+x` is not a question that filesystem answers the way this
+            # expects. Measured: `Finished release [optimized] in 173.44s`
+            # followed by "mcpp did not build" — the build had succeeded and the
+            # search was looking for the wrong name.
+            #
+            # `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built; `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use.
+            built=$(find "$src/target" -type f \
+                    \( -name mcpp -o -name mcpp.exe \) | head -1)
+            [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
+            echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
+            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # like one that does until something built with the wrong engine.
+            echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
+          fi
 
       # The compiler family and version for this row. mcpp keeps its toolchains
       # in a sandbox of its own, so this selects rather than installs into the
@@ -311,7 +374,15 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+          # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
+          # from whatever the index has; the step below replaces it with the
+          # build under review, and the pin is what an ordinary run tests.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            xlings install mcpp -y -g
+          else
+            xlings install "mcpp@$MCPP_VERSION" -y -g
+          fi; then break; fi
             if [ "$attempt" = 6 ]; then
               echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
               exit 1
@@ -320,6 +391,56 @@ jobs:
             sleep 60
           done
           mcpp self config --mirror GLOBAL
+          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          #
+          # Empty in the ordinary run, so this job keeps testing the RELEASED
+          # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
+          # repository variable — and the same job runs against that source.
+          #
+          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # releases went out green and only then turned this ecosystem red: the
+          # engine's own CI cannot see a defect that appears only in a real
+          # dependency graph, and this repository could not see the engine until
+          # it had been published. Validating before the release closes that gap.
+          #
+          # The released mcpp installed just above is the bootstrap that compiles
+          # it; mcpp builds itself and there is no other compiler for it here.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            src="$RUNNER_TEMP/mcpp-src"
+            [ -d "$src" ] || git clone --quiet --depth 1 \
+              --branch "$MCPP_SOURCE_REF" \
+              https://github.com/mcpp-community/mcpp.git "$src"
+            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
+            # compiles mcpp, and that pin does not move when mcpp is released —
+            # so a build inside the checkout obeys it and tries to install a
+            # version the index may no longer carry:
+            #
+            #     [error] xlings: version '2026.8.17.1' not found for 'mcpp'
+            #       available: 2026.8.25.1
+            #
+            # What is wanted here is the source compiled by the mcpp installed
+            # above, which is exactly what removing the file leaves.
+            rm -f "$src/.xlings.json"
+            ( cd "$src" && mcpp build --release )
+            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # macOS runners too: on Windows the artefact is `mcpp.exe`, and
+            # `-perm -u+x` is not a question that filesystem answers the way this
+            # expects. Measured: `Finished release [optimized] in 173.44s`
+            # followed by "mcpp did not build" — the build had succeeded and the
+            # search was looking for the wrong name.
+            #
+            # `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built; `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use.
+            built=$(find "$src/target" -type f \
+                    \( -name mcpp -o -name mcpp.exe \) | head -1)
+            [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
+            echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
+            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # like one that does until something built with the wrong engine.
+            echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
+          fi
 
       # The compiler family and version for this row. mcpp keeps its toolchains
       # in a sandbox of its own, so this selects rather than installs into the
@@ -501,7 +622,15 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+          # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
+          # from whatever the index has; the step below replaces it with the
+          # build under review, and the pin is what an ordinary run tests.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            xlings install mcpp -y -g
+          else
+            xlings install "mcpp@$MCPP_VERSION" -y -g
+          fi; then break; fi
             if [ "$attempt" = 6 ]; then
               echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
               exit 1
@@ -510,6 +639,56 @@ jobs:
             sleep 60
           done
           mcpp self config --mirror GLOBAL
+          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          #
+          # Empty in the ordinary run, so this job keeps testing the RELEASED
+          # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
+          # repository variable — and the same job runs against that source.
+          #
+          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # releases went out green and only then turned this ecosystem red: the
+          # engine's own CI cannot see a defect that appears only in a real
+          # dependency graph, and this repository could not see the engine until
+          # it had been published. Validating before the release closes that gap.
+          #
+          # The released mcpp installed just above is the bootstrap that compiles
+          # it; mcpp builds itself and there is no other compiler for it here.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            src="$RUNNER_TEMP/mcpp-src"
+            [ -d "$src" ] || git clone --quiet --depth 1 \
+              --branch "$MCPP_SOURCE_REF" \
+              https://github.com/mcpp-community/mcpp.git "$src"
+            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
+            # compiles mcpp, and that pin does not move when mcpp is released —
+            # so a build inside the checkout obeys it and tries to install a
+            # version the index may no longer carry:
+            #
+            #     [error] xlings: version '2026.8.17.1' not found for 'mcpp'
+            #       available: 2026.8.25.1
+            #
+            # What is wanted here is the source compiled by the mcpp installed
+            # above, which is exactly what removing the file leaves.
+            rm -f "$src/.xlings.json"
+            ( cd "$src" && mcpp build --release )
+            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # macOS runners too: on Windows the artefact is `mcpp.exe`, and
+            # `-perm -u+x` is not a question that filesystem answers the way this
+            # expects. Measured: `Finished release [optimized] in 173.44s`
+            # followed by "mcpp did not build" — the build had succeeded and the
+            # search was looking for the wrong name.
+            #
+            # `$src` is a FRESH clone each run, so `target/` holds exactly what
+            # this step just built; `-printf` would be the safer form on a cached
+            # tree and is a GNU extension this must not use.
+            built=$(find "$src/target" -type f \
+                    \( -name mcpp -o -name mcpp.exe \) | head -1)
+            [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
+            echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
+            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # like one that does until something built with the wrong engine.
+            echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
+          fi
 
       # The compiler family and version for this row. mcpp keeps its toolchains
       # in a sandbox of its own, so this selects rather than installs into the
