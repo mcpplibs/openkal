@@ -135,6 +135,18 @@ jobs:
             [ -d "$src" ] || git clone --quiet --depth 1 \
               --branch "$MCPP_SOURCE_REF" \
               https://github.com/mcpp-community/mcpp.git "$src"
+            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
+            # compiles mcpp, and that pin does not move when mcpp is released —
+            # so a build inside the checkout obeys it and tries to install a
+            # version the index may no longer carry:
+            #
+            #     [error] xlings: version '2026.8.17.1' not found for 'mcpp'
+            #       available: 2026.8.25.1
+            #
+            # What is wanted here is the source compiled by the mcpp installed
+            # above, which is exactly what removing the file leaves.
+            rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
             built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
@@ -387,6 +399,18 @@ jobs:
             [ -d "$src" ] || git clone --quiet --depth 1 \
               --branch "$MCPP_SOURCE_REF" \
               https://github.com/mcpp-community/mcpp.git "$src"
+            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
+            # compiles mcpp, and that pin does not move when mcpp is released —
+            # so a build inside the checkout obeys it and tries to install a
+            # version the index may no longer carry:
+            #
+            #     [error] xlings: version '2026.8.17.1' not found for 'mcpp'
+            #       available: 2026.8.25.1
+            #
+            # What is wanted here is the source compiled by the mcpp installed
+            # above, which is exactly what removing the file leaves.
+            rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
             built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
@@ -612,6 +636,18 @@ jobs:
             [ -d "$src" ] || git clone --quiet --depth 1 \
               --branch "$MCPP_SOURCE_REF" \
               https://github.com/mcpp-community/mcpp.git "$src"
+            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
+            # compiles mcpp, and that pin does not move when mcpp is released —
+            # so a build inside the checkout obeys it and tries to install a
+            # version the index may no longer carry:
+            #
+            #     [error] xlings: version '2026.8.17.1' not found for 'mcpp'
+            #       available: 2026.8.25.1
+            #
+            # What is wanted here is the source compiled by the mcpp installed
+            # above, which is exactly what removing the file leaves.
+            rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
             built=$(find "$src/target" -type f -name mcpp -perm -u+x | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
