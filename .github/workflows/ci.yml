@@ -98,7 +98,15 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+          # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
+          # from whatever the index has; the step below replaces it with the
+          # build under review, and the pin is what an ordinary run tests.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            xlings install mcpp -y -g
+          else
+            xlings install "mcpp@$MCPP_VERSION" -y -g
+          fi; then break; fi
             if [ "$attempt" = 6 ]; then
               echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
               exit 1
@@ -343,7 +351,15 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+          # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
+          # from whatever the index has; the step below replaces it with the
+          # build under review, and the pin is what an ordinary run tests.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            xlings install mcpp -y -g
+          else
+            xlings install "mcpp@$MCPP_VERSION" -y -g
+          fi; then break; fi
             if [ "$attempt" = 6 ]; then
               echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
               exit 1
@@ -560,7 +576,15 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if xlings install "mcpp@$MCPP_VERSION" -y -g; then break; fi
+            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+          # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
+          # from whatever the index has; the step below replaces it with the
+          # build under review, and the pin is what an ordinary run tests.
+          if [ -n "${MCPP_SOURCE_REF:-}" ]; then
+            xlings install mcpp -y -g
+          else
+            xlings install "mcpp@$MCPP_VERSION" -y -g
+          fi; then break; fi
             if [ "$attempt" = 6 ]; then
               echo "::error::mcpp@$MCPP_VERSION never appeared in the index (6 attempts over 5 minutes). If it was just released, the pointer has not propagated; if the pin names a version that was never published, it never will."
               exit 1
