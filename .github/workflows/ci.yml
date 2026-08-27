@@ -33,7 +33,7 @@ env:
   # A version verified to build these packages, not a measured minimum. The pin
   # exists for reproducibility rather than because an older mcpp is known to
   # fail.
-  MCPP_VERSION: 2026.8.26.2
+  MCPP_VERSION: 2026.8.27.1
   XLINGS_VERSION: v2026.8.17.2
   XLINGS_NON_INTERACTIVE: '1'
 
@@ -734,6 +734,56 @@ jobs:
         if: matrix.implementation == 'openkal-linux'
         run: |
           bash tools/run-kit-tests.sh '${{ matrix.implementation }}' .impl
+
+      # ⭐⭐ THE EXAMPLE A CONSUMER READS, BUILT AND RUN.
+      #
+      # examples/portable is the program the specification points at as the one
+      # every implementation must satisfy, and NOTHING BUILT IT. Its README
+      # stated that "an implementation's continuous integration fetches this
+      # source ... builds it against itself, and asserts the lines below";
+      # measured across all six implementation repositories, the word `portable`
+      # appeared in none of their workflows. A promise with nothing executing it.
+      #
+      # ⚠️ AND THE DRIFT THAT FOLLOWS FROM THAT IS VISIBLE IN ITS OWN MANIFEST:
+      # it named `openkal = "0.5.0"` --- three specification versions behind ---
+      # while claiming to demonstrate the current contract to a reader who would
+      # copy it. Nothing could have noticed.
+      #
+      # The manifest names published versions, because that is what a consumer
+      # writes. Those do not exist while a change spanning these repositories is
+      # under review, so the working trees stand in, exactly as
+      # tools/run-conformance.sh does for the suite.
+      #
+      # ⚠️ RELATIVE PATHS, NOT `pwd`. This job runs on Windows too, where MSYS
+      # reports `/d/a/...`, which the build tool does not resolve. Relative
+      # paths also cannot put a local directory into a file that might be
+      # committed.
+      #
+      # ⚠️ NO `standalone` FEATURE HERE. That feature makes the implementation
+      # supply `_start`, which collides with the C library's crt1.o on a hosted
+      # toolchain --- measured: "multiple definition of `_start`". The
+      # conformance runner defaults to no features for the same reason.
+      - name: The portable program builds and runs over this implementation
+        working-directory: examples/portable
+        run: |
+          set -euo pipefail
+          subst() { sed -E "$2" "$1" > "$1.next" && mv "$1.next" "$1"; }
+          subst mcpp.toml 's|^openkal = .*$|openkal = { path = "../.." }|'
+          subst mcpp.toml 's|^${{ matrix.implementation }} = .*$|${{ matrix.implementation }} = { path = "../../.impl" }|'
+          grep -q 'path = "../../.impl"' mcpp.toml \
+            || { echo "::error::the implementation was not substituted"; exit 1; }
+
+          mcpp run 2>&1 | tee portable.log
+
+          # ⭐ THE COUNT IS THE CRITERION, AND SO IS THE DENOMINATOR. A program
+          # that failed to start would print none of these lines, and a check
+          # for the absence of failures would hold over an empty log.
+          lines=$(grep -c '^openkal: ' portable.log)
+          [ "$lines" -ge 10 ] \
+            || { echo "::error::the program printed $lines lines; it reports one per interface"; exit 1; }
+          grep -q 'openkal: observations that did not hold: 0' portable.log \
+            || { echo "::error::the portable program reported observations that did not hold"; exit 1; }
+          echo "  the portable program held every observation over ${{ matrix.implementation }}"
 
       - name: A selection of three interfaces is examined, not refused
         run: |
