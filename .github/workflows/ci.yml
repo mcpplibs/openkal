@@ -717,6 +717,24 @@ jobs:
       # unconditionally would fail to link against a conforming implementation
       # of three. Selecting three is therefore asserted to produce a report
       # rather than a link failure.
+      # openkal-kit, which is in this repository and is not this specification.
+      #
+      # The kit composes facilities from openkal's interfaces --- awaiting a
+      # channel, writing an endpoint down and reading one back --- that the
+      # specification declines to admit because they can be composed. Running its
+      # tests here is what keeps the composition working as the interfaces it
+      # rests upon change.
+      #
+      # THE SURFACE CHECK ABOVE IS WHAT KEEPS THE TWO APART, and it does so by
+      # the shape of what is exported rather than by a declaration. The kit is
+      # C++ modules in `namespace kal::kit` and exports no name beginning with
+      # `kal_`; a C++ name is mangled to `_ZN3kal3kit…`, so an implementation
+      # that linked the kit still passes `check-surface.sh --complete`.
+      - name: The kit, composed from the interfaces above
+        if: matrix.implementation == 'openkal-linux'
+        run: |
+          bash tools/run-kit-tests.sh '${{ matrix.implementation }}' .impl
+
       - name: A selection of three interfaces is examined, not refused
         run: |
           rm -rf conformance/target

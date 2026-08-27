@@ -1,0 +1,71 @@
+[package]
+namespace   = "mcpplibs"
+name        = "openkal-kit"
+version     = "0.1.0"
+description = "Facilities composed from openkal's interfaces. Not part of the specification, and structurally incapable of being mistaken for it."
+license     = "Apache-2.0"
+authors     = ["mcpplibs"]
+repo        = "https://github.com/mcpplibs/openkal"
+
+# WHY THIS IS IN THE SPECIFICATION'S REPOSITORY AND IS NOT THE SPECIFICATION.
+#
+# The specification admits an interface only when it is a minimal capability
+# every kernel has and cannot be composed from the interfaces already there.
+# That rule is what keeps openkal implementable on a machine with firmware and
+# nothing else, and it leaves a gap: a program that wants to await two streams
+# at once has an answer in POSIX and no answer here, because awaiting two
+# streams is composed rather than primitive.
+#
+# The gap was being filled by the port layer. There is one port layer today and
+# what it composes is POSIX, so a native openkal program either wrote the
+# composition again or took a whole C library. This package is where the
+# composition is written once.
+#
+# ⭐ THE CONTRACT FORM IS WHAT MAKES IT UNMISTAKABLE.
+#
+# Clause 10 states that openkal's contract is a C application binary interface.
+# This package deliberately is not one: it is C++ modules in `namespace kal::kit`
+# and it exports no name beginning with `kal_`. A C++ name is mangled to
+# `_ZN3kal3kit…`, so `tools/check-surface.sh --complete` does not read this
+# package as an implementation that has added names --- the rule it enforces is
+# about the C surface, and this package has none.
+#
+# So "is this normative" is answered by the shape of what is exported rather
+# than by a sentence saying it is not. A sentence can be overlooked; a mangled
+# name cannot become a C symbol.
+#
+# The consequence is the one that matters: this package MAY evolve. Clause 8
+# forbids the specification from altering a declaration it has published, which
+# is what makes openkal safe to depend upon and what makes it the wrong place
+# for a facility still finding its shape.
+[targets.openkal-kit]
+kind = "lib"
+
+[dependencies]
+openkal = { path = ".." }
+
+[build]
+include_dirs = ["../include"]
+
+# AN IMPLEMENTATION, FOR THE TESTS AND FOR NOTHING ELSE.
+#
+# The package above depends upon the specification and no implementation, which
+# is what a consumer of openkal does and what keeps this package usable wherever
+# openkal is. The specification declares and does not define, so a LIBRARY built
+# from it correctly has undefined references and a TEST cannot.
+#
+# `mcpp build` ignores this section and `mcpp test` resolves it, so the
+# distinction is expressed rather than described: a consumer of this package
+# never acquires an implementation through it, and the tests link.
+#
+# Which implementation is a property of where the tests run and not of this
+# package, so it is conditional on the platform exactly as openkal-musl's own
+# manifest makes its backend conditional.
+# Named by version rather than by path, because a path here would say that the
+# implementation lives beside this repository, which is true on one machine and
+# on no other. The workflow that runs these tests substitutes a working tree, as
+# tools/run-conformance.sh already does for the conformance suite --- and for the
+# same reason: a change spanning the specification and an implementation must be
+# tested against both halves as written, not against whichever half is published.
+[target.'cfg(os = "linux")'.dev-dependencies]
+openkal-linux = { version = "0.6.0", features = ["standalone"] }
