@@ -145,3 +145,40 @@ under the compiler its author used is a description of that compiler.
 ## License
 
 Apache-2.0.
+
+## openkal-kit
+
+`kit/` holds facilities composed from the interfaces this specification defines.
+It is a separate package, `mcpplibs/openkal-kit`, and it is **not** part of the
+specification.
+
+The specification admits an interface only when it is a minimal capability every
+kernel has and cannot be composed from the interfaces already present. That rule
+is what keeps openkal implementable on a machine with firmware and nothing else,
+and it leaves a gap: a program that wants to carry bytes between two of its own
+contexts, or to turn `"127.0.0.1:8080"` into an endpoint, has an answer in POSIX
+and no answer here — because both are composed rather than primitive.
+
+That gap was being filled by the port layer. There is one port layer today and
+what it composes is POSIX, so a native openkal program either wrote the
+composition again or took a whole C library. The kit is where the composition is
+written once.
+
+**The contract form is what makes the two unmistakable.** Clause 10 states that
+openkal's contract is a C application binary interface. The kit deliberately is
+not one: it is C++ modules in `namespace kal::kit`, and it exports no name
+beginning with `kal_`. Measured on its objects: the defined names are C++ mangled
+module initialisers such as `_ZGIW7openkalW3kitW7channel`, and the operations are
+inline and emitted into consumers rather than exported at all. So
+`tools/check-surface.sh --complete` does not read a program that links the kit as
+an implementation which has added names — the rule that checker enforces is about
+the C surface, and the kit has none.
+
+So "is this normative" is answered by the shape of what is exported rather than
+by a sentence saying it is not. A sentence can be overlooked; a mangled name
+cannot become a C symbol.
+
+The consequence is the one that matters. Clause 8 forbids the specification from
+altering a declaration it has published, which is what makes openkal safe to
+depend upon and what makes it the wrong place for a facility still finding its
+shape. **The kit may evolve.**

@@ -2,6 +2,7 @@ module okc.process;
 
 import openkal.types;
 import openkal.process;
+import openkal.stream;   // the channel is read and written through it
 import openkal.fs;
 import openkal.env;
 import openkal.time;
@@ -89,13 +90,61 @@ void run() {
                    "the implementation does not claim prop_terminate");
     }
 
+    // THE THREE OPERATIONS VERSION 0.8 ADDS TO THIS INTERFACE.
+    //
+    // They are examined here and not in a section of their own, because they are
+    // part of openkal.process: clause 6.1 makes an interface provided IN PART a
+    // deviation, so an implementation reaching this section has undertaken to
+    // provide them.
+    {
+        kal_stream mine{}, theirs{};
+        const int rc = kal_process_channel(&mine, &theirs);
+        observe(kind::behaviour, rc == kal_ok, "a channel is created");
+        if (rc == kal_ok) {
+            const char msg[] = "through the channel";
+            const kal_io_result w = kal_stream_write(theirs, msg, sizeof msg - 1);
+            observe(kind::behaviour, w.e == kal_ok && w.n == sizeof msg - 1,
+                    "the far end of a channel accepts bytes");
+
+            char buf[64] = {0};
+            const kal_io_result r = kal_stream_read(mine, buf, sizeof buf);
+            bool same = r.e == kal_ok && r.n == sizeof msg - 1;
+            for (kal_uintptr i = 0; same && i < r.n; ++i)
+                if (buf[i] != msg[i]) same = false;
+            observe(kind::behaviour, same, "the near end reads what the far end wrote");
+
+            // THE END OF INPUT IS WHAT THE RELEASE IS FOR. A parent that does not
+            // release the far end after a spawn never observes it, which is the
+            // deadlock this pair invites and the reason the release is declared
+            // beside the operation rather than left to openkal.stream.
+            kal_process_channel_close(theirs);
+            const kal_io_result eof = kal_stream_read(mine, buf, sizeof buf);
+            observe(kind::behaviour, eof.e == kal_ok && eof.n == 0,
+                    "closing the far end is observed as end of input on the near one");
+            kal_process_channel_close(mine);
+        }
+
+        // The property word and the operations must agree, which is what clause
+        // 6.2 requires of a word and is the only thing that can be observed of
+        // an operation an implementation declines.
+        if (kal::process::has(kal::process::channel))
+            observe(kind::behaviour, rc == kal_ok,
+                    "a claimed channel is provided when asked for");
+        else
+            observe(kind::behaviour, rc == kal_err_not_supported,
+                    "an unclaimed channel is refused rather than half provided");
+    }
+
     if (performs(kind::abi)) {
         observe(kind::abi, sizeof(kal_process) == sizeof(kal_uintptr),
                 "a process handle occupies one machine word");
         observe(kind::abi, sizeof(kal_spawn_streams) == 3 * sizeof(kal_uintptr),
                 "the stream selection occupies three machine words");
         const kal_uintptr assigned = (kal::process::terminate | kal::process::stream_passing
-                                    | kal::process::exit_status).bits;
+                                    | kal::process::exit_status | kal::process::channel
+                                    | kal::process::grant_dir).bits;
+        observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
+                "a directory grant occupies three machine words");
         observe(kind::abi, (kal_process_props & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
     }

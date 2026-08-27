@@ -39,7 +39,8 @@ constexpr const char* name_of(kind k) {
 // them in, and the report follows it, so two runs of different implementations
 // can be read side by side.
 enum class interface_id {
-    abort, stream, memory, env, time, fs, process, task, count
+    abort, stream, memory, env, time, fs, process, task,
+    terminal, net, datagram, space, timeout, count
 };
 
 struct interface_row {
@@ -110,6 +111,41 @@ inline constexpr interface_row inventory[] = {
       false,
 #endif
       "task" },
+    { "openkal.terminal", false,
+#ifdef MCPP_FEATURE_TERMINAL
+      true,
+#else
+      false,
+#endif
+      "terminal" },
+    { "openkal.net",      false,
+#ifdef MCPP_FEATURE_NET
+      true,
+#else
+      false,
+#endif
+      "net" },
+    { "openkal.datagram", false,
+#ifdef MCPP_FEATURE_DATAGRAM
+      true,
+#else
+      false,
+#endif
+      "datagram" },
+    { "openkal.space",    false,
+#ifdef MCPP_FEATURE_SPACE
+      true,
+#else
+      false,
+#endif
+      "space" },
+    { "openkal.timeout",  false,
+#ifdef MCPP_FEATURE_TIMEOUT
+      true,
+#else
+      false,
+#endif
+      "timeout" },
 };
 
 // Which kinds of examination this build performs. Behaviour is unconditional:

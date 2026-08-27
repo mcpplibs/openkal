@@ -1,4 +1,4 @@
-# openkal Specification, version 0.7
+# openkal Specification, version 0.8
 
 ## 1. Scope
 
@@ -43,10 +43,23 @@ provides an interface in whole or not at all.
 | `openkal.process` | a program image that has been started | standard |
 | `openkal.task` | an execution context, and a suspension primitive | standard |
 | `openkal.exec` | a region of the address space a program may execute | optional |
+| `openkal.terminal` | an interactive stream's treatment of what is typed | optional |
+| `openkal.net` | a connection, and a listener for connections | optional |
+| `openkal.datagram` | a message with a boundary, sent without a connection | optional |
+| `openkal.space` | an address space, and a context executing in one | optional |
+| `openkal.timeout` | a bound upon operations that would otherwise wait | optional |
 | `openkal.event` | readiness of a set of resources | reserved |
 
-Version 0.7 specifies the core, standard and optional interfaces. The reserved
+Version 0.8 specifies the core, standard and optional interfaces. The reserved
 row is not specified, and its name shall not be used for other purposes.
+
+The five interfaces added in version 0.8 are optional in the sense clause 3
+defines, and their optionality is not a concession. An environment with no
+network is not deficient for providing neither `openkal.net` nor
+`openkal.datagram`; an environment with no memory management unit cannot
+provide `openkal.space` and is not deficient either. Clause 6.1 expresses each
+absence as the absence of a definition at the link, so a program that requires
+one of them is refused when it is built rather than when it runs.
 
 *Core* denotes an interface every implementation provides. *Standard* denotes
 one an implementation hosting a C library provides. *Optional* denotes one it
@@ -339,7 +352,9 @@ This clause adds no declaration and alters none, so clause 8's rule is not
 engaged and the version does not advance on its account. Every declaration of
 version 0.6 already satisfies it — one hundred and one of them, examined by the
 procedure below — and what is new is that the property is now stated and
-checked rather than held by the care of whoever wrote each header.
+checked rather than held by the care of whoever wrote each header. The five
+interfaces added in version 0.8 were examined by the same procedure and satisfy
+it also; the count is now one hundred and forty-six.
 
 Clause 9's procedure examines this.
 
@@ -412,6 +427,44 @@ consumer imports, which contradicts clause 4.
 **A record of capability flags**, accompanied by a file in which an
 implementation declares them. Not adopted: a record can disagree with the code
 it describes, and the file is a second place in which a package is configured.
+
+Two further arrangements were weighed while specifying version 0.8 and are
+recorded on the same basis.
+
+**Readiness notification.** An interface reporting that a stream may be read, by
+waking a word as `kal_task_wake` does, was considered as the remedy for a context
+that would otherwise wait without end. It composes better than the bound this
+specification adopted: one operation covers every waitable resource, a single
+context may await many sources, and a library above it needs no read-ahead buffer
+because a notification consumes nothing.
+
+It was not adopted because of what it asks of an implementation. On an
+environment whose readiness is discovered by polling a set of descriptors, an
+implementation would have to maintain that set and a context of its own to watch
+it. That is a mechanism reconstructed rather than a facility conveyed, which
+clause 7.1 excludes. `openkal.timeout` asks the same environment only for what it
+already does at the point of the call.
+
+**A space as a handle.** An earlier form of `openkal.space` separated the copying
+of an address space from the starting of a context in it, so that a caller held a
+space and could start a context in it afterwards. It was withdrawn while the
+first implementation was being written.
+
+No environment this specification targets has that pair as a primitive. The copy
+and the start are one act, and an implementation asked to separate them would
+have to start a context anyway, park it upon a waiting primitive, and build a
+channel by which to tell it what to run. Clause 7.1 identifies that as a fault in
+the shape of the specification rather than in the implementation, and the
+separated form was the shape at fault. The single operation that replaced it is
+what every such environment already performs.
+
+**An instant rather than a duration.** `openkal.timeout` states a duration
+because `kal_task_wait` does. An instant would not accumulate drift when a caller
+retries in a loop, and was considered for that reason. It was not adopted because
+it would give one specification two spellings of one idea. A caller that requires
+an instant computes the remaining duration from `kal_time_monotonic`, so the cost
+falls upon the caller that has the requirement rather than upon every
+implementation.
 
 The measurements that constrain any future proposal:
 
@@ -787,3 +840,33 @@ The following are recorded so that they are not mistaken for oversights.
    in its symbol names. Clause 8 protects the interface by prohibiting change
    rather than by permitting coexistence, and an ecosystem that outgrows that
    prohibition will require a mechanism this version does not define.
+4. **Readiness.** Awaiting one of several sources is not an operation of this
+   specification. It is reached above the interface, from `openkal.task` and a
+   bound upon each wait; clause 6.3 records the alternative that was weighed and
+   the property of implementations that excluded it.
+5. **Name resolution.** `openkal.net` and `openkal.datagram` carry an address and
+   a port. Turning a name into one is excluded by clause 3.4 and remains so: an
+   implementation shall not be required to parse an unbounded set of name
+   schemes.
+6. **Permission and ownership of files.** Not defined, and not a deferral. A
+   permission presupposes an identity, and the environments this specification
+   targets do not agree that one exists. A C library above openkal reports the
+   absence as the error its own surface defines.
+7. **Creation and reading of links.** Not defined, and not a deferral, for the
+   reason clause 6.4 gives: whether a filesystem has links is a property of the
+   format rather than of the environment. `KAL_FS_PROP_LINKS` reports it, and
+   resolution follows one where the property is claimed.
+8. **Duplication of the calling image.** `fork` is refused by clause 7.1 and that
+   refusal stands. It is refused as an OPERATION. The atomic capabilities from
+   which a library may compose it are specified: `openkal.space` clones an
+   address space and starts a context in one, and `KAL_SPACE_PROP_CLONE_HANDLES`
+   states whether the handles accompany the memory. What this specification
+   declines to do is duplicate execution state, which a library above the
+   interface performs with the compiler's own facilities. A sentence reading
+   "openkal will not have fork" would have buried that distinction, and this
+   entry exists so that it is not written.
+9. **Transfer of a handle between address spaces.** `kal_space_start` conveys no
+   handle, and `kal_process_channel` conveys a stream only across a spawn. A
+   general mechanism for passing a handle to a context in another space is not
+   defined by this version. It is the question `openkal.space` reaches first and
+   is not peculiar to it.

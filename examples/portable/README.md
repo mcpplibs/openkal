@@ -4,11 +4,15 @@ One program that exercises the eight interfaces the specification defines. It
 names no implementation, no operating system, no descriptor number and no
 system call.
 
-Its purpose is to be built by every implementation. An implementation's
-continuous integration fetches this source from the specification repository at
-the version its manifest names, builds it against itself, and asserts the lines
-below. The source is therefore identical everywhere by construction rather than
-by a copy that can drift.
+Its purpose is to be built over every implementation. The specification's own
+continuous integration does that: the conformance job builds this source against
+each implementation it tests and requires the final count to be zero, so the one
+source is exercised over all of them rather than copied into each.
+
+That sentence used to describe the implementations' own workflows doing it. None
+of them did, and the manifest here had drifted three specification versions
+behind without anything noticing --- which is what a claim with no criterion
+behind it costs.
 
 It prints one line per interface, each beginning `openkal: `, and a final line
 reporting the number of observations that did not hold. An implementation

@@ -22,5 +22,12 @@
 #include "openkal/process.h"
 #include "openkal/task.h"
 #include "openkal/exec.h"
+#include "openkal/terminal.h"
+#include "openkal/net.h"
+#include "openkal/datagram.h"
+#include "openkal/space.h"
+/* Last, because its declarations are the operations of the interfaces above
+ * with one argument added, and it includes each of them. */
+#include "openkal/timeout.h"
 
 #endif /* OPENKAL_H */
