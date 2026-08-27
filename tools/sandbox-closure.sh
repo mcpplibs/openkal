@@ -77,6 +77,26 @@ set -euo pipefail
 say() { printf '\n=== %s ===\n' "$*"; }
 
 say "the engine, from the index"
+
+# ⚠️⚠️ `xlings update' REPORTS SUCCESS WITHOUT HAVING REFRESHED ANYTHING, and
+# this script is the one place where that matters most.
+#
+# Measured three times in one day, in three shapes: the artifact pointer served
+# from a cache; `xlings update' exiting zero while the index directory still
+# held the previous artifact; and a registry reporting the current hash while
+# holding older content. The second is the one that bites here --- deleting the
+# refresh MARKER does not help, because `update' re-derives it from the
+# directory that is already there and writes the same hash back.
+#
+# ⇒ THE DIRECTORY IS REMOVED, not the marker. A script whose whole purpose is to
+# read what was just published cannot begin by reading what was published last
+# time, and "the index looked fresh" is indistinguishable from "the index was
+# fresh" in every output either produces.
+for base in "${XLINGS_HOME:-}" "$HOME/.xlings"; do
+    [ -n "$base" ] || continue
+    [ -d "$base/data/xim-pkgindex" ] && rm -rf "$base/data/xim-pkgindex" \
+        && echo "  removed $base/data/xim-pkgindex so that the index is fetched again"
+done
 xlings update > /dev/null 2>&1 || true
 # ⚠️ THE INDEX IS NAMED. `mcpp@<v>` alone is AMBIGUOUS wherever more than one
 # index repository carries the name --- measured: local, scode and xim all
