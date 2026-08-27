@@ -2,7 +2,10 @@
 
 **Date**: 2026-08-27
 **Scope**: openkal 0.8 and every repository that implements or consumes it
-**Status**: design, for review. Nothing here is implemented.
+**Status**: implemented. Sections 0–8 are the plan as it was reviewed and are
+left as they were written; **section 9 records what was built, the four
+decisions section 8 left open, and the five things the plan got wrong.** A plan
+edited to agree with its outcome is a plan nobody can learn from.
 
 ---
 
