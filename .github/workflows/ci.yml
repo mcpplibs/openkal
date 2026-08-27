@@ -773,6 +773,20 @@ jobs:
           grep -q 'path = "../../.impl"' mcpp.toml \
             || { echo "::error::the implementation was not substituted"; exit 1; }
 
+          # ⚠️ THE IMPLEMENTATION REACHES THE SPECIFICATION TOO, AND BY ITS OWN
+          # FORM. Substituting only this manifest leaves two routes to one
+          # package and the build refuses, correctly:
+          #
+          #   error: dependency 'mcpplibs.openkal' is requested as both a path
+          #          dep (by 'portable') and a git dep (by 'openkal-linux@path')
+          #
+          # Both must name the same directory, which is what run-conformance.sh
+          # does for the suite. From `.impl/` the specification is `..`; the two
+          # spellings resolve to one canonical path and therefore to one node.
+          subst ../../.impl/mcpp.toml 's|^openkal = .*$|openkal = { path = ".." }|'
+          grep -q 'openkal = { path = ".." }' ../../.impl/mcpp.toml \
+            || { echo "::error::the implementation still reaches openkal its own way"; exit 1; }
+
           mcpp run 2>&1 | tee portable.log
 
           # ⭐ THE COUNT IS THE CRITERION, AND SO IS THE DENOMINATOR. A program
