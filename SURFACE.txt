@@ -102,8 +102,6 @@ kal_datagram_props
 kal_datagram_recv_from
 kal_datagram_send_to
 # openkal.space
-kal_space_clone
-kal_space_destroy
 kal_space_props
 kal_space_start
 # openkal.timeout

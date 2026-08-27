@@ -7,10 +7,18 @@
 // stated in a C application binary interface at all.
 //
 // A library above this interface reaches fork by saving its own execution state
-// before the clone and restoring it in the new context. That is composition,
+// before the call and restoring it in the started context. That is composition,
 // and it belongs above this line rather than in it: the saving is done with the
 // compiler's own facilities, differs per architecture, and is not something a
 // kernel interface can perform on a caller's behalf.
+//
+// One operation and not two. An earlier form separated the copying of the space
+// from the starting of a context in it, so that a caller held a space as a
+// handle. No environment this specification targets has that pair as a
+// primitive, and an implementation asked to separate them would have to park a
+// started context and build a channel by which to tell it what to run --- a
+// mechanism reconstructed, which clause 7.1 identifies as a fault in the shape
+// of the specification rather than in the implementation.
 module;
 #include <openkal/space.h>
 
@@ -18,18 +26,10 @@ export module openkal.space;
 export import openkal.types;
 export import openkal.process;
 
-export using ::kal_space;
-
-export using ::kal_space_clone;
 export using ::kal_space_start;
-export using ::kal_space_destroy;
 export using ::kal_space_props;
 
-static_assert(sizeof(kal_space) == sizeof(kal_uintptr), "clause 7.2");
-
 export namespace kal::space {
-
-using space = kal_space;
 
 struct props_tag;
 using props = kal::props<props_tag>;
@@ -40,21 +40,12 @@ inline constexpr props deferred_copy{KAL_SPACE_PROP_DEFERRED_COPY};
 inline props properties() { return props{kal_space_props}; }
 inline bool  has(props p) { return properties().has(p); }
 
-struct clone_result   { space          sp; int e; };
-struct process_result { kal_process    p;  int e; };
+struct process_result { kal_process p; int e; };
 
-inline clone_result clone() {
-    space sp{};
-    const int e = kal_space_clone(&sp);
-    return { sp, e };
-}
-
-inline process_result start(space sp, void (*entry)(void*), void* arg, void* stack_top) {
+inline process_result start(void (*entry)(void*), void* arg, void* stack_top) {
     kal_process p{};
-    const int e = kal_space_start(sp, entry, arg, stack_top, &p);
+    const int e = kal_space_start(entry, arg, stack_top, &p);
     return { p, e };
 }
-
-inline void destroy(space sp) { kal_space_destroy(sp); }
 
 }

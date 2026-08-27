@@ -354,7 +354,7 @@ version 0.6 already satisfies it — one hundred and one of them, examined by th
 procedure below — and what is new is that the property is now stated and
 checked rather than held by the care of whoever wrote each header. The five
 interfaces added in version 0.8 were examined by the same procedure and satisfy
-it also; the count is now one hundred and fifty.
+it also; the count is now one hundred and forty-six.
 
 Clause 9's procedure examines this.
 
@@ -444,6 +444,19 @@ implementation would have to maintain that set and a context of its own to watch
 it. That is a mechanism reconstructed rather than a facility conveyed, which
 clause 7.1 excludes. `openkal.timeout` asks the same environment only for what it
 already does at the point of the call.
+
+**A space as a handle.** An earlier form of `openkal.space` separated the copying
+of an address space from the starting of a context in it, so that a caller held a
+space and could start a context in it afterwards. It was withdrawn while the
+first implementation was being written.
+
+No environment this specification targets has that pair as a primitive. The copy
+and the start are one act, and an implementation asked to separate them would
+have to start a context anyway, park it upon a waiting primitive, and build a
+channel by which to tell it what to run. Clause 7.1 identifies that as a fault in
+the shape of the specification rather than in the implementation, and the
+separated form was the shape at fault. The single operation that replaced it is
+what every such environment already performs.
 
 **An instant rather than a duration.** `openkal.timeout` states a duration
 because `kal_task_wait` does. An instant would not accumulate drift when a caller
