@@ -15,7 +15,7 @@ openkal = "0.8.0"
 openkal-linux = "0.6.0"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.4.0"
+openkal-macos = "0.5.0"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.2.0"
+openkal-windows = "0.3.0"

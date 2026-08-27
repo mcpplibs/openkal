@@ -75,11 +75,33 @@ void run() {
     // through the data path are not yet visible to the fetch path. The
     // specification does not place this upon an implementation, because the
     // program is the party that knows which bytes it wrote.
+    //
+    // ⚠️ THE BUILTIN IS NOT UNIVERSAL, AND THIS SUITE IS BUILT BY THREE
+    // COMPILERS. Measured on the MSVC row of openkal-windows, the first run in
+    // which this section was selected at all:
+    //
+    //     exec.cpp(78): error C3861: '__builtin___clear_cache': identifier not
+    //     found
+    //
+    // ⭐ The guard is on the COMPILER and not on the architecture, because what
+    // varies is which compiler spells the operation this way. Where it is
+    // absent, the architectures that compiler targets here keep the two paths
+    // coherent in hardware and there is nothing to do.
+#if defined(__GNUC__) || defined(__clang__)
     __builtin___clear_cache(static_cast<char*>(p),
                             static_cast<char*>(p) + kReturns42Size);
+#endif
 
+    // ⚠️ A BYTE COPY RATHER THAN `__builtin_memcpy', FOR THE SAME REASON AND
+    // FOUND IN THE SAME RUN. The suite reaches no C library --- it is written to
+    // run against an implementation that may be the only supplier of one --- and
+    // a builtin is not a C library, but it is not a language feature either.
     fn f = nullptr;
-    __builtin_memcpy(&f, &p, sizeof f);
+    {
+        auto* d = reinterpret_cast<unsigned char*>(&f);
+        const auto* b = reinterpret_cast<const unsigned char*>(&p);
+        for (unsigned long i = 0; i < sizeof f; ++i) d[i] = b[i];
+    }
     observe(kind::behaviour, f() == 42,
             "instructions written into the region and published are executed");
 
