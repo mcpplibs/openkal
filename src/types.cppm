@@ -19,6 +19,7 @@ export using ::kal_uintptr;
 export using ::kal_u32;
 export using ::kal_u64;
 export using ::kal_i64;
+export using ::kal_u8;
 
 // The complete set of error conditions openkal defines. The set is closed: an
 // implementation maps its environment's error values onto these and does not
@@ -41,6 +42,15 @@ export using ::kal_err_not_directory;
 
 // The result of an operation that transfers a count.
 export using ::kal_io_result;
+export using ::kal_endpoint;
+
+// Clause 5.3 freezes the layout. The address is twenty-four bytes so that one
+// carrying a scope identifier fits without a second type; a build in which it
+// were not would read every address at the wrong offset while still linking.
+static_assert(sizeof(kal_endpoint{}.addr) == 24,
+              "clause 5.3: an endpoint address is twenty-four bytes");
+static_assert(sizeof(kal_endpoint) >= 24 + sizeof(kal_uintptr) + sizeof(kal_u32),
+              "clause 5.3: an endpoint holds its address, a length and a port");
 
 // Clause 5.3 declares the layout of every structure immutable. A declaration
 // that something shall not change is not a mechanism; this is the mechanism.

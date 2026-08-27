@@ -64,24 +64,29 @@ void run() {
     // transfer uses kal_stream_read and kal_stream_write and not an operation of
     // this interface, which is the property that makes a connection a stream.
     kal_endpoint to = loopback_v4(bound.port);
-    kal_stream client{};
+    kal_net_conn client{};
     const int crc = kal_net_connect(&to, &client);
     observe(kind::behaviour, crc == kal_ok, "a connection to the listener is established");
     if (crc != kal_ok) { kal_net_close_listener(listener); return; }
 
-    kal_stream server{};
+    kal_net_conn server{};
     const int arc = kal_net_accept(listener, &server);
     observe(kind::behaviour, arc == kal_ok, "the listener accepts the connection");
     if (arc != kal_ok) { kal_net_close(client); kal_net_close_listener(listener); return; }
 
+    // The streams the connections own. Borrowed and released with the
+    // connection, which is the arrangement openkal.fs already uses.
+    const kal_stream cs{kal_net_stream(client)};
+    const kal_stream ss{kal_net_stream(server)};
+
     {
         const char msg[] = "openkal";
-        const kal_io_result w = kal_stream_write(client, msg, sizeof msg - 1);
+        const kal_io_result w = kal_stream_write(cs, msg, sizeof msg - 1);
         observe(kind::behaviour, w.e == kal_ok && w.n == sizeof msg - 1,
                 "a connection carries bytes through the stream operations");
 
         char buf[16] = {0};
-        const kal_io_result r = kal_stream_read(server, buf, sizeof buf);
+        const kal_io_result r = kal_stream_read(ss, buf, sizeof buf);
         bool same = r.e == kal_ok && r.n == sizeof msg - 1;
         for (kal_uintptr i = 0; same && i < r.n; ++i)
             if (buf[i] != msg[i]) same = false;
@@ -104,13 +109,13 @@ void run() {
     // are conforming; what would not be conforming is claiming the position and
     // then refusing.
     {
-        const bool claims = (kal_net_props & KAL_NET_PROP_HALFCLOSE) != 0;
-        const int rc = kal_net_shutdown(client, KAL_SHUT_WRITE);
+        const bool claims = kal::net::has(kal::net::halfclose);
+        const int rc = kal::net::shutdown(client, kal::net::shut::write);
         if (claims) {
             observe(kind::behaviour, rc == kal_ok,
                     "a claimed half-closure is performed when asked for");
             char buf[4] = {0};
-            const kal_io_result r = kal_stream_read(server, buf, sizeof buf);
+            const kal_io_result r = kal_stream_read(ss, buf, sizeof buf);
             observe(kind::behaviour, r.e == kal_ok && r.n == 0,
                     "the peer observes end of input after a half-closure");
         } else {
@@ -131,11 +136,11 @@ void run() {
         kal_endpoint odd{};
         odd.addr_len = 7;     // not 4, not 16, not 20
         odd.port = 9;
-        kal_stream s{};
-        const int rc = kal_net_connect(&odd, &s);
+        kal_net_conn c{};
+        const int rc = kal_net_connect(&odd, &c);
         observe(kind::behaviour, rc == kal_err_invalid,
                 "an endpoint of unknown length is refused, not misread");
-        if (rc == kal_ok) kal_net_close(s);
+        if (rc == kal_ok) kal_net_close(c);
     }
 #endif
 }

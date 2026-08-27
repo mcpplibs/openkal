@@ -94,6 +94,7 @@ kal_net_local
 kal_net_peer
 kal_net_props
 kal_net_shutdown
+kal_net_stream
 # openkal.datagram
 kal_datagram_close
 kal_datagram_local

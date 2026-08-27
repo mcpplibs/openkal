@@ -21,9 +21,22 @@
 #include "types.h"
 #include "stream.h"
 
-/* An opaque handle occupying one machine word, per clause 7.2. A listener is
- * not a stream: nothing is transferred through it, and giving it the stream
- * operations would be an interface whose resource can never satisfy them. */
+/* Opaque handles occupying one machine word, per clause 7.2.
+ *
+ * A CONNECTION IS AN OWNED HANDLE AND ITS STREAM IS BORROWED FROM IT, WHICH IS
+ * THE ARRANGEMENT `openkal.fs' ALREADY USES. An earlier form of this interface
+ * yielded a `kal_stream' directly and declared it owned. That could not be
+ * implemented: clause 7.2 requires that a released handle not be treated as
+ * valid, and a stream handle is whatever the environment's transfer operations
+ * take --- on a system of descriptors, a number the environment reuses as soon
+ * as it is closed. An owned handle can carry a generation beside the resource
+ * and a borrowed stream cannot, so the two are separate here exactly as
+ * `kal_file' and `kal_fs_stream' are separate there.
+ *
+ * A listener is neither: nothing is transferred through it, and giving it the
+ * stream operations would be an interface whose resource can never satisfy
+ * them. */
+struct kal_net_conn     { kal_uintptr h; };
 struct kal_net_listener { kal_uintptr h; };
 
 /* Directions for kal_net_shutdown. */
@@ -39,9 +52,14 @@ struct kal_net_listener { kal_uintptr h; };
 extern "C" {
 #endif
 
-int kal_net_connect(const struct kal_endpoint* to,    struct kal_stream* out);
+int kal_net_connect(const struct kal_endpoint* to,    struct kal_net_conn* out);
 int kal_net_listen (const struct kal_endpoint* local, struct kal_net_listener* out);
-int kal_net_accept (struct kal_net_listener l,        struct kal_stream* out);
+int kal_net_accept (struct kal_net_listener l,        struct kal_net_conn* out);
+
+/* A connection is read and written through openkal.stream. The stream remains
+ * valid while the connection is open and is not separately released; the
+ * connection owns it. The wording is `openkal.fs's, because the arrangement is. */
+kal_uintptr kal_net_stream(struct kal_net_conn c);
 
 /* Reports the endpoint of the peer, and the endpoint this end was given.
  *
@@ -49,8 +67,8 @@ int kal_net_accept (struct kal_net_listener l,        struct kal_stream* out);
  * is given a port by the environment, and a program that must publish where it
  * is listening has no other way to learn it. Clause 7.11 --- an enquiry whose
  * inverse exists --- is why both are here rather than only the first. */
-int kal_net_peer  (struct kal_stream s, struct kal_endpoint* out);
-int kal_net_local (struct kal_stream s, struct kal_endpoint* out);
+int kal_net_peer  (struct kal_net_conn c, struct kal_endpoint* out);
+int kal_net_local (struct kal_net_conn c, struct kal_endpoint* out);
 int kal_net_listener_local(struct kal_net_listener l, struct kal_endpoint* out);
 
 /* Ends transfer in one direction while the other continues.
@@ -60,14 +78,15 @@ int kal_net_listener_local(struct kal_net_listener l, struct kal_endpoint* out);
  * reports kal_err_not_supported and withholds KAL_NET_PROP_HALFCLOSE; a caller
  * that needs the peer to observe end-of-input must then close the whole
  * connection. */
-int kal_net_shutdown(struct kal_stream s, int direction);
+int kal_net_shutdown(struct kal_net_conn c, int direction);
 
-/* AN OWNED STREAM, UNLIKE THE THREE `openkal.stream' PROVIDES. A connection is
- * obtained and must be released; the standard streams are borrowed and are not.
- * This is the same division `openkal.fs' already draws with
- * `kal_fs_close_file', and the reason the release lives here rather than in
- * `openkal.stream': a stream in general has no owner to return it to. */
-void kal_net_close         (struct kal_stream s);
+/* Release. An implementation shall not treat a released handle as valid.
+ *
+ * The stream a released connection yielded is released with it and is not
+ * closed separately, which is the division `openkal.fs' draws with
+ * `kal_fs_close_file' and the reason no release lives in `openkal.stream': a
+ * stream in general has no owner to return it to. */
+void kal_net_close         (struct kal_net_conn c);
 void kal_net_close_listener(struct kal_net_listener l);
 
 /* Properties of this implementation.

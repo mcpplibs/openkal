@@ -45,12 +45,12 @@ inline kal_io_result write(kal_stream s, const void* p, kal_uintptr n, kal_u64 n
     return kal_timeout_write(s, p, n, ns);
 }
 
-struct stream_result { kal_stream s; int e; };
+struct conn_result { kal_net_conn c; int e; };
 
-inline stream_result accept(kal_net_listener l, kal_u64 ns) {
-    kal_stream s{};
-    const int e = kal_timeout_accept(l, ns, &s);
-    return { s, e };
+inline conn_result accept(kal_net_listener l, kal_u64 ns) {
+    kal_net_conn c{};
+    const int e = kal_timeout_accept(l, ns, &c);
+    return { c, e };
 }
 
 // Shaped like kal::datagram::recv_from, because it is that operation with a

@@ -75,6 +75,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_net_peer);
     (void)sizeof(&kal_net_props);
     (void)sizeof(&kal_net_shutdown);
+    (void)sizeof(&kal_net_stream);
     (void)sizeof(&kal_process_channel);
     (void)sizeof(&kal_process_channel_close);
     (void)sizeof(&kal_process_close);

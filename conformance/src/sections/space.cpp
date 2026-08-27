@@ -45,8 +45,8 @@ void run() {
     // copy does not carry handles cannot support a library reaching for POSIX
     // fork, and stating that is the whole purpose of the position.
     {
-        const bool handles  = (kal_space_props & KAL_SPACE_PROP_CLONE_HANDLES) != 0;
-        const bool deferred = (kal_space_props & KAL_SPACE_PROP_DEFERRED_COPY) != 0;
+        const bool handles  = kal::space::has(kal::space::clone_handles);
+        const bool deferred = kal::space::has(kal::space::deferred_copy);
         line(handles  ? "  the started context holds the handles the caller holds"
                       : "  the started context holds memory only, not handles");
         line(deferred ? "  the copy may be completed lazily"

@@ -37,7 +37,7 @@ extern "C" {
 struct kal_io_result kal_timeout_read (struct kal_stream s, void*       buf, kal_uintptr len, kal_u64 timeout_ns);
 struct kal_io_result kal_timeout_write(struct kal_stream s, const void* buf, kal_uintptr len, kal_u64 timeout_ns);
 
-int kal_timeout_accept(struct kal_net_listener l, kal_u64 timeout_ns, struct kal_stream* out);
+int kal_timeout_accept(struct kal_net_listener l, kal_u64 timeout_ns, struct kal_net_conn* out);
 
 struct kal_io_result kal_timeout_recv_from(struct kal_datagram d, void* buf, kal_uintptr len,
                                            struct kal_endpoint* from, kal_u64 timeout_ns);

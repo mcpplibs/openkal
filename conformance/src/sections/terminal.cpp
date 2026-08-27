@@ -19,9 +19,11 @@ void run() {
     // no terminal, which is the ordinary case in continuous integration, so
     // every observation below is conditioned on finding one and the condition
     // is reported rather than assumed.
+    // The properties are named through the modules and not through the macros:
+    // a macro does not cross a module boundary, and these sections are modules.
     const kal_stream out = kal_stdout();
     const bool interactive =
-        (kal_stream_props(out) & KAL_STREAM_PROP_INTERACTIVE) != 0;
+        kal::stream_props{kal_stream_props(out)}.has(kal::stream_prop::interactive);
 
     if (!interactive) {
         unobserved(kind::behaviour, "openkal.terminal",
@@ -103,13 +105,13 @@ void run() {
     // correspond to them must be answered. A word claiming a facility the
     // implementation refuses is the disagreement clause 6.2 exists to prevent.
     {
-        const kal_uintptr props = kal_terminal_props(out);
-        if ((props & KAL_TERM_PROP_SIZE) != 0) {
+        const auto props = kal::terminal::properties(out);
+        if (props.has(kal::terminal::has_size)) {
             kal_uintptr c = 0, r = 0;
             observe(kind::behaviour, kal_terminal_size(out, &c, &r) == kal_ok,
                     "a claimed display size is reported when asked for");
         }
-        if ((props & KAL_TERM_PROP_MODE) != 0) {
+        if (props.has(kal::terminal::has_mode)) {
             kal_uintptr m = 0;
             observe(kind::behaviour, kal_terminal_get_mode(out, &m) == kal_ok,
                     "a claimed mode is reported when asked for");
