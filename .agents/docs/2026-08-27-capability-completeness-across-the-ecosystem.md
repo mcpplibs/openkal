@@ -462,6 +462,47 @@ permits two listeners on one address at once. openkal-windows therefore does not
 set it, and setting it "for symmetry" would have made that implementation behave
 differently while looking the same.
 
+### 9.1a Five more, found by continuous integration rather than by reading
+
+Every one of these was invisible on the machine the work was done on, and each
+names a different kind of blindness.
+
+**⚠️⚠️ The symbol namespace is shared across the layer boundary.** Winsock
+exports the *BSD names* — `bind`, `listen`, `accept`, `connect` — and so does
+the C library above it: openkal-musl compiles musl's own `src/network/*.c`,
+which define those names and route them through the port. Naming `-lws2_32` on
+openkal-windows's link line put both definitions in one program. It is not an
+ordering problem: an import library's member defines the thunk *and* the
+`__imp_` pointer together. The remedy is to resolve the library at run time, so
+that nothing of it enters the program's symbol table.
+
+**⚠️⚠️ `kal_task_current()` is not stable across a copy of the address space,
+and nothing ever said it was.** openkal-musl keeps its per-context state in a
+table keyed on that identity. openkal-linux caches `gettid` in a thread-local,
+so the *copy of the cache* answers the parent's value and the lookup works;
+openkal-macos asks the kernel each time, so the started context answers a value
+the table has never seen. The second is the honest answer to the question the
+interface asks. The assumption was the port's, and the started context now
+rebinds its slot before anything reads per-context state.
+
+**⚠️ `__builtin___clear_cache` is a call, not an inline sequence.** On aarch64
+and riscv64 it becomes `___clear_cache` / `__riscv_flush_icache` in the
+compiler's support library — a dependency a package asserting "no C runtime
+symbol" may not acquire. §9.1's fourth item was written before this was
+measured; openkal-macos added the builtin and its own independence check
+reported it within the hour.
+
+**⚠️ A bounded wait must answer with the set the interface defines for it.**
+openkal-windows returned an error belonging to the *resource* where
+`openkal.timeout` defines one for the *wait*, and the conformance suite reported
+it — the second time on one runner out of three, because Wine chooses a
+different error for the same condition. An error of the resource is the
+transfer's to report, and the transfer follows the wait.
+
+**⚠️ The conformance suite was written against two compilers of three.**
+`__builtin___clear_cache` and `__builtin_memcpy` are not MSVC's, and the first
+run in which anything selected the `exec` section is the run that found it.
+
 ### 9.2 One thing neither this document nor anything else had noticed
 
 ⚠️⚠️ **No continuous integration anywhere selected the interfaces this document
