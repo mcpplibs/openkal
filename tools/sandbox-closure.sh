@@ -24,8 +24,15 @@
 #
 # WHY A SANDBOX. A machine that has been developing these packages has every one
 # of them installed, and would answer for its own state rather than for the
-# index. `xlings subos <name> --sandbox --cmd` gives a fresh environment, and a
-# fresh `/tmp` with it --- so nothing may be staged outside.
+# index. `xlings subos <name> --sandbox --cmd` gives an environment of its own,
+# and a `/tmp` of its own with it --- so nothing may be staged from outside.
+#
+# ⚠️ SEPARATE IS NOT FRESH, AND THIS COMMENT SAID FRESH. Measured 2026-08-27:
+# two invocations of the same environment, and the second found the directory
+# the first had made; the host's `/tmp` had neither. So the `/tmp` is not the
+# host's --- which is what matters for staging --- and it is not new each time,
+# which is what matters for a check that must not read its own last answer.
+# That is why the project directory below is REMOVED before it is written.
 #
 # It asks two questions, because they fail independently:
 #
@@ -116,6 +123,10 @@ got="$(mcpp --version | awk '{print $2}')"
 echo "  mcpp is $got"
 
 say "a project that names only published versions"
+# Removed rather than merely created: see the note about `/tmp' at the head of
+# this file. A directory left by the previous run would be built again, and a
+# build that succeeded against the previous release would look exactly like one
+# that succeeded against this one.
 rm -rf /tmp/closure && mkdir -p /tmp/closure/src && cd /tmp/closure
 cat > mcpp.toml <<TOML
 [package]
