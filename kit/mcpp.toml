@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "openkal-kit"
-version     = "0.1.0"
+version     = "0.1.1"
 description = "Facilities composed from openkal's interfaces. Not part of the specification, and structurally incapable of being mistaken for it."
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -50,10 +50,32 @@ repo        = "https://github.com/mcpplibs/openkal"
 kind = "lib"
 
 [dependencies]
-openkal = { path = ".." }
+# ⚠️⚠️ BY VERSION, NOT BY PATH, AND THE DIFFERENCE IS NOT COSMETIC.
+#
+# This line read `{ path = ".." }`, which is true inside this repository and
+# inside the tarball this package is published from --- and which made the
+# package unusable with any implementation. A consumer naming both openkal-kit
+# and an implementation reached the specification two ways, and the build
+# refused, correctly:
+#
+#   error: dependency 'mcpplibs.openkal' is requested as both a path dep (by
+#          'mcpplibs.openkal-kit@0.1.0') and a version dep (by
+#          'mcpplibs.openkal-musl@0.4.0'). Pick one.
+#
+# Two routes to one package are two copies of it, and two copies of a
+# specification are two sets of its modules. Measured in a sandbox against the
+# published packages, which is the only place this could be observed: no
+# continuous integration in this ecosystem resolves a published package,
+# because they all substitute working trees by design.
+openkal = "0.8.0"
 
-[build]
-include_dirs = ["../include"]
+# ⚠️ NO `include_dirs` HERE EITHER. It named `../include`, which reaches out of
+# this package into whatever happens to sit above it. With the specification
+# named by version that directory is the tarball's own copy while the headers
+# actually compiled against come from the resolved dependency --- two header
+# sets for one contract. openkal publishes `include` as its own `include_dirs`,
+# and a dependency's public directories reach a consumer; measured before this
+# line was removed, with the specification placed outside this package.
 
 # AN IMPLEMENTATION, FOR THE TESTS AND FOR NOTHING ELSE.
 #

@@ -56,6 +56,16 @@ sed -i.bak -E "s|^${package} = \{ version = \"[^\"]*\"(.*)$|${package} = { path 
     "$kit/mcpp.toml"
 rm -f "$kit/mcpp.toml.bak"
 
+# ⚠️ AND THE KIT REACHES THE SPECIFICATION BY VERSION TOO, WHICH IT DID NOT USED
+# TO. While that line read `path = ".."` it already named this working tree and
+# needed no substitution. It now names a published version --- because a path
+# there made the package unusable alongside any implementation --- so without
+# this line these tests would run against the PUBLISHED specification while
+# claiming to test the one written here, and a change to the specification would
+# be invisible to them.
+sed -i.bak -E "s|^openkal = .*$|openkal = { path = \"$here_native\" }|" "$kit/mcpp.toml"
+rm -f "$kit/mcpp.toml.bak"
+
 # ⚠️ ASSERTED RATHER THAN ASSUMED. A substitution that matched nothing leaves the
 # manifest naming a version, the resolver fetches a published implementation, and
 # the run reports on that one while appearing to report on this branch.
@@ -63,6 +73,8 @@ grep -q "path = \"$impl_native\"" "$kit/mcpp.toml" \
     || { echo "the implementation substitution matched nothing in kit/mcpp.toml" >&2; exit 2; }
 grep -q "path = \"$here_native\"" "$impl/mcpp.toml" \
     || { echo "the specification substitution matched nothing in $impl/mcpp.toml" >&2; exit 2; }
+grep -q "path = \"$here_native\"" "$kit/mcpp.toml" \
+    || { echo "the specification substitution matched nothing in kit/mcpp.toml" >&2; exit 2; }
 
 echo "--- the kit's dependencies ---"
 sed -n '/^\[dependencies\]/,/^$/p;/dev-dependencies/,+2p' "$kit/mcpp.toml"

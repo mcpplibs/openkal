@@ -730,6 +730,39 @@ jobs:
       # C++ modules in `namespace kal::kit` and exports no name beginning with
       # `kal_`; a C++ name is mangled to `_ZN3kal3kit…`, so an implementation
       # that linked the kit still passes `check-surface.sh --complete`.
+      # ⭐⭐ A PUBLISHED PACKAGE MAY NOT REACH ANOTHER BY PATH.
+      #
+      # kit/mcpp.toml is published as openkal-kit, out of this repository's own
+      # tarball. While it read `openkal = { path = ".." }` that was true here and
+      # true inside the tarball, and it made the package unusable with any
+      # implementation: a consumer naming both openkal-kit and an implementation
+      # reached the specification two ways --- by path from one, by version from
+      # the other --- and the build refused, correctly, because two routes to one
+      # package are two copies of it.
+      #
+      # ⚠️ NO CONTINUOUS INTEGRATION HERE COULD HAVE CAUGHT IT. Every workflow in
+      # this ecosystem substitutes working trees, so both routes become paths and
+      # agree. The defect appears only where an implementation names the
+      # specification by VERSION, which is the published shape and exactly what
+      # no job reproduces. It was found in a sandbox against the published
+      # packages, after release.
+      #
+      # This check is structural rather than behavioural for that reason: it
+      # cannot reproduce the graph, but it can require the form that avoids it.
+      - name: The kit names the specification by version
+        run: |
+          set -euo pipefail
+          if grep -nE '^openkal = \{[^}]*path' kit/mcpp.toml; then
+            echo "::error::kit/mcpp.toml reaches the specification by path."
+            echo "        openkal-kit is published from this tarball, and a path"
+            echo "        there is a second route to a package every consumer"
+            echo "        already reaches by version."
+            exit 1
+          fi
+          grep -qE '^openkal = "[0-9]' kit/mcpp.toml \
+            || { echo "::error::kit/mcpp.toml does not name openkal by version at all"; exit 1; }
+          echo "  the kit reaches the specification the way a consumer does: $(grep -E '^openkal = ' kit/mcpp.toml)"
+
       - name: The kit, composed from the interfaces above
         if: matrix.implementation == 'openkal-linux'
         run: |
