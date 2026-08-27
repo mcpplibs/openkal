@@ -4,6 +4,26 @@
 // Every implementation builds this same source and asserts the same lines. The
 // source is fetched from the specification repository rather than copied into
 // each implementation, so the programs cannot diverge.
+//
+// ⚠️⚠️ NAMING NO SYSTEM CALL IS NOT THE SAME AS NAMING NO COMPILER.
+//
+// This file used `__atomic_load_n`, `__ATOMIC_RELAXED` and `__UINT32_TYPE__`,
+// which are GCC and Clang spellings. MSVC has none of them, so the program
+// whose whole premise is portability did not compile on one of the three
+// compilers its own specification is tested against --- and nothing noticed,
+// because until 2026-08-27 no continuous integration anywhere built this file.
+//
+// The integer types are now the specification's own: openkal/types.h already
+// carries the MSVC branch, so `kal_u32` and `kal_u64` are the portable
+// spellings and using them keeps this program inside the vocabulary it exists
+// to demonstrate.
+//
+// The atomics are the LANGUAGE's. `std::atomic_ref` is freestanding in C++23,
+// so depending on it does not contradict what this program shows: suspension
+// is a kernel facility and openkal offers it, while an atomic operation is a
+// language facility and openkal is right not to.
+#include <atomic>
+
 import openkal.types;
 import openkal.stream;
 import openkal.memory;
@@ -50,26 +70,31 @@ static void observe(bool held, const char* what) {
 // A mutex is not part of the specification. It is constructed here from the
 // primitive that is, which is the relation a C library has to a kernel.
 
-static __UINT32_TYPE__ lock_state = 0;   // 0 free, 1 held, 2 held and contended
+static kal_u32 lock_state = 0;           // 0 free, 1 held, 2 held and contended
 static unsigned long long counter  = 0;
 
-static bool exchange(__UINT32_TYPE__* p, __UINT32_TYPE__ expected, __UINT32_TYPE__ desired) {
-    return __atomic_compare_exchange_n(p, &expected, desired, false,
-                                       __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE);
+// The word is waited upon through openkal and modified through the language, so
+// both must see the same object. `atomic_ref` refers to it rather than
+// replacing it, which is what lets `kal_task_wait` take its address.
+static bool exchange(kal_u32* p, kal_u32 expected, kal_u32 desired) {
+    return std::atomic_ref<kal_u32>(*p).compare_exchange_strong(
+        expected, desired, std::memory_order_acquire, std::memory_order_acquire);
 }
 
 static void acquire() {
     if (exchange(&lock_state, 0, 1)) return;
     do {
-        __UINT32_TYPE__ seen = __atomic_load_n(&lock_state, __ATOMIC_RELAXED);
+        const kal_u32 seen =
+            std::atomic_ref<kal_u32>(lock_state).load(std::memory_order_relaxed);
         if (seen == 2 || exchange(&lock_state, 1, 2))
             kal_task_wait(&lock_state, 2, 0);
     } while (!exchange(&lock_state, 0, 2));
 }
 
 static void release() {
-    if (__atomic_fetch_sub(&lock_state, 1, __ATOMIC_RELEASE) != 1) {
-        __atomic_store_n(&lock_state, 0, __ATOMIC_RELEASE);
+    if (std::atomic_ref<kal_u32>(lock_state)
+            .fetch_sub(1, std::memory_order_release) != 1) {
+        std::atomic_ref<kal_u32>(lock_state).store(0, std::memory_order_release);
         kal_uintptr woken = 0;
         kal_task_wake(&lock_state, 1, &woken);
     }
@@ -144,7 +169,7 @@ int main() {
         kal_file g{};
         bool sought = false;
         if (made && kal_fs_open_file(wd, "portable.probe", 14, 0, 0, &g) == kal_ok) {
-            __UINT64_TYPE__ at = 0;
+            kal_u64 at = 0;
             sought = kal_fs_seek(g, 6, kal::fs::seek_set, &at) == kal_ok && at == 6;
             char buf[8] = {};
             kal_io_result r = kal_stream_read(kal_stream{kal_fs_stream(g)}, buf, 4);
