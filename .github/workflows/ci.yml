@@ -566,32 +566,12 @@ jobs:
           # empty string --- which named neither the cause nor the symptom.
           here="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' mcpp.toml | head -1)"
           there="$(sed -n 's/^openkal[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' .impl/mcpp.toml | head -1)"
-          # ⭐ THE COMPARISON IS OF THE CONTRACT, NOT OF THE STRING.
-          #
-          # It compared the whole version and so refused 0.8.1 against an
-          # implementation written for 0.8.0 --- correctly by the letter and
-          # wrongly by the meaning. Clause 8 forbids the specification from
-          # altering a declaration it has published, so within one major.minor
-          # series the contract every implementation is written against is the
-          # same contract; a patch releases packaging, wording or a repaired
-          # example. Requiring the patch component to match would make every
-          # such release a five-repository migration that changes no code.
-          #
-          # ⚠️ THE MINOR COMPONENT STILL COUNTS. 0.8 → 0.9 is where interfaces
-          # are added, and an implementation written for the earlier one does
-          # not provide them; that is the mismatch this check exists to name
-          # before the compiler reports it as a hundred missing declarations.
-          series() { printf '%s' "$1" | cut -d. -f1,2; }
           if [ -n "$there" ]; then
-            if [ "$(series "$here")" != "$(series "$there")" ]; then
+            if [ "$here" != "$there" ]; then
               echo "::error::this is openkal $here and ${{ matrix.implementation }} is written against openkal $there. Nothing is wrong with either; they are not in step. Re-run after the implementation's branch has the matching version." >&2
               exit 1
             fi
-            if [ "$here" != "$there" ]; then
-              echo "both describe openkal $(series "$here"); this is $here and the implementation names $there, which is the same contract"
-            else
-              echo "both describe openkal $here"
-            fi
+            echo "both describe openkal $here"
           else
             impl_branch="$(sed -n 's/^openkal[[:space:]]*=[[:space:]]*{.*branch[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' .impl/mcpp.toml | head -1)"
             if [ -z "$impl_branch" ]; then
