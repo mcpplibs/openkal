@@ -1,4 +1,4 @@
-# The C surface of openkal 0.6, one name per line.
+# The C surface of openkal 0.8, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -57,9 +57,12 @@ kal_fs_set_modified
 kal_fs_stream
 kal_fs_truncate
 # openkal.process
+kal_process_channel
+kal_process_channel_close
 kal_process_close
 kal_process_props
 kal_process_spawn
+kal_process_spawn_with
 kal_process_terminate
 kal_process_wait
 # openkal.task
@@ -75,3 +78,38 @@ kal_exec_alloc
 kal_exec_free
 kal_exec_props
 kal_exec_publish
+# openkal.terminal
+kal_terminal_get_mode
+kal_terminal_props
+kal_terminal_set_mode
+kal_terminal_size
+# openkal.net
+kal_net_accept
+kal_net_close
+kal_net_close_listener
+kal_net_connect
+kal_net_listen
+kal_net_listener_local
+kal_net_local
+kal_net_peer
+kal_net_props
+kal_net_shutdown
+# openkal.datagram
+kal_datagram_close
+kal_datagram_local
+kal_datagram_open
+kal_datagram_props
+kal_datagram_recv_from
+kal_datagram_send_to
+# openkal.space
+kal_space_clone
+kal_space_destroy
+kal_space_props
+kal_space_start
+# openkal.timeout
+kal_timeout_accept
+kal_timeout_granularity_ns
+kal_timeout_read
+kal_timeout_recv_from
+kal_timeout_wait_process
+kal_timeout_write

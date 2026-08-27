@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "openkal-conformance"
-version     = "0.5.1"
+version     = "0.6.0"
 description = "The behavioural half of clause 9: a suite an implementation of openkal runs against itself, selectable to the interfaces it provides."
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -18,7 +18,7 @@ repo        = "https://github.com/mcpplibs/openkal"
 # What it depends upon is therefore openkal and the language. The formatting in
 # okc.report is the price of that, and it is sixty lines.
 [dependencies]
-openkal = "0.7.0"
+openkal = "0.8.0"
 
 # The implementation under examination is not named here.
 #
@@ -62,6 +62,16 @@ process  = ["fs"]     # a program is started relative to a directory
 task     = []
 exec     = []
 
+# The five interfaces version 0.8 adds. Each is optional in the sense clause 3
+# defines, so each is a feature and none is in `hosted': a set demanding an
+# optional interface would turn a permitted choice into a link error, which is
+# the mistake the note above `optional' records having been made once already.
+terminal = []
+net      = []
+datagram = []
+space    = ["process"]   # a started context is waited for as a process
+timeout  = []
+
 # The specification names this set `hosted' (clause 3.3). Both spellings are
 # here because the workflows and the older invocations use `standard', and a
 # rename that broke them would be a rename of the wrong thing.
@@ -91,7 +101,7 @@ standard = ["hosted"]
 # bare-metal one provides it only if its board has a source, and neither is a
 # deviation. The caller names this set for an implementation that provides
 # these interfaces and omits it for one that does not.
-optional = ["exec", "random"]
+optional = ["exec", "random", "terminal", "net", "datagram", "space", "timeout"]
 
 # The kinds of examination. Behaviour is always performed; the other three are
 # selected, because each costs time that a reader running the suite to answer

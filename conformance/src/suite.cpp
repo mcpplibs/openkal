@@ -12,6 +12,11 @@ import okc.fs;
 import okc.process;
 import okc.task;
 import okc.exec;
+import okc.terminal;
+import okc.net;
+import okc.datagram;
+import okc.space;
+import okc.timeout;
 
 namespace okc {
 
@@ -32,6 +37,11 @@ int run_all() {
     process::run();
     task::run();
     exec::run();
+    terminal::run();
+    net::run();
+    datagram::run();
+    space::run();
+    timeout::run();
     termination::run();
 
     return summarise();

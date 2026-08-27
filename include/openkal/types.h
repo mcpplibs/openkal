@@ -54,6 +54,20 @@ typedef signed   __int64 kal_i64;
 #  error "openkal requires a compiler that states a sixty-four bit type"
 #endif
 
+/* A byte.
+ *
+ * The three widths above are the ones openkal's OPERATIONS use --- a size, an
+ * offset, a count. An address is the first datum this specification must state
+ * byte by byte rather than as a number, because its meaning is the sequence of
+ * its bytes and not their arithmetic value. */
+#if defined(__UINT8_TYPE__)
+typedef __UINT8_TYPE__ kal_u8;
+#elif defined(_MSC_VER)
+typedef unsigned char  kal_u8;
+#else
+#  error "openkal requires a compiler that states an eight bit type"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -87,6 +101,32 @@ enum kal_error {
 struct kal_io_result {
     kal_uintptr n;
     int         e;
+};
+
+/* Where a connection or a message goes. The layout is frozen (clause 5.3).
+ *
+ * HERE AND NOT IN net.h, because `openkal.datagram' uses it too and either
+ * interface may be provided without the other. A type shared by two interfaces
+ * belongs to neither of them.
+ *
+ * BYTES AND A LENGTH, not a tagged union of families. The length is what
+ * distinguishes one kind of address from another, and it is a VALUE rather than
+ * a layout --- so the set of lengths this specification defines may grow while
+ * clause 5.3 continues to hold the structure itself fixed. That is the rule
+ * clause 6.2 gives a property word, applied to a value instead of to a bit.
+ *
+ * An implementation refuses a length it does not know (kal_err_invalid) rather
+ * than reading it as one it does. Twenty-four bytes is chosen so that an
+ * address carrying a scope identifier fits without a second type. */
+struct kal_endpoint {
+    kal_u8      addr[24];   /* network order --- the bytes of the address    */
+    kal_uintptr addr_len;   /* 4 = IPv4  16 = IPv6  20 = IPv6 with a scope
+                             * identifier. Further values are defined by later
+                             * revisions and are refused, not misread, by an
+                             * implementation that does not know them.       */
+    kal_u32     port;       /* a number, in host order: this interface does
+                             * not ask a caller to perform a protocol's byte
+                             * order conversion                              */
 };
 
 #ifdef __cplusplus
