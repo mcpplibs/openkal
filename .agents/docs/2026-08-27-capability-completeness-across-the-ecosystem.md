@@ -483,6 +483,7 @@ openkal-macos the same; openkal-windows enumerates the six it provides, because
 | `std::filesystem` over the port, and `permissions`/`create_symlink` **refused** | `openkal-llvm-runtime/examples/cxx` |
 | every new route references its interface **weakly** | `openkal-musl` CI, eleven names, with `kal_time_sleep` as the strong control |
 | the five interfaces examined rather than skipped | every backend's conformance run |
+| the **published** packages resolved, built and run | `openkal/tools/sandbox-closure.sh`, which is the only thing in this ecosystem that resolves a published package |
 
 ⚠️ The weak-reference check found two apparent failures on its first run, and
 both were the check's fault: a search under `target/` reaches the *dependency's*
