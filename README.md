@@ -167,7 +167,9 @@ written once.
 **The contract form is what makes the two unmistakable.** Clause 10 states that
 openkal's contract is a C application binary interface. The kit deliberately is
 not one: it is C++ modules in `namespace kal::kit`, and it exports no name
-beginning with `kal_`. A C++ name is mangled to `_ZN3kal3kit…`, so
+beginning with `kal_`. Measured on its objects: the defined names are C++ mangled
+module initialisers such as `_ZGIW7openkalW3kitW7channel`, and the operations are
+inline and emitted into consumers rather than exported at all. So
 `tools/check-surface.sh --complete` does not read a program that links the kit as
 an implementation which has added names — the rule that checker enforces is about
 the C surface, and the kit has none.

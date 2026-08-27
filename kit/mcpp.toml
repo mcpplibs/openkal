@@ -25,10 +25,18 @@ repo        = "https://github.com/mcpplibs/openkal"
 #
 # Clause 10 states that openkal's contract is a C application binary interface.
 # This package deliberately is not one: it is C++ modules in `namespace kal::kit`
-# and it exports no name beginning with `kal_`. A C++ name is mangled to
-# `_ZN3kal3kit…`, so `tools/check-surface.sh --complete` does not read this
-# package as an implementation that has added names --- the rule it enforces is
+# and it exports no name beginning with `kal_`. Measured on its objects --- the
+# defined names are C++ mangled module initialisers such as
+# `_ZGIW7openkalW3kitW7channel`, and the operations themselves are inline and
+# emitted into consumers rather than exported at all. So
+# `tools/check-surface.sh --complete` does not read a program linking this
+# package as an implementation that has added names: the rule it enforces is
 # about the C surface, and this package has none.
+#
+# ⚠️ THE MEASUREMENT MATTERS BECAUSE THE ARGUMENT IS STRUCTURAL. A claim that
+# rests on how a compiler mangles names is worth checking against what the
+# compiler actually emitted, and the first form of this comment named a mangling
+# (`_ZN3kal3kit…`) these objects do not contain.
 #
 # So "is this normative" is answered by the shape of what is exported rather
 # than by a sentence saying it is not. A sentence can be overlooked; a mangled
