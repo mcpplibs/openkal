@@ -1924,3 +1924,135 @@ Unchanged from §13.3, and now the whole of it:
 3. **Whether the floor operation is per-interface or one for the specification.**
 4. **Where the interposer lives** — openkal's repository, where the conformance
    runner is, or its own.
+
+---
+
+## 15. What landing it measured
+
+This section is written after the change was implemented across the eight
+repositories, and records only what could not have been written before it.
+
+### 15.1 Two defects the aarch64 leg had carried since it was written
+
+The goal named x86_64 and aarch64. Running the Linux implementation under
+qemu-aarch64 found two constants in `openkal-linux/src/sys.h` that were the
+x86_64 values on both architectures:
+
+- `O_DIRECTORY` and `O_NOFOLLOW` — `0200000`/`0400000` on x86_64 and
+  `040000`/`0100000` on the asm-generic architectures, which is aarch64.
+- `struct kstat` — the asm-generic layout orders `mode, nlink, uid, gid, rdev,
+  pad, size, blksize, pad, blocks`, and this file had the x86_64 order.
+
+⭐ **A HEAD~1 control proved they were not introduced by this change.** Both
+were present before it, so the aarch64 leg had never worked, and nothing said
+so: no job ran aarch64, and the x86_64 leg cannot observe either constant.
+`static_assert` on the offsets now states the layout rather than assuming it.
+
+### 15.2 The interposer found nothing, and that is the finding
+
+`tools/run-abi-test.sh` builds one binary and runs it against two
+implementations, the second produced from the first by renaming six symbols. All
+twelve assertions held on the first run. The value is not that it found a defect:
+it is that **no artifact of that shape existed in this ecosystem before**, so the
+claim that a program can be built against one implementation and run against
+another had never been an observation. Six of its twelve assertions exercise
+branches — an older implementation, a coarser granularity, an absent interface,
+no executable memory, no node identity — that nothing here could previously
+produce.
+
+### 15.3 ⚠️⚠️ Eight jobs that could only be green when the change was already published
+
+Every repository substitutes working trees in continuous integration so that a
+change spanning them is reviewed as a whole. Measured while landing this: **eight
+jobs across four repositories called `mcpp build` at a point where the manifest
+still named `openkal` by version**, and failed with `E_NOT_FOUND: package
+'compat.openkal@0.9.0' not found`.
+
+⭐ The mechanism is not a missing substitution. `run-conformance.sh` substitutes
+the manifest and **restores it on exit** — correctly, since a script that rewrote
+a checked-in file and walked away would leave the tree holding a path. Every step
+after it is back to naming a version.
+
+⭐⭐ **THE UNIT IS THE STEP, NOT THE JOB, AND NOT THE REPOSITORY.** The first
+pass at this asked "does this job substitute?", found three repositories, and
+passed a fourth that does substitute — and then gives it back. The second pass
+asked the question of each step and found the rest. Each of the four
+repositories also had a job doing it correctly, which is what made the gap
+invisible to a survey done a repository at a time.
+
+These steps are green on `main` and **can only be green there**, because there
+the published version is the one under test. It is not a check that fails; it is
+a check that cannot run at the only time it would have something to say.
+
+### 15.4 A test that asserted a limitation, and the limitation was lifted
+
+`openkal-llvm-runtime/examples/cxx` asserted `creating a symbolic link is
+refused, not ignored`. Decision 3 added `kal_fs_link_create`; openkal-musl
+answers `symlinkat` with it; the refusal stopped arriving and the test failed.
+
+⭐ **That is the good case, and it is why the assertion was written that way
+round.** Had it tolerated both answers, the arrival of the operation would have
+been invisible in the only place in this ecosystem where a C++ standard library
+exercises it.
+
+The same shape appeared in openkal-musl's own continuous integration, where a
+probe asserting that *an absent operation reports itself* had named `symlinkat`
+as the absent one. It reported zero diagnostics for a hundred attempts — the
+same reading a broken diagnostic channel gives. It now names an operation
+openkal does not express and **asserts that the dispatcher does not handle it**,
+so the day that changes the step says so instead of passing while measuring
+nothing.
+
+### 15.5 ⭐⭐ The defect three layers up, whose every ingredient was correct
+
+Adding links exposed one more, and it is the most instructive thing this change
+produced.
+
+`fs::remove_all` on a directory holding a symbolic link returned `ENOTEMPTY` and
+left the tree standing. The host toolchain removed the same tree. Every
+operation the port offers behaved correctly in isolation — `symlink`,
+`readlink`, `stat`, `lstat`, `unlink`, `getdents`, and `remove` on the link
+itself all matched the host row for row.
+
+The difference was one errno. openkal states that opening RESOLVES and offers no
+form that declines to — deliberately, since a program that opens a link to read
+its bytes is asking what `kal_fs_link_read` answers. So `open(O_NOFOLLOW)`
+resolved, and for a link whose target is absent it answered `ENOENT`.
+
+⚠️ **That is a different answer to a different question.** `O_NOFOLLOW` does not
+ask to open the link and does not ask to open its target; it asks *whether the
+name is a link*, and POSIX says `ELOOP` when it is. libc++'s `remove_all`
+descends by opening each entry `O_DIRECTORY|O_NOFOLLOW`: on `ELOOP` or `ENOTDIR`
+it unlinks the entry, on `ENOENT` it concludes the entry has already gone. So it
+unlinked nothing and then reported the directory it had just declined to empty
+as not empty.
+
+⭐ **THE ENQUIRY THAT ANSWERS IT IS THE ONE THIS DESIGN ADDED.** `KAL_FS_NO_RESOLVE`
+lets the port ask about the name itself, on a path taken only when the caller
+passed the flag. The design decision and the defect it repairs were found three
+weeks and three layers apart, and the second is the evidence for the first.
+
+### 15.6 What the self-review found that the implementation had missed
+
+Recorded because all four are the same shape — a place that names the surface
+and is compiled by nothing that would notice it had moved:
+
+1. `openkal/examples/` — three programs still on the 0.8 surface. They *are*
+   built in continuous integration, so they would have failed there; nothing
+   about them says which version they are written for.
+2. The frozen-layout probe in openkal's own workflow asserted the 0.8
+   `kal_node_info`. Both widths were compiled locally before the fix was pushed.
+3. `SURFACE.txt`'s self-description group was spelled `# openkal ---`, which does
+   not match the `# openkal.<name>` pattern openkal-linux derives its module
+   imports from. Two names were listed with no import, and the diagnostic named
+   the names rather than the heading.
+4. Version pins: `openkal-musl` pinned `openkal-windows` at 0.3.0 against a
+   package at 0.4.0, and two READMEs asked a reader for `openkal = "0.5.1"`.
+
+⭐ The tool written for (4) had the defect it exists to catch. A manifest with no
+version pin makes `grep` exit 1; under `pipefail` that ended the loop, so the
+survey stopped at the first such file and reported **"ok" having examined eight
+of eleven pins**. It now carries a denominator — and a floor that denominator
+cannot supply, since a denominator drawn from the same enumeration cannot report
+that the enumeration is empty: the package's own root manifest must have been
+reached.
