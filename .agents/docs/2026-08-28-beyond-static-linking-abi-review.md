@@ -2211,3 +2211,49 @@ of them uses a range, so none picks 0.9.0 up silently.
 0.7.0 repairs is one its programs can meet. Moving it is a separate change with
 its own review, and recording that here is the difference between a decision and
 an omission.
+
+---
+
+## 17. Verified against the published packages
+
+⚠️ **NO CONTINUOUS INTEGRATION IN THIS ECOSYSTEM RESOLVES A PUBLISHED PACKAGE.**
+Every workflow in all eight repositories substitutes working trees — deliberately,
+since the repositories are changed together — so the index entries, the tarball
+layout, the checksums, the wrap directory and the dependency graph a consumer
+actually gets had, before this, never been exercised by anything. The sandbox
+run is not a closing ceremony; it is the only thing that verifies what was
+published.
+
+Two programs, both naming every dependency **by version** and none by path, run
+in `xlings subos eco-2026-8-29-1 --sandbox` with the CN mirror configured for
+both `xlings` and `mcpp`:
+
+    kernel-abi   openkal   (openkal-linux@0.7.0, graph)
+    c-abi        musl      (openkal-musl@0.7.0, graph)
+    c++-abi      libc++    (openkal-llvm-runtime@0.4.0, graph)
+
+    Downloading mcpplibs.openkal v0.9.0
+    Downloading mcpplibs.openkal-kit v0.2.0
+    Downloading mcpplibs.openkal-linux v0.7.0
+
+⭐ **The first program names `openkal-kit` AND an implementation**, which is the
+graph that failed after the previous release: a consumer reaches openkal twice,
+once from each, and if either reaches it by path the build refuses. Nothing in
+any workflow reproduces that shape, because every workflow makes both routes
+paths. It resolves.
+
+| leg | x86_64-linux-gnu | aarch64-linux-musl |
+|---|---|---|
+| specification over `openkal-linux`, with the kit | 10 held, 0 failed | 10 held, 0 failed |
+| C++ standard library over musl over openkal | 11 held, 0 failed | 11 held, 0 failed |
+
+Forty-four observations, none of them of the packaging: each is of something
+this version introduced or repaired — the self-description, the granularity, the
+copy-out environment, `self_size` and `present`, node identity, links and the
+two enquiries, the signal mask the report was filed about, a page the allocator
+can use, `O_NOFOLLOW` reporting `ELOOP`, and a tree holding three kinds of link
+being removed.
+
+⭐ **BOTH ARCHITECTURES, THROUGH THE PUBLISHED PACKAGES.** The aarch64 leg is the
+one that had never worked: two constants in `openkal-linux/src/sys.h` were the
+x86_64 values on both machines, and no job ran that architecture to notice.
