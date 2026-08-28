@@ -2169,3 +2169,45 @@ exist. **Merging** must go specification-last, because the specification's own
 integration reads every implementation's `main` and requires them to have
 arrived. The two orders are opposite and both are right; only one of them is the
 one that comes to mind.
+
+---
+
+## 16. Released
+
+Nine packages, 2026-08-28, in the order the dependency graph requires.
+
+| package | version | bytes | sha256 (first 16) |
+|---|---|---|---|
+| `openkal` | 0.9.0 | 283855 | `c9c3c1e7e6903ed6` |
+| `openkal-kit` | 0.2.0 | 283869 | `c93c5ce133e95c93` |
+| `openkal-linux` | 0.7.0 | 64295 | `b70c0c852a8f2ba1` |
+| `openkal-macos` | 0.6.0 | 65508 | `e62c1317a0474830` |
+| `openkal-windows` | 0.4.0 | 70610 | `5baa87943163998f` |
+| `openkal-opensbi` | 0.3.0 | 31717 | `52a687acfbf34f4e` |
+| `openkal-uefi` | 0.3.0 | 17864 | `996514a2c0c59af7` |
+| `openkal-musl` | 0.7.0 | 1001976 | `e66bf5a2fac456a1` |
+| `openkal-llvm-runtime` | 0.4.0 | 15614767 | `e1bb5b5e9174781b` |
+
+⭐ **Every tarball was downloaded from both hosts and compared byte for byte
+against the file the checksum was taken from**, rather than trusted to either
+service's listing — `gh release view` has listed an asset whose blob was missing
+and whose download was 404, and GitCode's `HEAD` returns a redirect stub whose
+length is not the asset's. Eighteen URLs, eighteen matches. The published
+`openkal` archive was then extracted and compared against `git archive` of its
+own tag: 118 files, no difference.
+
+The `mcpp-index` change is one commit for all nine, because each names another
+by version and adding them separately would leave the index, between two merges,
+in a state where a published manifest names a version it does not have.
+
+### 16.1 What is deliberately not in this release
+
+Three packages elsewhere in the ecosystem name openkal by an exact version and
+therefore continue to resolve unchanged: `riscv-virt-rt` (openkal 0.5.2),
+`std-freestanding-alloc-kal` (0.8.0) and `sbase` (openkal-musl 0.6.0). None
+of them uses a range, so none picks 0.9.0 up silently.
+
+⚠️ `sbase` is the one worth naming: it stands on openkal-musl, and the crash
+0.7.0 repairs is one its programs can meet. Moving it is a separate change with
+its own review, and recording that here is the difference between a decision and
+an omission.
