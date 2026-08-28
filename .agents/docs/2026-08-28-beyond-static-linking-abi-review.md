@@ -2147,3 +2147,25 @@ supposed to prevent and does not, when the denominator is drawn from the same
 partial enumeration. It now globs the headers and matches both forms: 58
 declared across four headers rather than 49 across one, and four names were
 outside it. Only one was referenced, which is why only one broke a link.
+
+### 15.9 ⚠️ The specification must be merged LAST, not first
+
+openkal's continuous integration checks, for every implementation it runs the
+conformance suite against, that the implementation is written against the same
+openkal version — and says so plainly when it is not:
+
+    the implementation is at main 04fba62
+    this is openkal 0.9.0 and openkal-macos is written against openkal 0.8.0.
+    Nothing is wrong with either; they are not in step.
+
+Merging the eight pull requests in dependency order — specification first, so
+that everything below it resolves — put openkal's own `main` run in flight
+**twelve seconds before** the implementations' merges landed. The gate fired,
+correctly, and the run had to be repeated.
+
+⭐ The order is the reverse of the publish order. **Publishing** must go
+specification-first, because a package cannot name a version that does not
+exist. **Merging** must go specification-last, because the specification's own
+integration reads every implementation's `main` and requires them to have
+arrived. The two orders are opposite and both are right; only one of them is the
+one that comes to mind.
