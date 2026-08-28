@@ -17,7 +17,41 @@ struct kal_process { kal_uintptr h; };
 /* How a started program's standard streams are supplied. A stream handle of
  * zero denotes that the program inherits the corresponding stream of its
  * parent, which is what an environment without a general mechanism for
- * passing handles can always provide. */
+ * passing handles can always provide.
+ *
+ * A STREAM PLACED HERE IS THE STARTED PROGRAM'S FOR AS LONG AS THAT PROGRAM
+ * RUNS, AND THE CALLER MAY RELEASE ITS OWN REFERENCE AS SOON AS THE SPAWN HAS
+ * RETURNED. `kal_process_channel' below already requires this of a caller in as
+ * many words --- a parent that does not release `theirs' after the spawn never
+ * observes the end of input on `mine' --- so an implementation that did not
+ * carry the stream across would make that instruction impossible to follow. It
+ * is stated here for streams in general, because a caller that places the stream
+ * of a file it opened for the purpose is in the same position and had nothing to
+ * read.
+ *
+ * ⚠️ ZERO IS RESERVED HERE AND IS NOT RESERVED IN `openkal.stream', WHICH IS A
+ * COLLISION AND IS RECORDED RATHER THAN REPAIRED.
+ *
+ * `kal_stream' has no distinguished value: an implementation whose streams are
+ * its environment's own descriptors answers `kal_stdin()' with zero, and
+ * openkal-linux does. The two readings agree at position `in' --- placing
+ * standard input at standard input and inheriting it are the same act --- and
+ * cannot be told apart anywhere else, so a caller that places its own standard
+ * input at position `out' or `err' is asking for something this structure cannot
+ * express.
+ *
+ * ⇒ A caller that cannot tolerate the ambiguity DOES NOT PASS THE VALUE: it
+ * reports the request as unsupported, which is what a library above this
+ * interface can act upon, rather than passing on a word that will be read as
+ * inheritance. An implementation MAY remove the ambiguity for its own resources
+ * by not answering any stream enquiry with zero, and one that does so removes it
+ * for every caller.
+ *
+ * Repairing it in this structure would mean a second declaration --- clause 8
+ * forbids altering this one --- and the case it would serve is a caller that
+ * sends a program's output to its own standard input. Recorded here so that the
+ * next implementation meets it in the specification rather than in a program
+ * that wrote to the wrong stream. */
 struct kal_spawn_streams {
     kal_uintptr in;
     kal_uintptr out;
