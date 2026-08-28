@@ -52,9 +52,15 @@ shift
 # script.
 MCPP=2026.8.27.1
 KIT=0.1.1
-MUSL=0.5.0
+MUSL=0.6.0
 LINUX=0.6.0
-RUNTIME=0.3.0
+RUNTIME=0.3.1
+MIRROR=GLOBAL
+# ⚠️ WHICH MIRROR THE SANDBOX DOWNLOADS FROM, AND IT IS NOT THE SAME ANSWER
+# EVERYWHERE. A runner outside China reaches the global one fastest and a
+# machine inside it does not; the two are a property of where this is run rather
+# than of what is being checked, so it is an argument with the runner's answer as
+# the default.
 
 for pair in "$@"; do
     case "$pair" in
@@ -63,12 +69,47 @@ for pair in "$@"; do
         musl=*)    MUSL="${pair#*=}"    ;;
         linux=*)   LINUX="${pair#*=}"   ;;
         runtime=*) RUNTIME="${pair#*=}" ;;
+        mirror=*)  MIRROR="${pair#*=}"  ;;
         *) echo "unknown pair: $pair" >&2; exit 2 ;;
     esac
 done
 
 xlings subos list 2>/dev/null | grep -q "  $subos " \
   || { echo "::error::the environment $subos does not exist"; exit 1; }
+
+# ⚠️⚠️ THE INDEX IS REACHED THROUGH A POINTER THAT IS CACHED UPSTREAM, AND
+# REMOVING THE LOCAL COPY DOES NOT TOUCH IT.
+#
+# mcpp-index publishes a content-hash artifact and a rolling pointer file. A
+# client fetches the pointer from `raw.githubusercontent.com`, which serves a
+# cached copy for some minutes after a push. So a run started right after a merge
+# resolves the PREVIOUS artifact --- and reports the package that was just added
+# as
+#
+#     E_NOT_FOUND: package 'x@v' not found in the synced index
+#       (… mcpplibs@artifact:<previous sha> …), synced 0 seconds ago
+#
+# which reads as a release that failed and is nothing of the kind. Measured
+# 2026-08-28, twice: the pointer repository's own commit already named the new
+# artifact while the raw URL still served the old one.
+#
+# ⇒ The two are compared here, before an hour of building is spent on an answer
+# about the wrong index. The API is not cached the way the raw host is, which is
+# what makes the comparison possible at all.
+head="$(curl -fsSL --max-time 60 https://api.github.com/repos/mcpplibs/mcpp-index/commits/main \
+        | sed -n 's/.*"sha": "\([0-9a-f]\{7\}\).*/\1/p' | head -1)"
+seen="$(curl -fsSL --max-time 60 -H 'Cache-Control: no-cache' \
+        "https://raw.githubusercontent.com/xlings-res/mcpp-index/main/mcpp-index-pointers.json" \
+        | sed -n 's/.*"index_version": "\([^"]*\)".*/\1/p' | head -1)"
+if [ -n "$head" ] && [ -n "$seen" ] && [ "$head" != "$seen" ]; then
+    echo "::error::the index pointer is behind: it names $seen and mcpp-index main is $head"
+    echo "        the artifact for $head may already exist; what is stale is the cached"
+    echo "        pointer a client reads. Wait a few minutes and run this again ---"
+    echo "        building against $seen would answer for the previous index."
+    exit 1
+fi
+[ -n "$seen" ] && echo "  the index pointer names $seen, and mcpp-index main is ${head:-unknown}"
+
 
 cat <<REPORT
 the closure under examination:
@@ -77,6 +118,7 @@ the closure under examination:
   openkal-musl         $MUSL
   openkal-linux        $LINUX
   openkal-llvm-runtime $RUNTIME
+  mirror               $MIRROR
 REPORT
 
 read -r -d '' SCRIPT <<'INNER' || true
@@ -109,6 +151,7 @@ xlings update > /dev/null 2>&1 || true
 # index repository carries the name --- measured: local, scode and xim all
 # answer, and xlings refuses rather than choosing. The engine is published in
 # xim.
+xlings config --mirror __MIRROR__ > /dev/null 2>&1 || true
 xlings install "xim:mcpp@__MCPP__" -y -g
 
 # ⚠️⚠️ INSTALLING IS NOT BECOMING WHAT RUNS. In an environment that already has
@@ -117,7 +160,7 @@ xlings install "xim:mcpp@__MCPP__" -y -g
 # this check would build the whole ecosystem with the OLD engine and report the
 # release as verified.
 xlings use mcpp __MCPP__ || true
-mcpp self config --mirror GLOBAL
+mcpp self config --mirror __MIRROR__
 got="$(mcpp --version | awk '{print $2}')"
 [ "$got" = "__MCPP__" ] || { echo "::error::mcpp is $got, not __MCPP__"; exit 1; }
 echo "  mcpp is $got"
@@ -152,12 +195,18 @@ cat > src/main.cpp <<'CPP'
 // in, which is what makes the include path under examination the one used.
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <spawn.h>
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+extern char** environ;
 
 #include <openkal/stream.h>
 #include <openkal/terminal.h>
@@ -171,7 +220,13 @@ static int hidden = 7;
 static int weak = 11;
 struct weak_alias { int value; };
 
-int main() {
+int main(int argc, char** argv) {
+    // ⭐ THE PROGRAM THIS ONE STARTS IS ITSELF. A criterion that shelled out to
+    // `/bin/sh` would be asserting something about the sandbox rather than about
+    // the C library, and would report the absence of a shell as a defect of the
+    // release.
+    if (argc > 1) { (void)!::write(1, argv[1], ::strlen(argv[1])); return 0; }
+
     std::vector<int> v{4, 2, 7};
     std::ranges::sort(v);
     std::print("sorted:");
@@ -224,6 +279,58 @@ int main() {
     const bool reaped = kid > 0 && ::waitpid(kid, &status, 0) == kid
                      && WIFEXITED(status) && WEXITSTATUS(status) == 23;
     std::println("the calling image is duplicated: {}", reaped);
+
+    // ⭐⭐ AND WHAT openkal-musl 0.6.0 ANSWERS, WHICH A CONSUMER REPORTED AND
+    // NOT THIS ECOSYSTEM (openkal-linux#13). Each of the three was measured
+    // from outside, on packages that had been published and were green here.
+
+    // ① A redirection the caller performed reaches the started program. It used
+    //    not to: `dup2` rebinds the C library's own table and cannot rebind the
+    //    running program's stream, so the started program wrote to the stream
+    //    THIS program had been started with and the file stayed empty.
+    std::fflush(stdout);
+    const int saved = ::dup(1);
+    const int sink  = ::open("/tmp/sink.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    bool redirected = false;
+    if (saved >= 0 && sink >= 0) {
+        ::dup2(sink, 1);
+        ::close(sink);
+        pid_t echoer = -1;
+        char* av[] = { argv[0], const_cast<char*>("carried-into-the-file"), nullptr };
+        const int se = ::posix_spawn(&echoer, argv[0], nullptr, nullptr, av, ::environ);
+        if (se == 0) { int est = 0; ::waitpid(echoer, &est, 0); }
+        std::fflush(stdout);
+        ::dup2(saved, 1);
+        ::close(saved);
+        char buf[64] = {};
+        const int rd = ::open("/tmp/sink.txt", O_RDONLY);
+        const auto n = rd >= 0 ? ::read(rd, buf, sizeof buf - 1) : -1;
+        if (rd >= 0) ::close(rd);
+        redirected = se == 0 && n > 0 && memcmp(buf, "carried-into-the-file", 21) == 0;
+    }
+    std::println("a redirection reaches the started program: {}", redirected);
+
+    // ② An uncaught exception ends the program the way a C library says it
+    //    does. It used to reach musl's `a_crash()` --- `hlt` --- and be reported
+    //    as a segmentation fault, which is this runtime's own exit path: the
+    //    terminate handler in libc++abi ends in `abort`.
+    const pid_t thrower = ::fork();
+    if (thrower == 0) throw std::runtime_error("deliberate, and uncaught");
+    int tst = 0;
+    ::waitpid(thrower, &tst, 0);
+    std::println("an uncaught exception ends on SIGABRT: {}",
+                 WIFSIGNALED(tst) && WTERMSIG(tst) == SIGABRT);
+
+    // ③ Asking after a started program without waiting for it returns. It used
+    //    to block, which is the one thing that flag exists to prevent.
+    const pid_t slow = ::fork();
+    if (slow == 0) { ::usleep(300000); ::_exit(9); }
+    int sst = 0;
+    long spins = 0;
+    pid_t got = 0;
+    while ((got = ::waitpid(slow, &sst, WNOHANG)) == 0 && spins < 100000) spins++;
+    std::println("asking without waiting returned {} times, then named it: {}",
+                 spins > 0, got == slow && WIFEXITED(sst) && WEXITSTATUS(sst) == 9);
     return 0;
 }
 CPP
@@ -240,6 +347,13 @@ grep -q 'kit parses true and refuses true: 255 8080' /tmp/out.log
 # reported nothing.
 grep -qE 'sockets: port [1-9][0-9]* connected true readable true carried true' /tmp/out.log
 grep -q 'the calling image is duplicated: true'      /tmp/out.log
+# ⭐ THE THREE openkal-musl 0.6.0 ANSWERS. Each was red on 0.5.0.
+grep -q 'a redirection reaches the started program: true' /tmp/out.log \
+  || { echo "::error::a started program did not receive the caller's redirection"; exit 1; }
+grep -q 'an uncaught exception ends on SIGABRT: true'     /tmp/out.log \
+  || { echo "::error::an uncaught exception did not end the way a C library says"; exit 1; }
+grep -q 'asking without waiting returned true times, then named it: true' /tmp/out.log \
+  || { echo "::error::waitpid(WNOHANG) blocked, or did not name the program"; exit 1; }
 
 say "what the engine believes each layer is"
 # ⭐ THE VERSION IS THE FIELD THAT DISCRIMINATES. That the engine knows a layer
@@ -297,5 +411,6 @@ SCRIPT="${SCRIPT//__KIT__/$KIT}"
 SCRIPT="${SCRIPT//__MUSL__/$MUSL}"
 SCRIPT="${SCRIPT//__RUNTIME__/$RUNTIME}"
 SCRIPT="${SCRIPT//__LINUX__/$LINUX}"
+SCRIPT="${SCRIPT//__MIRROR__/$MIRROR}"
 
 xlings subos use "$subos" --sandbox --cmd "$SCRIPT"
