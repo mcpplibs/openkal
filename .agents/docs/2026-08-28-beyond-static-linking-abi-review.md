@@ -2096,3 +2096,54 @@ acquires the receiving layer's requirements, and the sending layer is not
 obliged to know them.** openkal is right to answer one. musl is wrong to believe
 it. The remedy is not in either interface but at the seam, where the answer is
 taken as a floor to respect rather than as the value.
+
+### 15.8 ⚠️⚠️ Two defects the aarch64 leg surfaced that are not about aarch64
+
+The goal named x86_64 and aarch64, and running the second found two more. Both
+are recorded here for the same reason: **the leg that surfaces a defect is not
+the axis the defect is on**, and taking the first for the second would have
+produced a wrong fix in each case.
+
+**One C library passes the vectors and the other does not.** `openkal-linux`
+captured `(argc, argv, envp)` in a `[[gnu::constructor]]`. glibc calls every
+`.init_array` entry with those three; **musl calls them with no arguments**. So
+under musl the function recorded whatever the argument registers held, and the
+first enquiry after the count dereferenced a small integer.
+
+It was found by running the tests for aarch64, where it reads as an
+architecture defect. The control that settles it is `x86_64-linux-musl`:
+
+| target | argc | argv | envp |
+|---|---|---|---|
+| x86_64-linux-gnu | 1 | stack | stack |
+| x86_64-linux-musl | 0x4004c2 | 1 | stack |
+| aarch64-linux-musl | 0x405ee4 | 1 | stack |
+
+Both musl rows are shifted by one and the glibc row is not, so **the axis is the
+C library**. The arguments are now checked rather than believed, and where they
+do not hold the vectors are recovered from `environ` by walking back over
+`argv`'s terminator to the slot holding the count — which must equal the number
+of entries actually found, or nothing is recorded.
+
+⭐ `environ` is a **weak** reference, and the independence check states that as a
+rule rather than as an exception: this one name is permitted only when its type
+letter is weak. It is admissible where `puts` is not because the check exists to
+stop a CALL into the program's runtime re-entering this implementation, and a
+pointer executes nothing; and because weak means a program with no C library
+still links. A strong reference would make one required silently. Both
+directions were measured.
+
+**A check that was right, with the wrong scope.** openkal-windows verifies that
+every name its headers declare is exported by a `.def`, and its comment records
+the defect it was written for: names added without `.def` lines, failing one
+repository away in a consumer's cross-build. It happened again — and the check
+stayed green, because it read `src/win32.h` alone and matched one declaration
+macro, while `src/win.h` declares the object manager's entries in the plain
+`__declspec(dllimport)` form.
+
+⭐ **IT REPORTED A NUMBER, AND THE NUMBER WAS OF THE NAMES IT KNEW ABOUT.**
+Nothing said the set was partial — which is the failure mode a denominator is
+supposed to prevent and does not, when the denominator is drawn from the same
+partial enumeration. It now globs the headers and matches both forms: 58
+declared across four headers rather than 49 across one, and four names were
+outside it. Only one was referenced, which is why only one broke a link.
