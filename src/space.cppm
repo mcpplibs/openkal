@@ -37,7 +37,7 @@ using props = kal::props<props_tag>;
 inline constexpr props clone_handles{KAL_SPACE_PROP_CLONE_HANDLES};
 inline constexpr props deferred_copy{KAL_SPACE_PROP_DEFERRED_COPY};
 
-inline props properties() { return props{kal_space_props}; }
+inline props properties() { return props{kal_space_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 struct process_result { kal_process p; int e; };

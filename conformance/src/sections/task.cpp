@@ -102,7 +102,7 @@ void run() {
     unobserved(kind::behaviour, "openkal.task", "the interface was not selected");
     return;
 #else
-    claim("kal_task_props", kal_task_props);
+    claim("kal_task_props()", kal_task_props());
 
     // A context runs, and the context that started it can tell that it did.
     {
@@ -218,7 +218,7 @@ void run() {
         const kal_uintptr assigned = (kal::task::preemptive | kal::task::parallel
                                     | kal::task::wait_timeout
                                     | kal::task::thread_local_storage).bits;
-        observe(kind::abi, (kal_task_props & ~assigned) == 0,
+        observe(kind::abi, (kal_task_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
         observe(kind::abi, kal_task_current() == kal_task_current(),
                 "the identity of the calling context is stable within it");

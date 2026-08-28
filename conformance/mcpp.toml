@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "openkal-conformance"
-version     = "0.6.0"
+version     = "0.7.0"
 description = "The behavioural half of clause 9: a suite an implementation of openkal runs against itself, selectable to the interfaces it provides."
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -18,7 +18,7 @@ repo        = "https://github.com/mcpplibs/openkal"
 # What it depends upon is therefore openkal and the language. The formatting in
 # okc.report is the price of that, and it is sixty lines.
 [dependencies]
-openkal = "0.8.0"
+openkal = "0.9.0"
 
 # The implementation under examination is not named here.
 #
@@ -45,7 +45,7 @@ main = "src/main.cpp"
 # the count of what was skipped in the report rather than in the reader's head.
 #
 #     mcpp run                          the core set
-#     mcpp run --features standard      every interface version 0.5 defines
+#     mcpp run --features full          every interface
 #     mcpp run --features fs,task       the core set, and these two
 #
 # The core set is the default because clause 3 says every implementation
@@ -62,21 +62,29 @@ process  = ["fs"]     # a program is started relative to a directory
 task     = []
 exec     = []
 
-# The five interfaces version 0.8 adds. Each is optional in the sense clause 3
-# defines, so each is a feature and none is in `hosted': a set demanding an
-# optional interface would turn a permitted choice into a link error, which is
-# the mistake the note above `optional' records having been made once already.
+# Every interface outside the core set is a feature, and there is no name that
+# gathers a subset of them. Version 0.8 had one --- `hosted' --- and it named a
+# class of environment, which is a thing a name cannot do: it was falsified
+# inside this ecosystem within a release, by a C library hosted above an
+# implementation providing none of the three interfaces it promised.
 terminal = []
 net      = []
 datagram = []
 space    = ["process"]   # a started context is waited for as a process
 timeout  = []
 
-# The specification names this set `hosted' (clause 3.3). Both spellings are
-# here because the workflows and the older invocations use `standard', and a
-# rename that broke them would be a rename of the wrong thing.
-hosted   = ["core", "env", "time", "fs", "process", "task"]
-standard = ["hosted"]
+# ⚠️ `hosted' AND `standard' WERE HERE AND ARE GONE, BECAUSE THE SPECIFICATION'S
+# OWN NAME FOR THAT SET IS GONE.
+#
+# Version 0.8 named a set of interfaces after a class of environment, and a name
+# that describes a class of environment is falsified by an environment nobody had
+# in mind. This one was falsified inside its own ecosystem within a release: a C
+# library is hosted above an implementation providing none of `openkal.fs',
+# `openkal.process' or `openkal.task'.
+#
+# Nothing invoked them --- every workflow in this ecosystem passes `core' or
+# `full,optional' --- so removing them costs nothing and removes a second
+# spelling of a decision the specification has withdrawn.
 
 # Deliberately not part of `full'. Clause 6.1 states that an implementation
 # provides an interface in whole or not at all and that a missing one is not a
@@ -85,9 +93,10 @@ standard = ["hosted"]
 # rather than an observation that did not hold. The caller names this set for an
 # implementation that provides these interfaces, and omits it for one that does
 # not --- which is the same choice the implementation itself made.
-# ⚠️ `random` IS HERE AND NOT IN `hosted`, AND THE NOTE ABOVE ALREADY SAID WHY.
+# ⚠️ `random` IS HERE AND NOT AMONG THE INTERFACES `full` NAMES, AND THE NOTE
+# ABOVE ALREADY SAID WHY.
 #
-# It was put in `hosted` first, and the suite then failed to LINK against every
+# It was named there first, and the suite then failed to LINK against every
 # backend that had not yet implemented it:
 #
 #     lld-link: error: undefined symbol: kal_random_fill
@@ -121,4 +130,14 @@ stability = []
 # declared rather than assumed, so that requesting cost without time selects
 # time instead of failing to link.
 cost      = ["time"]
-full      = ["standard", "abi", "stability", "cost"]
+# ⚠️⚠️ THE INTERFACES ARE NAMED HERE AND NOT THROUGH ANOTHER SET, BECAUSE A SET
+# DEFINED IN TERMS OF A SET CAN SHRINK WITHOUT ANYTHING SAYING SO.
+#
+# This was `["standard", …]`, and `standard` was a name the specification has
+# withdrawn. Removing it left `full` meaning four kinds of examination and no
+# interface at all --- measured 2026-08-29: the same command reported 168 held
+# before and 119 held after, WITH AN EXIT STATUS OF ZERO BOTH TIMES, because
+# every section it stopped examining reported itself as not observed rather than
+# as failing. A set that names its members cannot do that.
+full      = ["core", "env", "time", "fs", "process", "task",
+             "abi", "stability", "cost"]

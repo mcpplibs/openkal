@@ -24,16 +24,16 @@ void run() {
     {
         const char msg[] = "  (openkal.stream: this line was written by the suite)\n";
         const kal_uintptr n = sizeof msg - 1;
-        const kal_io_result r = kal_stream_write(out, msg, n);
-        observe(kind::behaviour, r.e == kal_ok && r.n == n,
+        const kal_intptr r = kal_stream_write(out, msg, n);
+        observe(kind::behaviour, r == static_cast<kal_intptr>(n),
                 "a write transfers the whole buffer and reports it");
     }
 
     // A transfer of nothing is a transfer. An implementation that refused it
     // would break every caller that writes a computed length.
     {
-        const kal_io_result r = kal_stream_write(out, "", 0);
-        observe(kind::behaviour, r.e == kal_ok && r.n == 0,
+        const kal_intptr r = kal_stream_write(out, "", 0);
+        observe(kind::behaviour, r == 0,
                 "a write of no bytes succeeds and reports no bytes");
     }
 
@@ -60,7 +60,7 @@ void run() {
         // descriptor, an operating-system handle or a capability index in it.
         observe(kind::abi, sizeof(kal_stream) == sizeof(kal_uintptr),
                 "a stream handle occupies one machine word");
-        observe(kind::abi, sizeof(kal_io_result) == 2 * sizeof(kal_uintptr),
+        observe(kind::abi, sizeof(kal_intptr) == sizeof(kal_uintptr),
                 "a transfer result occupies two machine words");
         // The same handle answers the same way twice. An implementation that
         // packed a generation into the word and incremented it on use would
@@ -72,8 +72,8 @@ void run() {
     if (performs(kind::stability)) {
         bool all = true;
         for (int i = 0; i < repetitions && all; ++i) {
-            const kal_io_result r = kal_stream_write(out, "", 0);
-            if (r.e != kal_ok) all = false;
+            const kal_intptr r = kal_stream_write(out, "", 0);
+            if (r < 0) all = false;
         }
         observe(kind::stability, all, "a stream serves the operation repeated many times");
     }

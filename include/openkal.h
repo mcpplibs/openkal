@@ -12,6 +12,9 @@
 #define OPENKAL_H
 
 #include "openkal/types.h"
+/* Second, because a consumer asks what the implementation is before it uses
+ * anything the implementation provides. */
+#include "openkal/version.h"
 #include "openkal/abort.h"
 #include "openkal/stream.h"
 #include "openkal/memory.h"

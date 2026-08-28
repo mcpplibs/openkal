@@ -59,7 +59,7 @@ int kal_net_accept (struct kal_net_listener l,        struct kal_net_conn* out);
 /* A connection is read and written through openkal.stream. The stream remains
  * valid while the connection is open and is not separately released; the
  * connection owns it. The wording is `openkal.fs's, because the arrangement is. */
-kal_uintptr kal_net_stream(struct kal_net_conn c);
+struct kal_stream kal_net_stream(struct kal_net_conn c);
 
 /* Reports the endpoint of the peer, and the endpoint this end was given.
  *
@@ -94,7 +94,7 @@ void kal_net_close_listener(struct kal_net_listener l);
  * A word rather than an enquiry, because these do not vary between the
  * resources of the interface: an implementation either speaks IPv6 or does not
  * (clause 6.2). */
-extern const kal_uintptr kal_net_props;
+kal_uintptr kal_net_props(void);
 
 #ifdef __cplusplus
 }

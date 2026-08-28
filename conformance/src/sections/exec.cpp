@@ -49,11 +49,32 @@ void run() {
         return;
     }
 
-    claim("kal_exec_props", kal_exec_props);
-    observe(kind::abi, (kal_exec_props & ~kal::exec::republish.bits) == 0,
+    claim("kal_exec_props()", kal_exec_props());
+    observe(kind::abi,
+            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available).bits) == 0,
             "no position the specification has not assigned is reported");
 
+    // ⭐ WHETHER THE INTERFACE CAN BE EXERCISED BY THIS ARTIFACT IS READ BEFORE
+    // IT IS EXERCISED, AND BOTH ANSWERS ARE OBSERVED.
+    //
+    // Clause 6.5 settles availability at dependency resolution and says it is
+    // not reported at run time, because a path no artifact takes is a path
+    // nothing has verified. That reasoning holds for an artifact produced for
+    // its own machine and inverts for one produced once and run in many: the
+    // producer decided for every environment, and the consumer resolves
+    // nothing. So the position exists, and this is the observation that keeps
+    // it from being the unverified path the clause warns about.
+    const bool available = (kal_exec_props() & kal::exec::available.bits) != 0;
+
     void* p = kal_exec_alloc(kReturns42Size);
+    if (!available) {
+        observe(kind::behaviour, p == nullptr,
+                "an implementation that does not claim availability reserves nothing");
+        unobserved(kind::behaviour, "instructions written into a region are executed",
+                   "this artifact was not produced so that it may execute memory,"
+                   " which the capability word reports");
+        return;
+    }
     observe(kind::behaviour, p != nullptr, "a region is reserved");
     if (p == nullptr) return;
 

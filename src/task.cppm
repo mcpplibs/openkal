@@ -47,7 +47,7 @@ inline constexpr props wait_timeout{KAL_TASK_PROP_WAIT_TIMEOUT};
 // variable and therefore cannot be ported onto an implementation without it.
 inline constexpr props thread_local_storage{KAL_TASK_PROP_THREAD_LOCAL};
 
-inline props properties() { return props{kal_task_props}; }
+inline props properties() { return props{kal_task_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 }

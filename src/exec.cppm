@@ -36,7 +36,13 @@ using props = kal::props<props_tag>;
 // before deciding how to hold what it has generated.
 inline constexpr props republish{KAL_EXEC_PROP_REPUBLISH};
 
-inline props properties() { return props{kal_exec_props}; }
+// Whether memory this program may execute is available to THIS ARTIFACT in
+// THIS environment. Clause 6.5 settles availability at dependency resolution,
+// which is the right answer for an artifact produced for its own machine and
+// no answer at all for one produced once and run in many.
+inline constexpr props available{KAL_EXEC_PROP_AVAILABLE};
+
+inline props properties() { return props{kal_exec_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 inline void* alloc(kal_uintptr size) { return kal_exec_alloc(size); }

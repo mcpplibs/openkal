@@ -2,6 +2,7 @@ module okc.suite;
 
 import okc.spec;
 import okc.report;
+import okc.version;
 import okc.abort;
 import okc.stream;
 import okc.memory;
@@ -28,6 +29,9 @@ int run_all() {
     // openkal.abort is last among the core interfaces rather than first,
     // because observing it requires starting a copy and the copy's own report
     // would otherwise appear before this one's heading.
+    // First, because it is what a consumer asks before it uses anything, and
+    // because it is the one section no arrangement skips.
+    version::run();
     stream::run();
     memory::run();
     env::run();

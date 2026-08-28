@@ -43,7 +43,7 @@ inline kal_duration wall()        { return kal_time_wall(); }
 inline kal_duration granularity() { return kal_time_monotonic_granularity(); }
 inline void         sleep(kal_duration ns) { kal_time_sleep(ns); }
 
-inline props properties() { return props{kal_time_props}; }
+inline props properties() { return props{kal_time_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 }

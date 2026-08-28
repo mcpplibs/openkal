@@ -49,7 +49,7 @@ extern "C" {
  * no source", which is answered by the interface's absence. */
 int kal_random_fill(void* out, kal_uintptr len);
 
-extern const kal_uintptr kal_random_props;
+kal_uintptr kal_random_props(void);
 
 #ifdef __cplusplus
 }

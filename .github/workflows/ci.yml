@@ -258,11 +258,31 @@ jobs:
           cat > .abi-probe/src/main.cpp <<'EOF'
           #include <openkal/types.h>
           #include <openkal/fs.h>
-          static_assert(__builtin_offsetof(kal_node_info, size) == 0);
-          static_assert(__builtin_offsetof(kal_node_info, modified_ns) == 8);
-          static_assert(sizeof(kal_node_info) == 24);
+          // `self_size' IS FIRST, AND THAT IS THE WHOLE OF THE GROWTH RULE.
+          // An implementation built at a later version reads this field before
+          // it touches anything else, which is how it learns how much of the
+          // structure the caller has. A layout in which it were not first would
+          // make the field unreadable by exactly the implementation it exists
+          // to inform.
+          static_assert(__builtin_offsetof(kal_node_info, self_size) == 0);
+          static_assert(__builtin_offsetof(kal_node_info, present)   == 4);
+          // The fields that existed at 0.9.0, at the offsets they had. Growth
+          // is permitted only past the end; these do not move.
+          static_assert(__builtin_offsetof(kal_node_info, size)        == 8);
+          static_assert(__builtin_offsetof(kal_node_info, modified_ns) == 16);
+          static_assert(__builtin_offsetof(kal_node_info, identity)    == 24);
+          static_assert(__builtin_offsetof(kal_node_info, kind)        == 40);
+          static_assert(__builtin_offsetof(kal_node_info, writable)    == 44);
+          // The same at both pointer widths, which is the property this
+          // 32-bit row exists to observe: no field of it is pointer-sized.
+          static_assert(sizeof(kal_node_info) == 48);
           static_assert(sizeof(kal_dir)  == sizeof(kal_uintptr));
           static_assert(sizeof(kal_file) == sizeof(kal_uintptr));
+          // A transfer is one signed word, and a signed word is a pointer's
+          // width. An implementation returning `int' here would truncate a
+          // count on a 64-bit machine and would be caught by nothing else.
+          static_assert(sizeof(kal_intptr) == sizeof(kal_uintptr));
+          static_assert((kal_intptr)-1 < 0);
           extern "C" void _start() { for (;;) {} }
           EOF
           for t in riscv64-none-elf riscv32-none-elf; do

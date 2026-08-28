@@ -1,4 +1,4 @@
-# openkal Specification, version 0.8
+# openkal Specification, version 0.9
 
 ## 1. Scope
 
@@ -31,27 +31,32 @@ it provides. An implementation is not required to provide every interface.
 An interface is the unit of versioning and of provision. An implementation
 provides an interface in whole or not at all.
 
-| Interface | Resource | Core |
-| --- | --- | --- |
-| `openkal.abort` | termination | core |
-| `openkal.stream` | a byte stream | core |
-| `openkal.memory` | a region of the address space | core |
-| `openkal.env` | the parameters a program receives at inception | standard |
-| `openkal.time` | a time source | standard |
-| `openkal.random` | a source of unpredictable bytes | optional |
-| `openkal.fs` | a directory, and an open file | standard |
-| `openkal.process` | a program image that has been started | standard |
-| `openkal.task` | an execution context, and a suspension primitive | standard |
-| `openkal.exec` | a region of the address space a program may execute | optional |
-| `openkal.terminal` | an interactive stream's treatment of what is typed | optional |
-| `openkal.net` | a connection, and a listener for connections | optional |
-| `openkal.datagram` | a message with a boundary, sent without a connection | optional |
-| `openkal.space` | an address space, and a context executing in one | optional |
-| `openkal.timeout` | a bound upon operations that would otherwise wait | optional |
-| `openkal.event` | readiness of a set of resources | reserved |
+| Interface | Resource | Tier | S | L | X |
+| --- | --- | --- | --- | --- | --- |
+| `openkal.abort` | termination | core | ✓ | ✓ | ✓ |
+| `openkal.stream` | a byte stream | core | ✓ | ✓ | ✓ |
+| `openkal.memory` | a region of the address space | core | ✓ | ✓ | ✓ |
+| `openkal.env` | the parameters a program receives at inception | optional | ✓ | ✓ | ✓ |
+| `openkal.time` | a time source | optional | ✓ | ✓ | ✓ |
+| `openkal.random` | a source of unpredictable bytes | optional | ✓ | ✓ | ✓ |
+| `openkal.fs` | a directory, and an open file | optional | ✓ | ✓ | ✓ |
+| `openkal.process` | a program image that has been started | optional | ✓ | ✓ | ✓ |
+| `openkal.task` | an execution context, and a suspension primitive | optional | ✓ | ✓ | ✓ |
+| `openkal.exec` | a region of the address space a program may execute | optional | ✓ | ✓ | ✓ |
+| `openkal.terminal` | an interactive stream's treatment of what is typed | optional | ✓ | ✓ | ✓ |
+| `openkal.net` | a connection, and a listener for connections | optional | ✓ | ✓ | ✓ |
+| `openkal.datagram` | a message with a boundary, sent without a connection | optional | ✓ | ✓ | ✓ |
+| `openkal.space` | an address space, and a context executing in one | optional | ✓ | ✓ | ✓ |
+| `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
+| `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.8 specifies the core, standard and optional interfaces. The reserved
-row is not specified, and its name shall not be used for other purposes.
+Version 0.9 specifies the core and optional interfaces. The reserved row is not
+specified, and its name shall not be used for other purposes.
+
+The S, L and X columns state which boundaries an interface's declarations can
+cross. They are defined in clause 4.4 and are a statement about the shape of the
+declarations, not a requirement upon implementations: an implementation cannot
+violate them, and only a declaration can.
 
 The five interfaces added in version 0.8 are optional in the sense clause 3
 defines, and their optionality is not a concession. An environment with no
@@ -61,10 +66,33 @@ provide `openkal.space` and is not deficient either. Clause 6.1 expresses each
 absence as the absence of a definition at the link, so a program that requires
 one of them is refused when it is built rather than when it runs.
 
-*Core* denotes an interface every implementation provides. *Standard* denotes
-one an implementation hosting a C library provides. *Optional* denotes one it
-may omit without ceasing to host a C library, at the cost of the facilities
-built upon it.
+*Core* denotes an interface every implementation provides. *Optional* denotes
+every other, and how its absence reaches a consumer is one of two things:
+
+| how an optional interface is resolved | mechanism |
+| --- | --- |
+| the implementation does not provide it at all | clause 6.1 — the definitions are absent, and a consumer that uses one fails to link |
+| the implementation provides it only to an artifact produced in a particular way | a feature of the implementation's package, resolved at dependency resolution — clause 6.5 |
+
+⚠️ There were three tiers, and the middle one said that an implementation
+*hosting a C library* provides `openkal.env`, `openkal.time`, `openkal.fs`,
+`openkal.process` and `openkal.task`. It was false, and falsified within this
+specification's own ecosystem: an implementation for a machine with firmware and
+no operating system provides none of the last three, and a C library is hosted
+above it. The tier stated a fact that was not one, and it stated it about the
+consumer rather than about the interface.
+
+The honest classification is the *Resource* column beside it. An interface
+exists where its resource exists — storage, a second image, a scheduler, a
+network, an address space that can be copied, entropy, an interactive stream, a
+bound upon a wait. Clause 6.1 makes the absence a fact a consumer learns; no
+tier is needed to predict it, and the prediction was wrong.
+
+*Informative, and carrying no requirement*: an implementation of a system with
+storage and a scheduler ordinarily provides `openkal.env`, `openkal.time`,
+`openkal.fs`, `openkal.process`, `openkal.task` and `openkal.timeout`. This
+sentence describes what is common; nothing follows from it, and an
+implementation is not measured against it.
 
 ### 3.1 The basis of the core set
 
@@ -101,6 +129,15 @@ placed outside it costs a consumer one declared dependency. The first error is
 found late and by the wrong party; the second is found at dependency resolution
 and by the party that can act on it.
 
+⚠️ **What this closes is the set of INTERFACES.** `kal_version` and
+`kal_interfaces` are exported by every conforming implementation and belong to
+no interface: they provide no resource, and an implementation answers both with
+constants. They are the specification's own self-description, required by clause
+9, and requiring them adds nothing to the core set that a bare machine would
+have to supply. A consumer that is linked never needs to call them; a consumer
+bound at load or across a boundary has no linker to ask, and asking an interface
+by calling into it is the act that must not happen first.
+
 ### 3.3 Naming a set of interfaces
 
 An interface is provided or not provided, and clause 6.1 makes that a fact a
@@ -110,23 +147,24 @@ not scale: the sets a program can be written against are not arbitrary subsets,
 and an ecosystem that could only enumerate them could not say "this package
 needs an environment of such-and-such a kind".
 
-The specification therefore names sets, and the names are for stating a
-requirement rather than for measuring conformance:
+⚠️ **The specification names no such set, and the one it did name has been
+withdrawn.** Version 0.8 named `hosted` — the core interfaces together with
+`openkal.env`, `openkal.time`, `openkal.fs`, `openkal.process` and
+`openkal.task`. The name described a class of environment, and a name that
+describes a class of environment is falsified by an environment nobody had in
+mind. This one was falsified inside its own ecosystem within a release: a C
+library is hosted above an implementation that provides none of the last three.
 
-| Name | Interfaces |
-| --- | --- |
-| `core` | `openkal.abort`, `openkal.stream`, `openkal.memory` |
-| `hosted` | `core`, and `openkal.env`, `openkal.time`, `openkal.fs`, `openkal.process`, `openkal.task` |
+The scaling argument is also weaker than it read. There are fifteen interfaces,
+and a consumer that needs five names five. That is five lines, not a problem of
+scale, and it is what the ecosystem already does — a consumer states its
+required set per target, in its own package, which is where a convention among
+consumers belongs.
 
-A name is a shorthand and confers nothing. **An implementation does not claim a
-name**; it provides interfaces, and whether it satisfies a consumer that asked
-for `hosted` follows from which interfaces it provides. Nothing in this clause
-alters clause 6.1: an interface a consumer uses and an implementation does not
-provide is an undefined symbol, whichever names either of them mentions.
-
-Optional interfaces are deliberately not gathered into a name. A set that
-required every optional interface would make *optional* mean nothing, and a
-consumer that needs one names that one.
+`core` remains, and is not a set a consumer states: it is the requirement upon
+implementations stated in clause 3.2. Nothing in this clause alters clause 6.1:
+an interface a consumer uses and an implementation does not provide is an
+undefined symbol.
 
 ### 3.4 Interfaces the specification declines to define
 
@@ -225,11 +263,13 @@ and C cannot, and both are checks rather than facilities.
 
 **The frozen layouts are asserted.** Clause 5.3 declares the layout of every
 structure immutable. A declaration that something shall not change is not a
-mechanism; `static_assert` is. `kal_io_result` being two machine words is the
-difference between a result returned in registers and one returned through a
+mechanism; `static_assert` is. A handle being one machine word is the
+difference between a value returned in a register and one returned through a
 hidden pointer, which is a change of calling convention that no declaration
 would report and that a consumer built against the earlier layout would not
-survive.
+survive. `kal_node_info` is the one structure that is permitted to grow, and it
+carries `self_size` for precisely that reason — the assertion on it fixes the
+offsets of the fields that exist, not the size of the whole.
 
 **The capability words become types that cannot be mixed.** Clause 6.2 gives
 each interface a word and positions within it, and every such word is a
@@ -277,6 +317,46 @@ The failure is later than a compilation failure would be and is legible. An
 arrangement that reported it during compilation was considered and is described
 in clause 6.3, together with the reason it was not adopted.
 
+### 4.4 The boundaries a declaration can cross
+
+Compile-time portability is the floor of this specification and not its goal.
+Every interface, operation and structure is designed so that it can also be
+crossed at run time, and where one cannot the reason is recorded in the table of
+clause 3 rather than left to be discovered.
+
+Three boundaries are distinguished, because "crossed at run time" gives opposite
+answers for two of them:
+
+| | boundary | the implementation is | what it additionally forbids |
+| --- | --- | --- | --- |
+| **S** | static | chosen when the artifact is built, and linked into it | nothing |
+| **L** | late-bound | a separate object resolved at load, in the caller's address space; the artifact does not change when the implementation does | a structure whose size the consumer fixed when it was built; a report whose value the consumer fixed when it was built |
+| **X** | crossed | in another address space or at another privilege level; a call is a trap or a message | a returned pointer into the implementation; a result wider than one machine word; a call back into the consumer |
+
+Returning a pointer into the implementation is admissible at **L** and
+inadmissible at **X**; so is a result of two machine words. An interface marked
+for one is not thereby marked for the other.
+
+**An interface is X-capable when all six of the following hold.**
+
+1. It exports no object. Everything an implementation reports about itself is an
+   operation (clause 6.2).
+2. No operation returns a pointer into the implementation's storage. A value is
+   copied into a buffer the caller supplies.
+3. No result is wider than one machine word. An operation whose whole result is
+   a count returns that count or the negated error value; an operation that
+   produces a resource returns `int` and writes the resource through a pointer.
+4. Every structure that crosses carries its own size, or states why it cannot
+   grow.
+5. An entry is an address at which a context begins, not a function that is
+   called. No return address exists in the started context.
+6. Its absence is discoverable by an operation and not only by a linker
+   (`kal_interfaces`, clause 3.2).
+
+The first four are decidable from `SURFACE.txt` and the declarations, and clause
+9 asserts them. **A new interface is designed against this rule before it is
+specified.** The reserved `openkal.event` is the first to which that applies.
+
 ## 5. Common definitions
 
 ### 5.1 Machine word
@@ -313,6 +393,28 @@ makes an addition to it the kind of change a reader is entitled to see argued.
 The addition is governed by clause 8, which admits new declarations. A value
 already assigned retains its meaning, so a program compiled against version 0.4
 observes the same values for the same conditions as before.
+
+### 5.2.1 How an operation reports its result
+
+There is one rule, and it holds for every interface.
+
+> An operation whose whole result is a **count of bytes** returns `kal_intptr`:
+> the count, or the negated error value when no byte was produced. A count of
+> zero is a count and not an error; for a read it denotes end of input.
+>
+> An operation that produces a **resource**, or that produces nothing, returns
+> `int` from `kal_error` and writes what it produced through a pointer.
+
+Version 0.8 returned a structure of a count and an error from the operations
+that transfer. It is withdrawn, and the measurement that withdrew it is that
+every consumer of it collapsed the pair by hand and by this rule — report what
+was moved, or the condition when nothing was. The pair was never the shape a
+caller wanted, and a result of two words cannot be carried by a boundary that
+returns one (clause 4.4).
+
+The collapse is sound because the error set of clause 5.2 is **closed**: a
+negated error occupies a small known range and can never be mistaken for a
+count. An open-ended error space would not permit it.
 
 ### 5.3 Structure layouts
 
@@ -515,6 +617,23 @@ how the artifact is produced is not reported at run time.** Reporting it at run
 time would make every caller carry a path that most artifacts never take — and
 a path no artifact takes is a path nothing has verified.
 
+⚠️ **The rule holds where the artifact is produced for its own environment, and
+inverts where it is not.** An artifact that is distributed is produced once, by
+a party that decided for every environment it will meet, possibly long before
+and for a different system; the consumer resolves nothing. So availability
+settled this way is *also* reported at run time, by a position in the
+interface's property word — `KAL_EXEC_PROP_AVAILABLE`. The interface is provided
+either way, and whether it can be exercised is read.
+
+This is not the shape clause 6.2 forbids. An operation that is present and
+always fails is a defect *because the caller cannot tell*, and a position the
+caller reads first is what tells it.
+
+The objection above survives and is answered by clause 9 rather than dismissed:
+a path few artifacts take is a path little verified, so the conformance
+arrangement answers that position both ways. Until it did, the unavailable path
+had no producer at all.
+
 ### 6.6 Concurrency
 
 An implementation shall permit concurrent operations upon distinct handles.
@@ -568,6 +687,16 @@ An implementation shall not assume a process model, a division between
 privileged and unprivileged execution, or a namespace shared by all callers. A
 handle shall be meaningful in the context of the caller that obtained it.
 
+**An implementation shall refuse a word that is not a handle it issued**, and
+shall not act upon it as though it were one it did. The preceding paragraph
+constrains a handle's *scope*; this one constrains its *validity*, and the two
+are not the same requirement. Under a static link the distinction is academic —
+the caller and the implementation are one program. Where the implementation is
+on the far side of a boundary it is the boundary itself, and an implementation
+that acted upon an arbitrary word would let a caller name a resource it was
+never given. The division of a handle into an index and a generation, which
+clause 7.2 already recommends for release, satisfies this as well.
+
 ### 7.3 Allocation
 
 Where the environment already provides an allocator, `kal_alloc` shall be built
@@ -590,8 +719,13 @@ a recurring source of defects. The loop belongs in the implementation, which is
 written once.
 
 `kal_stream_read` shall report the number of bytes transferred, which may be
-fewer than requested. A result of zero bytes with `kal_ok` denotes end of input.
-Unlike a partial write, a partial read carries information the caller requires.
+fewer than requested. A result of zero denotes end of input. Unlike a partial
+write, a partial read carries information the caller requires.
+
+Both report that number, or the negated error value when no byte was moved, in
+one signed machine word — clause 5.2.1. An operation that moved bytes and then
+met a condition reports the bytes; the condition is reported by the next call,
+which is what every consumer of the earlier two-word form already did by hand.
 
 ### 7.5 Interruption
 
@@ -634,7 +768,7 @@ implementation that reports absence as a failure obliges every caller to
 distinguish that failure from the ones that denote a broken enquiry — a
 directory it may not read, a name it may not resolve.
 
-`kal_fs_open_file`, `kal_fs_open` and `kal_fs_open_dir` are access rather than
+`kal_fs_open` and `kal_fs_open_dir` are access rather than
 enquiry, and shall report a name that does not exist as `kal_err_not_found`.
 
 The distinction is the same one `openkal.env` draws between a variable that is
@@ -850,12 +984,41 @@ The following are recorded so that they are not mistaken for oversights.
    schemes.
 6. **Permission and ownership of files.** Not defined, and not a deferral. A
    permission presupposes an identity, and the environments this specification
-   targets do not agree that one exists. A C library above openkal reports the
-   absence as the error its own surface defines.
-7. **Creation and reading of links.** Not defined, and not a deferral, for the
-   reason clause 6.4 gives: whether a filesystem has links is a property of the
-   format rather than of the environment. `KAL_FS_PROP_LINKS` reports it, and
-   resolution follows one where the property is claimed.
+   targets do not agree that one exists.
+
+   ⭐ **And what a program should write instead, which was not recorded and is
+   now.** A program that means "only I may read this" is stating it in a
+   vocabulary this environment does not have. It has three answers, and none of
+   them is a mode:
+
+   - against another part of the same program, the capability already does it:
+     a handle not given cannot be reached;
+   - against another user of the machine, it is the *environment's*
+     responsibility — the party that starts the program supplies a preopen that
+     others do not have;
+   - against a location the program does not trust, it encrypts the contents.
+
+   ⚠️ The measurement that settles the alternative: a mode word is not stored by
+   several filesystems a hosted implementation will meet, and on such a volume
+   `chmod` **reports success and changes nothing**, which is the outcome this
+   specification exists to refuse. `kal_node_info.writable` — one boolean — is
+   not a simplification of a mode word; it is the intersection of what those
+   formats store.
+
+7. **Creation and reading of links.** ⚠️ **Settled in 0.9.** `kal_fs_link_create`
+   and `kal_fs_link_read` are operations of `openkal.fs`, and they are operations
+   of it rather than an interface of their own for exactly the reason this entry
+   used to give: whether a volume has such nodes is a property of the format and
+   not of the environment, so the variability is between the *resources* of one
+   implementation. Clause 6.2 says such a property is answered by an enquiry
+   taking the resource, and `kal_fs_props` is now that enquiry — which is what
+   makes the operations admissible, because a caller can ask before it calls.
+
+   Resolution is stated in `fs.h` beside each operation it governs, and no
+   longer only here. It was here alone, and two call sites of one implementation
+   consequently chose opposite directions: opening resolved a link while asking
+   did not, so a program was told that a name referred to a link when opening it
+   would have reached a file.
 8. **Duplication of the calling image.** `fork` is refused by clause 7.1 and that
    refusal stands. It is refused as an OPERATION. The atomic capabilities from
    which a library may compose it are specified: `openkal.space` clones an

@@ -51,7 +51,7 @@ inline constexpr props exit_status   {KAL_PROCESS_PROP_EXIT_STATUS};
 inline constexpr props channel       {KAL_PROCESS_PROP_CHANNEL};
 inline constexpr props grant_dir     {KAL_PROCESS_PROP_GRANT_DIR};
 
-inline props properties() { return props{kal_process_props}; }
+inline props properties() { return props{kal_process_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 using preopen = kal_preopen;

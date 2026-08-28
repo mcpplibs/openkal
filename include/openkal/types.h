@@ -34,6 +34,31 @@ typedef unsigned int kal_uintptr;
 #  error "openkal requires a compiler that states the width of a pointer"
 #endif
 
+/* The signed machine word, in which every operation whose whole result is a
+ * count reports that count or the condition that prevented it.
+ *
+ * ONE WORD AND NOT TWO, AND THE REASON IS BOTH SIDES AT ONCE. An earlier form
+ * returned a structure of a count and an error. Every consumer of it collapsed
+ * the pair by hand and by the same rule --- report what was transferred, or the
+ * condition when nothing was --- so the pair was never the shape a caller
+ * wanted; and a result of two words cannot be carried by a boundary that
+ * returns one, which is the second half of clause 4.4.
+ *
+ * The collapse is safe because the error set of this header is CLOSED (clause
+ * 5.2): a negated error occupies a small known range and can never be mistaken
+ * for a count. An open-ended error space would not permit it. */
+#if defined(__INTPTR_TYPE__)
+typedef __INTPTR_TYPE__ kal_intptr;
+#elif defined(_MSC_VER)
+#  if defined(_WIN64)
+typedef signed __int64 kal_intptr;
+#  else
+typedef signed int kal_intptr;
+#  endif
+#else
+#  error "openkal requires a compiler that states the width of a pointer"
+#endif
+
 /* The three fixed widths openkal's operations use, stated once here rather than
  * at each use.
  *
@@ -95,13 +120,18 @@ enum kal_error {
     kal_err_not_directory = 13   /* the reverse of the preceding condition   */
 };
 
-/* The result of an operation that transfers a count. The layout is frozen:
- * two machine words are returned in registers on the architectures openkal
- * targets, and a wider result would be returned through a hidden pointer. */
-struct kal_io_result {
-    kal_uintptr n;
-    int         e;
-};
+/* HOW AN OPERATION REPORTS ITS RESULT --- one rule, stated once.
+ *
+ *   An operation whose whole result is a COUNT OF BYTES returns `kal_intptr':
+ *   the count, or the negated error value when no byte was produced. A count
+ *   of zero is a count and not an error, and for a read it denotes end of
+ *   input.
+ *
+ *   An operation that produces a RESOURCE, or that produces nothing, returns
+ *   `int' from `kal_error' and writes what it produced through a pointer.
+ *
+ * A caller therefore never inspects two things to learn one thing, and every
+ * result of either kind fits in one machine word. */
 
 /* Where a connection or a message goes. The layout is frozen (clause 5.3).
  *
@@ -119,14 +149,21 @@ struct kal_io_result {
  * than reading it as one it does. Twenty-four bytes is chosen so that an
  * address carrying a scope identifier fits without a second type. */
 struct kal_endpoint {
-    kal_u8      addr[24];   /* network order --- the bytes of the address    */
-    kal_uintptr addr_len;   /* 4 = IPv4  16 = IPv6  20 = IPv6 with a scope
-                             * identifier. Further values are defined by later
-                             * revisions and are refused, not misread, by an
-                             * implementation that does not know them.       */
-    kal_u32     port;       /* a number, in host order: this interface does
-                             * not ask a caller to perform a protocol's byte
-                             * order conversion                              */
+    kal_u8  addr[24];   /* network order --- the bytes of the address        */
+    kal_u32 addr_len;   /* 4 = IPv4  16 = IPv6  20 = IPv6 with a scope
+                         * identifier. Further values are defined by later
+                         * revisions and are refused, not misread, by an
+                         * implementation that does not know them.
+                         *
+                         * A fixed width rather than a machine word: the value
+                         * is at most twenty-four, and a machine word would
+                         * freeze a difference between a thirty-two and a
+                         * sixty-four bit target that nothing in this structure
+                         * needs. Clause 5.3 holds the layout, so the layout
+                         * should not carry a distinction it has no use for. */
+    kal_u32 port;       /* a number, in host order: this interface does not
+                         * ask a caller to perform a protocol's byte order
+                         * conversion                                        */
 };
 
 #ifdef __cplusplus

@@ -27,7 +27,7 @@ void run() {
     unobserved(kind::behaviour, "openkal.datagram", "the interface was not selected");
     return;
 #else
-    claim("kal_datagram_props", kal_datagram_props);
+    claim("kal_datagram_props()", kal_datagram_props());
 
     kal_endpoint want = loopback_v4(0);
     kal_datagram receiver{};
@@ -58,18 +58,18 @@ void run() {
     // therefore always the length that was given.
     {
         const char msg[] = "openkal";
-        const kal_io_result w = kal_datagram_send_to(sender, msg, sizeof msg - 1, &to);
-        observe(kind::behaviour, w.e == kal_ok && w.n == sizeof msg - 1,
+        const kal_intptr w = kal_datagram_send_to(sender, msg, sizeof msg - 1, &to);
+        observe(kind::behaviour, w == static_cast<kal_intptr>(sizeof msg - 1),
                 "a message is sent whole and the count is the length given");
 
         kal_endpoint from{};
         char buf[16] = {0};
-        const kal_io_result r = kal_datagram_recv_from(receiver, buf, sizeof buf, &from);
-        bool same = r.e == kal_ok && r.n == sizeof msg - 1;
-        for (kal_uintptr i = 0; same && i < r.n; ++i)
+        const kal_intptr r = kal_datagram_recv_from(receiver, buf, sizeof buf, &from);
+        bool same = r == static_cast<kal_intptr>(sizeof msg - 1);
+        for (kal_intptr i = 0; same && i < r; ++i)
             if (buf[i] != msg[i]) same = false;
         observe(kind::behaviour, same, "the message received is the message sent");
-        observe(kind::behaviour, r.e != kal_ok || from.addr_len == 4,
+        observe(kind::behaviour, r < 0 || from.addr_len == 4,
                 "the sender of a received message is reported");
     }
 
@@ -80,12 +80,12 @@ void run() {
     {
         char big[64];
         for (auto& c : big) c = 'x';
-        const kal_io_result w = kal_datagram_send_to(sender, big, sizeof big, &to);
-        if (w.e == kal_ok) {
+        const kal_intptr w = kal_datagram_send_to(sender, big, sizeof big, &to);
+        if (w >= 0) {
             char small[8] = {0};
             kal_endpoint from{};
-            const kal_io_result r = kal_datagram_recv_from(receiver, small, sizeof small, &from);
-            observe(kind::behaviour, r.e == kal_ok && r.n <= sizeof small,
+            const kal_intptr r = kal_datagram_recv_from(receiver, small, sizeof small, &from);
+            observe(kind::behaviour, r >= 0 && static_cast<kal_uintptr>(r) <= sizeof small,
                     "a truncated message reports the count placed in the buffer");
         } else {
             unobserved(kind::behaviour, "truncation reports the buffered count",

@@ -25,10 +25,21 @@ export using ::kal_env_var_at;
 
 export namespace kal::env {
 
+// Each of these copies into the caller's buffer and reports the length the
+// value HAS, or the negated error value. A caller with a large enough buffer is
+// done in one call; a caller that wants to size first passes a capacity of
+// zero; a caller whose buffer was too small learns it by comparing. Nothing is
+// truncated silently.
 inline kal_uintptr arg_count() { return kal_env_arg_count(); }
-inline const char* arg(kal_uintptr i, kal_uintptr* len) { return kal_env_arg(i, len); }
-inline const char* var(const char* name, kal_uintptr n, kal_uintptr* len) {
-    return kal_env_var(name, n, len);
+inline kal_intptr  arg(kal_uintptr i, char* out, kal_uintptr cap) {
+    return kal_env_arg(i, out, cap);
+}
+inline kal_intptr  var(const char* name, kal_uintptr n, char* out, kal_uintptr cap) {
+    return kal_env_var(name, n, out, cap);
+}
+inline kal_uintptr var_count() { return kal_env_var_count(); }
+inline kal_intptr  var_at(kal_uintptr i, char* out, kal_uintptr cap) {
+    return kal_env_var_at(i, out, cap);
 }
 
 }

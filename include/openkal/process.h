@@ -53,9 +53,9 @@ struct kal_process { kal_uintptr h; };
  * next implementation meets it in the specification rather than in a program
  * that wrote to the wrong stream. */
 struct kal_spawn_streams {
-    kal_uintptr in;
-    kal_uintptr out;
-    kal_uintptr err;
+    struct kal_stream in;
+    struct kal_stream out;
+    struct kal_stream err;
 };
 
 /* One directory a started program shall receive among its preopens. The layout
@@ -126,7 +126,7 @@ int kal_process_wait(struct kal_process, int* status, int* terminated);
 int kal_process_terminate(struct kal_process);
 void kal_process_close(struct kal_process);
 
-extern const kal_uintptr kal_process_props;
+kal_uintptr kal_process_props(void);
 
 #ifdef __cplusplus
 }

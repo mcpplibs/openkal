@@ -41,9 +41,11 @@ const char* argument_for(errand e) {
 errand child_errand() {
 #ifdef MCPP_FEATURE_ENV
     for (kal_uintptr i = 1; i < kal_env_arg_count(); ++i) {
-        kal_uintptr len = 0;
-        const char* a = kal_env_arg(i, &len);
-        if (!a) continue;
+        char abuf[1024];
+        const kal_intptr alen = kal_env_arg(i, abuf, sizeof abuf);
+        if (alen < 0 || static_cast<kal_uintptr>(alen) >= sizeof abuf) continue;
+        const kal_uintptr len = static_cast<kal_uintptr>(alen);
+        const char* a = abuf;
         if (same(a, len, argument_for(errand::exit_with_33)))       return errand::exit_with_33;
         if (same(a, len, argument_for(errand::exit_after_writing))) return errand::exit_after_writing;
         if (same(a, len, argument_for(errand::abort_with_message))) return errand::abort_with_message;
@@ -103,7 +105,10 @@ after g_after;
 #ifdef MCPP_FEATURE_ENV
             {
                 kal_uintptr len = 0;
-                const char* self = kal_env_arg(0, &len);
+                char sbuf[1024];
+                const kal_intptr slen = kal_env_arg(0, sbuf, sizeof sbuf);
+                const char* self = (slen >= 0 && static_cast<kal_uintptr>(slen) < sizeof sbuf)
+                                 ? (len = static_cast<kal_uintptr>(slen), sbuf) : nullptr;
                 if (!self || !same(self, len, "openkal-conformance-child")) kal_exit(36);
             }
 #endif
@@ -158,14 +163,18 @@ bool prefix_at_boundary(const char* name, kal_uintptr nlen,
 
 bool locate_self(kal_dir& base, const char*& relative, kal_uintptr& relative_len) {
     kal_uintptr len = 0;
-    const char* argv0 = kal_env_arg(0, &len);
+    static char a0[1024];
+    const kal_intptr a0len = kal_env_arg(0, a0, sizeof a0);
+    const char* argv0 = (a0len >= 0 && static_cast<kal_uintptr>(a0len) < sizeof a0)
+                      ? (len = static_cast<kal_uintptr>(a0len), a0) : nullptr;
     if (!argv0 || len == 0) return false;
 
     kal_uintptr best = 0, best_len = 0;
     bool found = false;
     for (kal_uintptr i = 0; i < kal_fs_preopen_count(); ++i) {
-        kal_dir d{}; const char* name = nullptr; kal_uintptr nlen = 0;
-        if (kal_fs_preopen(i, &d, &name, &nlen) != kal_ok) continue;
+        kal_dir d{}; char name[1024]; kal_uintptr nlen = 0;
+        if (kal_fs_preopen(i, &d, name, sizeof name, &nlen) != kal_ok) continue;
+        if (nlen >= sizeof name) continue;
         if (!prefix_at_boundary(name, nlen, argv0, len)) continue;
         if (!found || nlen > best_len) { found = true; best = i; best_len = nlen; }
     }
@@ -179,8 +188,8 @@ bool locate_self(kal_dir& base, const char*& relative, kal_uintptr& relative_len
         return relative_len > 0;
     }
 
-    kal_dir d{}; const char* name = nullptr; kal_uintptr nlen = 0;
-    kal_fs_preopen(best, &d, &name, &nlen);
+    kal_dir d{}; kal_uintptr nlen = 0;
+    kal_fs_preopen(best, &d, nullptr, 0, &nlen);
     base = d;
     kal_uintptr at = best_len;
     while (at < len && is_separator(argv0[at])) ++at;

@@ -39,7 +39,7 @@ using props = kal::props<props_tag>;
 inline constexpr props ipv6     {KAL_DGRAM_PROP_IPV6};
 inline constexpr props broadcast{KAL_DGRAM_PROP_BROADCAST};
 
-inline props properties() { return props{kal_datagram_props}; }
+inline props properties() { return props{kal_datagram_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 struct open_result     { datagram d; int e; };
@@ -65,18 +65,18 @@ inline endpoint_result local(datagram d) {
     return { ep, e };
 }
 
-inline kal_io_result send_to(datagram d, const void* p, kal_uintptr n, const endpoint& to) {
+inline kal_intptr send_to(datagram d, const void* p, kal_uintptr n, const endpoint& to) {
     return kal_datagram_send_to(d, p, n, &to);
 }
 
 // The sender is reported beside the result rather than through an
 // out-parameter: every caller of a receive wants both, and none of them wants
 // to declare an endpoint first.
-struct recv_result { kal_io_result r; endpoint from; };
+struct recv_result { kal_intptr n; endpoint from; };
 
 inline recv_result recv_from(datagram d, void* p, kal_uintptr n) {
     endpoint from{};
-    const kal_io_result r = kal_datagram_recv_from(d, p, n, &from);
+    const kal_intptr r = kal_datagram_recv_from(d, p, n, &from);
     return { r, from };
 }
 

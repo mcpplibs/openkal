@@ -21,8 +21,8 @@ kal_dir here() { return kal::fs::working(); }
 
 bool write_bytes(kal_file f, const char* s, kal_uintptr n) {
     kal_stream st{ kal_fs_stream(f) };
-    const kal_io_result r = kal_stream_write(st, s, n);
-    return r.e == kal_ok && r.n == n;
+    const kal_intptr r = kal_stream_write(st, s, n);
+    return r == static_cast<kal_intptr>(n);
 }
 
 // Opens, writes and releases in one step, so that the observations that follow
@@ -41,13 +41,18 @@ long read_file(const char* name, char* buf, kal_uintptr cap) {
     if (kal::fs::open_file(here(), name, length(name), kal::fs::open::read, &f) != kal_ok)
         return -1;
     kal_stream st{ kal_fs_stream(f) };
-    const kal_io_result r = kal_stream_read(st, buf, cap);
+    const kal_intptr r = kal_stream_read(st, buf, cap);
     kal_fs_close_file(f);
-    return r.e == kal_ok ? static_cast<long>(r.n) : -1;
+    return r >= 0 ? static_cast<long>(r) : -1;
 }
 #endif
 
 }  // namespace
+
+// Every enquiry states how much of the structure exists on this side, and asks
+// for everything. Written once, so that a call site says what it is asking and
+// not how the asking works.
+kal_node_info fresh() { return kal::fs::info_for_caller(); }
 
 void run() {
     heading("openkal.fs");
@@ -55,19 +60,31 @@ void run() {
     unobserved(kind::behaviour, "openkal.fs", "the interface was not selected");
     return;
 #else
-    claim("kal_fs_props", kal_fs_props);
+    claim("kal_fs_props(here())", kal_fs_props(here()));
 
     // Every operation is relative to a directory the environment supplied, so
     // the first observation is that it supplied one.
     {
         const kal_uintptr n = kal_fs_preopen_count();
         observe(kind::behaviour, n >= 1, "the environment supplied at least one directory");
-        kal_dir d{}; const char* name = nullptr; kal_uintptr len = 0;
-        const int e = kal_fs_preopen(0, &d, &name, &len);
-        observe(kind::behaviour, e == kal_ok && name != nullptr && len > 0,
+        kal_dir d{}; char name[1024]; kal_uintptr len = 0;
+        const int e = kal_fs_preopen(0, &d, name, sizeof name, &len);
+        observe(kind::behaviour, e == kal_ok && len > 0,
                 "the first supplied directory has a name");
-        if (name) { put("  the program was started in: ");
-                    kal_stream_write(kal_stdout(), name, len); put("\n"); }
+        if (e == kal_ok && len > 0 && len < sizeof name) {
+            put("  the program was started in: ");
+            kal_stream_write(kal_stdout(), name, len); put("\n");
+        }
+
+        // ⭐ THE NAME IS COPIED AND THE LENGTH IS THE NAME'S. A capacity of zero
+        // reports the length without writing, which is what lets a caller size
+        // a buffer before it has one.
+        {
+            kal_dir probe{}; kal_uintptr sized = 0;
+            const int se = kal_fs_preopen(0, &probe, nullptr, 0, &sized);
+            observe(kind::behaviour, se == kal_ok && sized == len,
+                    "a capacity of zero reports the name's length without writing");
+        }
 
         // Names are the environment's and this specification requires only that
         // they be distinct. A caller that resolves a global name against them
@@ -75,10 +92,11 @@ void run() {
         bool distinct = true;
         for (kal_uintptr i = 0; i < n && distinct; ++i)
             for (kal_uintptr j = i + 1; j < n && distinct; ++j) {
-                kal_dir a{}, b{}; const char* an = nullptr; const char* bn = nullptr;
+                kal_dir a{}, b{}; char an[1024], bn[1024];
                 kal_uintptr al = 0, bl = 0;
-                kal_fs_preopen(i, &a, &an, &al);
-                kal_fs_preopen(j, &b, &bn, &bl);
+                kal_fs_preopen(i, &a, an, sizeof an, &al);
+                kal_fs_preopen(j, &b, bn, sizeof bn, &bl);
+                if (al >= sizeof an || bl >= sizeof bn) continue;
                 if (al != bl) continue;
                 bool same = true;
                 for (kal_uintptr k = 0; k < al; ++k) if (an[k] != bn[k]) { same = false; break; }
@@ -110,9 +128,9 @@ void run() {
     // accepted it in neither until this was written.
     {
         const char* self = ".";
-        kal_node_info info{};
+        kal_node_info info = fresh();
         observe(kind::behaviour,
-                kal_fs_info(here(), self, length(self), &info) == kal_ok
+                kal_fs_info(here(), self, length(self), 0, kal::fs::field::all, &info) == kal_ok
                     && info.kind == kal_node_directory,
                 "the reserved name denotes the directory itself");
 
@@ -125,9 +143,9 @@ void run() {
             // created through the original is found through it.
             const char* probe = "okc-self.tmp";
             put_file(probe, "x");
-            kal_node_info seen{};
+            kal_node_info seen = fresh();
             observe(kind::behaviour,
-                    kal_fs_info(again, probe, length(probe), &seen) == kal_ok
+                    kal_fs_info(again, probe, length(probe), 0, kal::fs::field::all, &seen) == kal_ok
                         && seen.kind == kal_node_file,
                     "the second reference reaches what the first reaches");
             kal_fs_remove(here(), probe, length(probe));
@@ -142,9 +160,9 @@ void run() {
     // access to it is refused with the value that says which condition held.
     {
         kal_fs_remove(here(), kName, length(kName));
-        kal_node_info info{};
+        kal_node_info info = fresh();
         observe(kind::behaviour,
-                kal_fs_info(here(), kName, length(kName), &info) == kal_ok
+                kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &info) == kal_ok
                     && info.kind == kal_node_absent,
                 "enquiry about a name that does not exist succeeds and reports absence");
         kal_file f{};
@@ -168,19 +186,19 @@ void run() {
                     "positioning reports where it arrived");
             char buf[8] = {};
             kal_stream st{ kal_fs_stream(f) };
-            const kal_io_result r = kal_stream_read(st, buf, 4);
+            const kal_intptr r = kal_stream_read(st, buf, 4);
             observe(kind::behaviour,
-                    r.e == kal_ok && r.n == 4 && buf[0] == '3' && buf[3] == '6',
+                    r == 4 && buf[0] == '3' && buf[3] == '6',
                     "a transfer after positioning reads from where it was positioned");
 
-            kal_node_info info{};
+            kal_node_info info = fresh();
             observe(kind::behaviour,
-                    kal_fs_file_info(f, &info) == kal_ok && info.size == 10
+                    kal_fs_file_info(f, kal::fs::field::all, &info) == kal_ok && info.size == 10
                         && info.kind == kal_node_file,
                     "enquiry about the open file reports its length and what it is");
 
             observe(kind::behaviour, kal_fs_truncate(f, 4) == kal_ok
-                        && kal_fs_file_info(f, &info) == kal_ok && info.size == 4,
+                        && kal_fs_file_info(f, kal::fs::field::all, &info) == kal_ok && info.size == 4,
                     "the length of an open file is set");
 
             // The inverse of the enquiry above, and it is checked by reading
@@ -194,7 +212,7 @@ void run() {
             // be requiring a resolution the interface does not claim. A second
             // is the resolution every environment that records the time at all
             // agrees upon.
-            if (kal::fs::has(kal::fs::modified_time)) {
+            if (kal::fs::has(here(), kal::fs::modified_time)) {
                 // Opened again for writing, because that is what the operation
                 // requires: one environment decides at the point of opening
                 // what may afterwards be done with a file.
@@ -204,8 +222,8 @@ void run() {
                                                       kal::fs::open::read | kal::fs::open::write,
                                                       &w);
                 const int e = opened == kal_ok ? kal_fs_set_modified(w, chosen) : opened;
-                kal_node_info after{};
-                const int read_back = opened == kal_ok ? kal_fs_file_info(w, &after) : opened;
+                kal_node_info after = fresh();
+                const int read_back = opened == kal_ok ? kal_fs_file_info(w, kal::fs::field::all, &after) : opened;
                 if (opened == kal_ok) kal_fs_close_file(w);
                 observe(kind::behaviour,
                         e == kal_ok && read_back == kal_ok
@@ -272,9 +290,9 @@ void run() {
             kal_uintptr iter = 0;
             if (kal_fs_list_begin(d, &iter) == kal_ok) {
                 for (;;) {
-                    const char* name = nullptr; kal_uintptr len = 0; int knd = 0;
-                    if (kal_fs_list_next(d, &iter, &name, &len, &knd) != kal_ok) break;
-                    if (!name) break;
+                    char name[512]; kal_uintptr len = 0; int knd = 0;
+                    if (kal_fs_list_next(d, &iter, name, sizeof name, &len, &knd) != kal_ok) break;
+                    if (iter == 0) break;
                     ++seen;
                     if (at + len + 2 < sizeof reported) {
                         if (at) reported[at++] = ' ';
@@ -303,12 +321,161 @@ void run() {
         observe(kind::behaviour,
                 kal_fs_rename(here(), kName, length(kName), here(), kOther, length(kOther)) == kal_ok,
                 "a name is renamed");
-        kal_node_info info{};
+        kal_node_info info = fresh();
         observe(kind::behaviour,
-                kal_fs_info(here(), kName, length(kName), &info) == kal_ok
+                kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &info) == kal_ok
                     && info.kind == kal_node_absent,
                 "the name it was renamed from is then absent");
         kal_fs_remove(here(), kOther, length(kOther));
+    }
+
+    // --- what an enquiry answers, and what it does not --------------------
+    //
+    // ⭐ THREE MECHANISMS, THREE OBSERVATIONS. The size the caller states, the
+    // fields the implementation filled, and the fields the caller asked for are
+    // three different questions, and the defect this shape replaces was a
+    // structure that answered none of them.
+    {
+        observe(kind::behaviour, kal_fs_max_name() >= 255,
+                "the greatest name this implementation accepts is stated and is usable");
+
+        put_file(kName, "0123456789");
+
+        // The implementation reports what it filled. `kind` is the point of the
+        // enquiry, so an implementation that reported none of it is one that
+        // answered nothing.
+        kal_node_info full = fresh();
+        const int e = kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &full);
+        observe(kind::behaviour, e == kal_ok && (full.present & kal::fs::field::kind) != 0,
+                "an enquiry reports which of the fields it filled");
+        observe(kind::behaviour, e == kal_ok
+                    && (full.present & ~kal::fs::field::all) == 0,
+                "it reports no position the specification has not assigned");
+
+        // ⚠️ AN IMPLEMENTATION WRITES NO MORE THAN THE CALLER SAID EXISTS. A
+        // consumer built against a later revision holds a larger structure than
+        // an earlier implementation knows; a consumer built against an earlier
+        // one holds a smaller structure than a later implementation would fill,
+        // and THAT is the direction that corrupts the caller. The observation
+        // is made with a guard beyond a deliberately understated size.
+        {
+            struct { kal_node_info info; unsigned char guard[64]; } probe{};
+            for (auto& c : probe.guard) c = 0x7f;
+            probe.info.self_size = static_cast<kal_u32>(
+                __builtin_offsetof(kal_node_info, modified_ns));
+            const int se = kal_fs_info(here(), kName, length(kName), 0,
+                                       kal::fs::field::all, &probe.info);
+            bool untouched = true;
+            for (auto c : probe.guard) if (c != 0x7f) untouched = false;
+            bool tail_untouched = true;
+            const auto* raw = reinterpret_cast<const unsigned char*>(&probe.info);
+            for (kal_uintptr i = probe.info.self_size; i < sizeof(kal_node_info); ++i)
+                if (raw[i] != 0) tail_untouched = false;
+            observe(kind::behaviour, se == kal_ok && untouched && tail_untouched,
+                    "an enquiry writes no more of the structure than the caller stated");
+        }
+
+        // The identity is comparable and nothing else. Two enquiries about one
+        // name agree; two names that were separately created do not.
+        if ((full.present & kal::fs::field::identity) != 0) {
+            kal_node_info again = fresh();
+            kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::identity, &again);
+            observe(kind::behaviour,
+                    again.identity[0] == full.identity[0]
+                        && again.identity[1] == full.identity[1],
+                    "one node has the same identity on a second enquiry");
+
+            put_file(kOther, "x");
+            kal_node_info other = fresh();
+            kal_fs_info(here(), kOther, length(kOther), 0, kal::fs::field::identity, &other);
+            observe(kind::behaviour,
+                    other.identity[0] != full.identity[0]
+                        || other.identity[1] != full.identity[1],
+                    "two nodes that are not the same node have different identities");
+            kal_fs_remove(here(), kOther, length(kOther));
+        } else {
+            unobserved(kind::behaviour, "a node's identity distinguishes it from another",
+                       "the implementation does not report an identity for this resource");
+        }
+        kal_fs_remove(here(), kName, length(kName));
+    }
+
+    // --- nodes whose content is another name ------------------------------
+    //
+    // ⚠️ WHETHER THIS VOLUME HAS THEM IS ASKED FIRST, WHICH IS WHY THE ENQUIRY
+    // TAKES THE DIRECTORY. The same implementation succeeds on one volume and
+    // fails on another, so a word per implementation could state neither
+    // honestly, and an operation that cannot be performed here is not clause
+    // 6.2's defect precisely because a caller is able to ask.
+    {
+        const kal_uintptr p = kal_fs_props(here());
+        const char* kLink   = "okc-conformance-link.tmp";
+        kal_fs_remove(here(), kLink, length(kLink));
+
+        if ((p & kal::fs::make_links.bits) != 0) {
+            put_file(kName, "0123456789");
+            const int made = kal_fs_link_create(here(), kLink, length(kLink),
+                                                kName, length(kName), 0);
+            observe(kind::behaviour, made == kal_ok,
+                    "a node whose content is another name is made where the volume has them");
+
+            char target[512];
+            const kal_intptr n = kal_fs_link_read(here(), kLink, length(kLink),
+                                                  target, sizeof target);
+            bool matches = n == static_cast<kal_intptr>(length(kName));
+            for (kal_intptr i = 0; matches && i < n; ++i)
+                if (target[i] != kName[i]) matches = false;
+            observe(kind::behaviour, matches, "its content reads back as it was written");
+
+            // ⭐⭐ THE OBSERVATION THE WHOLE OF THIS EXISTS FOR. Asking resolves
+            // and opening resolves, so the two agree; asking with
+            // KAL_FS_NO_RESOLVE reports the node itself. An implementation in
+            // which asking did not resolve while opening did reported a link
+            // where a caller would have reached a file, and one such node made
+            // a whole tree uncopyable for a C library above it.
+            kal_node_info followed = fresh(), itself = fresh();
+            const int fe = kal_fs_info(here(), kLink, length(kLink), 0,
+                                       kal::fs::field::all, &followed);
+            const int ie = kal_fs_info(here(), kLink, length(kLink),
+                                       kal::fs::no_resolve, kal::fs::field::all, &itself);
+            observe(kind::behaviour,
+                    fe == kal_ok && followed.kind == kal_node_file && followed.size == 10,
+                    "an enquiry resolves, and reports what the name finally refers to");
+            observe(kind::behaviour, ie == kal_ok && itself.kind == kal_node_link,
+                    "an enquiry that declines to resolve reports the node itself");
+
+            // A name that finally refers to nothing is answered, not refused.
+            const char* kDangling = "okc-conformance-dangling.tmp";
+            kal_fs_remove(here(), kDangling, length(kDangling));
+            if (kal_fs_link_create(here(), kDangling, length(kDangling),
+                                   "okc-no-such-target", 18, 0) == kal_ok) {
+                kal_node_info gone = fresh();
+                const int ge = kal_fs_info(here(), kDangling, length(kDangling), 0,
+                                           kal::fs::field::all, &gone);
+                observe(kind::behaviour, ge == kal_ok && gone.kind == kal_node_absent,
+                        "a name that finally refers to nothing is reported as absent");
+                kal_fs_remove(here(), kDangling, length(kDangling));
+            }
+
+            // The length is the content's, so a caller may size before it copies.
+            const kal_intptr sized = kal_fs_link_read(here(), kLink, length(kLink), nullptr, 0);
+            observe(kind::behaviour, sized == static_cast<kal_intptr>(length(kName)),
+                    "a capacity of zero reports the content's length without writing");
+
+            kal_fs_remove(here(), kLink, length(kLink));
+            kal_fs_remove(here(), kName, length(kName));
+        } else {
+            unobserved(kind::behaviour,
+                       "a node whose content is another name is made and read",
+                       "this volume does not have them, which the enquiry reports");
+            // AND THE REFUSAL IS OBSERVED RATHER THAN ASSUMED. An
+            // implementation that did not claim the position and then performed
+            // the operation anyway would be claiming less than it does, which
+            // misleads a caller in the direction of doing without.
+            observe(kind::behaviour,
+                    kal_fs_link_create(here(), kLink, length(kLink), "x", 1, 0) != kal_ok,
+                    "an operation the enquiry did not claim is refused");
+        }
     }
 
     if (performs(kind::abi)) {
@@ -316,8 +483,9 @@ void run() {
                         && sizeof(kal_file) == sizeof(kal_uintptr),
                 "a directory and a file handle each occupy one machine word");
         const kal_uintptr assigned = (kal::fs::case_sensitive | kal::fs::links
-                                    | kal::fs::modified_time | kal::fs::atomic_rename).bits;
-        observe(kind::abi, (kal_fs_props & ~assigned) == 0,
+                                    | kal::fs::modified_time | kal::fs::atomic_rename
+                                    | kal::fs::make_links).bits;
+        observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 
         // Clause 6.6: an implementation shall not treat a released handle as
@@ -329,8 +497,8 @@ void run() {
         if (kal::fs::open_file(here(), kName, length(kName), kal::fs::open::read, &f) == kal_ok) {
             const kal_file released = f;
             kal_fs_close_file(f);
-            kal_node_info info{};
-            observe(kind::abi, kal_fs_file_info(released, &info) != kal_ok,
+            kal_node_info info = fresh();
+            observe(kind::abi, kal_fs_file_info(released, kal::fs::field::all, &info) != kal_ok,
                     "a released handle is not treated as valid");
         }
         kal_fs_remove(here(), kName, length(kName));

@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "openkal-kit"
-version     = "0.1.1"
+version     = "0.2.0"
 description = "Facilities composed from openkal's interfaces. Not part of the specification, and structurally incapable of being mistaken for it."
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]
@@ -67,7 +67,7 @@ kind = "lib"
 # published packages, which is the only place this could be observed: no
 # continuous integration in this ecosystem resolves a published package,
 # because they all substitute working trees by design.
-openkal = "0.8.0"
+openkal = "0.9.0"
 
 # ⚠️ NO `include_dirs` HERE EITHER. It named `../include`, which reaches out of
 # this package into whatever happens to sit above it. With the specification
@@ -98,4 +98,4 @@ openkal = "0.8.0"
 # same reason: a change spanning the specification and an implementation must be
 # tested against both halves as written, not against whichever half is published.
 [target.'cfg(os = "linux")'.dev-dependencies]
-openkal-linux = { version = "0.6.0", features = ["standalone"] }
+openkal-linux = { version = "0.7.0", features = ["standalone"] }

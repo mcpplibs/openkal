@@ -49,9 +49,9 @@ int kal_datagram_local(struct kal_datagram d, struct kal_endpoint* out);
  * interface produces. The count reported on success is therefore always the
  * length that was given, and is reported so that the result type is the one
  * every transferring operation in openkal uses. */
-struct kal_io_result kal_datagram_send_to(struct kal_datagram d,
-                                          const void* buf, kal_uintptr len,
-                                          const struct kal_endpoint* to);
+kal_intptr kal_datagram_send_to(struct kal_datagram d,
+                                const void* buf, kal_uintptr len,
+                                const struct kal_endpoint* to);
 
 /* Reports one message and who sent it.
  *
@@ -59,13 +59,13 @@ struct kal_io_result kal_datagram_send_to(struct kal_datagram d,
  * is what the medium does. The count reported is what was placed in the buffer;
  * a caller that must not lose bytes offers a buffer as large as the largest
  * message it will accept. */
-struct kal_io_result kal_datagram_recv_from(struct kal_datagram d,
-                                            void* buf, kal_uintptr len,
-                                            struct kal_endpoint* from);
+kal_intptr kal_datagram_recv_from(struct kal_datagram d,
+                                  void* buf, kal_uintptr len,
+                                  struct kal_endpoint* from);
 
 void kal_datagram_close(struct kal_datagram d);
 
-extern const kal_uintptr kal_datagram_props;
+kal_uintptr kal_datagram_props(void);
 
 #ifdef __cplusplus
 }

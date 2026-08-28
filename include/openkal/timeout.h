@@ -4,7 +4,7 @@
  * Every operation here is the operation of the same name in another interface,
  * with one argument added. Clause 7.8 already establishes that a second form of
  * one operation is admissible when the first cannot state the whole of an
- * intent: `kal_fs_open_file' and `kal_fs_open' stand beside each other for that
+ * intent: `kal_fs_info' and `kal_fs_file_info' stand beside each other for that
  * reason, and these stand beside their originals for the same one.
  *
  * THE ARGUMENT IS A DURATION, NOT AN INSTANT, and the name of this interface
@@ -34,13 +34,13 @@
 extern "C" {
 #endif
 
-struct kal_io_result kal_timeout_read (struct kal_stream s, void*       buf, kal_uintptr len, kal_u64 timeout_ns);
-struct kal_io_result kal_timeout_write(struct kal_stream s, const void* buf, kal_uintptr len, kal_u64 timeout_ns);
+kal_intptr kal_timeout_read (struct kal_stream s, void*       buf, kal_uintptr len, kal_u64 timeout_ns);
+kal_intptr kal_timeout_write(struct kal_stream s, const void* buf, kal_uintptr len, kal_u64 timeout_ns);
 
 int kal_timeout_accept(struct kal_net_listener l, kal_u64 timeout_ns, struct kal_net_conn* out);
 
-struct kal_io_result kal_timeout_recv_from(struct kal_datagram d, void* buf, kal_uintptr len,
-                                           struct kal_endpoint* from, kal_u64 timeout_ns);
+kal_intptr kal_timeout_recv_from(struct kal_datagram d, void* buf, kal_uintptr len,
+                                 struct kal_endpoint* from, kal_u64 timeout_ns);
 
 int kal_timeout_wait_process(struct kal_process p, kal_u64 timeout_ns,
                              int* status, int* terminated);
@@ -54,7 +54,7 @@ int kal_timeout_wait_process(struct kal_process p, kal_u64 timeout_ns,
  *
  * Per implementation rather than per resource, so a word rather than an enquiry
  * (clause 6.2). */
-extern const kal_uintptr kal_timeout_granularity_ns;
+kal_u64 kal_timeout_granularity(void);
 
 #ifdef __cplusplus
 }
