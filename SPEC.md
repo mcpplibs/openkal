@@ -263,11 +263,13 @@ and C cannot, and both are checks rather than facilities.
 
 **The frozen layouts are asserted.** Clause 5.3 declares the layout of every
 structure immutable. A declaration that something shall not change is not a
-mechanism; `static_assert` is. `kal_io_result` being two machine words is the
-difference between a result returned in registers and one returned through a
+mechanism; `static_assert` is. A handle being one machine word is the
+difference between a value returned in a register and one returned through a
 hidden pointer, which is a change of calling convention that no declaration
 would report and that a consumer built against the earlier layout would not
-survive.
+survive. `kal_node_info` is the one structure that is permitted to grow, and it
+carries `self_size` for precisely that reason — the assertion on it fixes the
+offsets of the fields that exist, not the size of the whole.
 
 **The capability words become types that cannot be mixed.** Clause 6.2 gives
 each interface a word and positions within it, and every such word is a
@@ -766,7 +768,7 @@ implementation that reports absence as a failure obliges every caller to
 distinguish that failure from the ones that denote a broken enquiry — a
 directory it may not read, a name it may not resolve.
 
-`kal_fs_open_file`, `kal_fs_open` and `kal_fs_open_dir` are access rather than
+`kal_fs_open` and `kal_fs_open_dir` are access rather than
 enquiry, and shall report a name that does not exist as `kal_err_not_found`.
 
 The distinction is the same one `openkal.env` draws between a variable that is

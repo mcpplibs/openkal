@@ -7,10 +7,16 @@
 # An implementation provides an interface in whole or not at all, so the
 # absence of a group below denotes an interface the implementation does not
 # provide and is not a deviation.
-# openkal --- the specification's own self-description. Not an interface: it
-# provides no resource, so clause 3.2's closure of the core SET is untouched.
-# Every conforming implementation exports both, so that a consumer with no
-# linker to ask can ask before it calls.
+# openkal.version --- the specification's own self-description. Not an
+# interface: it provides no resource, so clause 3.2's closure of the core SET is
+# untouched. Every conforming implementation exports both, so that a consumer
+# with no linker to ask can ask before it calls.
+#
+# It is spelled as a group like the interfaces because it IS a header and a
+# module of that name, and because the groups here are what a reader and a
+# generator both consume: openkal-linux derives its module-import list from
+# these headings, and a group spelled differently produced two names with no
+# import and a diagnostic that named the names rather than the heading.
 kal_interfaces
 kal_version
 # openkal.abort

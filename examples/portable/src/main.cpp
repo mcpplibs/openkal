@@ -41,10 +41,12 @@ static void say(const char* s) {
     kal_uintptr n = length(s);
     kal_uintptr done = 0;
     while (done < n) {
-        kal_io_result r = kal_stream_write(kal_stdout(), s + done, n - done);
-        if (r.e != kal_ok) return;
-        if (r.n == 0) return;
-        done += r.n;
+        // The count, or a negated condition. A partial write is not a failure
+        // and is why this loops; a count of zero would loop forever, so it
+        // ends the attempt.
+        const kal_intptr r = kal_stream_write(kal_stdout(), s + done, n - done);
+        if (r <= 0) return;
+        done += (kal_uintptr)r;
     }
 }
 
@@ -113,8 +115,8 @@ int main() {
     // observation is that the interface reports its outcome rather than
     // returning a count that must be interpreted.
     {
-        kal_io_result r = kal_stream_write(kal_stdout(), "", 0);
-        observe(r.e == kal_ok && r.n == 0, "a stream reports its outcome");
+        const kal_intptr r = kal_stream_write(kal_stdout(), "", 0);
+        observe(r == 0, "a stream reports the count it moved");
     }
 
     // openkal.memory
@@ -128,11 +130,15 @@ int main() {
 
     // openkal.env
     {
+        char buf[4096];
         bool args = kal_env_arg_count() >= 1;
-        kal_uintptr n = 0, vn = 0;
-        bool named = kal_env_arg(0, &n) != nullptr && n > 0;
+        // The length reported is the value's, not the buffer's, so a caller may
+        // ask with no buffer at all in order to size one.
+        const kal_intptr n = kal_env_arg(0, buf, sizeof buf);
+        bool named = n > 0 && n == kal_env_arg(0, nullptr, 0);
         // A variable that is absent is reported as absent rather than as empty.
-        bool absent = kal_env_var("OPENKAL_A_NAME_NOTHING_SETS", 27, &vn) == nullptr;
+        bool absent = kal_env_var("OPENKAL_A_NAME_NOTHING_SETS", 27, buf, sizeof buf)
+                          == -kal_err_not_found;
         observe(args && named && absent, "the environment supplies arguments, and absence differs from emptiness");
     }
 
@@ -150,42 +156,57 @@ int main() {
     // openkal.fs — every operation is relative to a directory the environment
     // supplied, and a name that leaves it is refused rather than followed.
     {
-        kal_dir wd{}; const char* nm = nullptr; kal_uintptr nl = 0;
-        bool got = kal_fs_preopen_count() >= 1 && kal_fs_preopen(0, &wd, &nm, &nl) == kal_ok;
+        kal_dir wd{}; char nm[256]; kal_uintptr nl = 0;
+        bool got = kal_fs_preopen_count() >= 1
+                && kal_fs_preopen(0, &wd, nm, sizeof nm, &nl) == kal_ok;
 
         kal_file f{};
-        bool made = got && kal_fs_open_file(wd, "portable.probe", 14, 1, 1, &f) == kal_ok;
+        const auto rw = kal::fs::open::read | kal::fs::open::write
+                      | kal::fs::open::create | kal::fs::open::truncate;
+        bool made = got && kal::fs::open_file(wd, "portable.probe", 14, rw, &f) == kal_ok;
         if (made) {
-            kal_stream s{kal_fs_stream(f)};
+            // The stream of a file is a stream. It is not converted, it is not
+            // a number reinterpreted --- the operation's type says so.
+            kal_stream s = kal_fs_stream(f);
             kal_stream_write(s, "0123456789", 10);
             kal_fs_close_file(f);
         }
 
-        kal_node_info info{};
-        bool sized = made && kal_fs_info(wd, "portable.probe", 14, &info) == kal_ok && info.size == 10;
+        // The caller states how much of the structure exists on its side, and
+        // the implementation reports which fields it filled. Both are what let
+        // this program run against an implementation built at another version.
+        kal_node_info info = kal::fs::info_for_caller();
+        bool sized = made
+                  && kal_fs_info(wd, "portable.probe", 14, 0,
+                                 kal::fs::field::size, &info) == kal_ok
+                  && (info.present & kal::fs::field::size) != 0
+                  && info.size == 10;
 
         // Positioning is a property of the file rather than of the stream,
         // which is why it is declared here and not in openkal.stream.
         kal_file g{};
         bool sought = false;
-        if (made && kal_fs_open_file(wd, "portable.probe", 14, 0, 0, &g) == kal_ok) {
+        if (made && kal::fs::open_file(wd, "portable.probe", 14,
+                                       kal::fs::open::read, &g) == kal_ok) {
             kal_u64 at = 0;
             sought = kal_fs_seek(g, 6, kal::fs::seek_set, &at) == kal_ok && at == 6;
             char buf[8] = {};
-            kal_io_result r = kal_stream_read(kal_stream{kal_fs_stream(g)}, buf, 4);
-            sought = sought && r.e == kal_ok && r.n == 4
-                            && buf[0] == '6' && buf[3] == '9';
+            const kal_intptr r = kal_stream_read(kal_fs_stream(g), buf, 4);
+            sought = sought && r == 4 && buf[0] == '6' && buf[3] == '9';
             kal_fs_close_file(g);
         }
 
         kal_file escape{};
-        bool refused = got && kal_fs_open_file(wd, "../portable.probe", 17, 0, 0, &escape) != kal_ok;
+        bool refused = got && kal::fs::open_file(wd, "../portable.probe", 17,
+                                                 kal::fs::open::read, &escape) != kal_ok;
 
         if (made) kal_fs_remove(wd, "portable.probe", 14);
         // Clause 7.7: enquiry about a name that does not exist succeeds and
         // reports absence. A test that expected an error here would pass
         // against an implementation that conflated enquiry with access.
-        bool gone = got && kal_fs_info(wd, "portable.probe", 14, &info) == kal_ok
+        info = kal::fs::info_for_caller();
+        bool gone = got && kal_fs_info(wd, "portable.probe", 14, 0,
+                                       kal::fs::field::kind, &info) == kal_ok
                         && info.kind == kal_node_absent;
 
         observe(got && made && sized && sought && refused && gone,
@@ -218,8 +239,9 @@ int main() {
         // its absence is reported as unobservable rather than as a failure.
         kal_dir root{}; bool haveRoot = false;
         for (kal_uintptr i = 0, n = kal_fs_preopen_count(); i < n && !haveRoot; ++i) {
-            kal_dir d{}; const char* nm = nullptr; kal_uintptr nl = 0;
-            if (kal_fs_preopen(i, &d, &nm, &nl) == kal_ok && nl == 1 && nm[0] == '/') {
+            kal_dir d{}; char nm[256]; kal_uintptr nl = 0;
+            if (kal_fs_preopen(i, &d, nm, sizeof nm, &nl) == kal_ok
+                    && nl == 1 && nm[0] == '/') {
                 root = d; haveRoot = true;
             }
         }

@@ -4,7 +4,7 @@
  * Every operation here is the operation of the same name in another interface,
  * with one argument added. Clause 7.8 already establishes that a second form of
  * one operation is admissible when the first cannot state the whole of an
- * intent: `kal_fs_open_file' and `kal_fs_open' stand beside each other for that
+ * intent: `kal_fs_info' and `kal_fs_file_info' stand beside each other for that
  * reason, and these stand beside their originals for the same one.
  *
  * THE ARGUMENT IS A DURATION, NOT AN INSTANT, and the name of this interface
