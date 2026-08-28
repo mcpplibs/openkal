@@ -83,14 +83,14 @@ int failed_count()     { return g_failed; }
 int unobserved_count() { return g_unobserved; }
 
 void write_inventory() {
-    line("openkal conformance suite, version 0.5.0");
+    line("openkal conformance suite, version 0.9.0");
     line("");
     line("interface        provision  examined  select with");
     for (const auto& row : inventory) {
         write("  ");
         write(row.name);
         for (kal_uintptr i = length(row.name); i < 17; ++i) write(" ");
-        write(row.core ? "core       " : "standard   ");
+        write(row.core ? "core       " : "optional   ");
         write(row.selected ? "yes       " : "no        ");
         write("--features ");
         write(row.feature);

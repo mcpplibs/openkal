@@ -13,7 +13,7 @@ void run() {
     unobserved(kind::behaviour, "openkal.random", "the interface was not selected");
     return;
 #else
-    claim("kal_random_props", kal_random_props);
+    claim("kal_random_props()", kal_random_props());
 
     // A fill either succeeds completely or changes nothing. The buffer is
     // pre-set to a value the source is unlikely to produce for every byte, so

@@ -73,11 +73,20 @@ extern "C" {
  * specification targets. An implementation whose environment gives the started
  * context a stack of its own ignores the argument, and reports that by
  * withholding nothing: a caller cannot observe which of the two occurred, and
- * has no decision resting upon it. */
+ * has no decision resting upon it.
+ *
+ * ⭐ `entry' IS AN ADDRESS AT WHICH A CONTEXT BEGINS, NOT A FUNCTION THAT IS
+ * CALLED. NO RETURN ADDRESS EXISTS: the started context stands at the top of a
+ * stack with nothing beneath it, and returning from `entry' ends the context
+ * with a status saying that it returned rather than choosing one. This was
+ * already the behaviour every implementation had --- one of them records that
+ * the transfer "cannot be written in C" for exactly this reason --- and saying
+ * it here is what lets an implementation on the far side of a boundary
+ * establish the context by setting a program counter and a stack pointer. */
 int kal_space_start(void (*entry)(void*), void* arg, void* stack_top,
                     struct kal_process* out);
 
-extern const kal_uintptr kal_space_props;
+kal_uintptr kal_space_props(void);
 
 #ifdef __cplusplus
 }

@@ -27,10 +27,30 @@ struct kal_task { kal_uintptr h; };
 extern "C" {
 #endif
 
-/* Starts a context executing the given function with the given argument. The
- * stack is provided by the implementation; its size is a property rather than
- * a parameter, because an environment that does not allocate stacks separately
- * cannot honour a request for one. */
+/* Starts a context.
+ *
+ * ⭐ `entry' IS AN ADDRESS AT WHICH A CONTEXT BEGINS, NOT A FUNCTION THAT IS
+ * CALLED, AND THE DIFFERENCE IS WHAT LETS THIS CROSS A BOUNDARY. An
+ * implementation on the far side of one does not call into the program; it
+ * establishes a context whose program counter is `entry' and whose first
+ * argument is `arg', which is what a kernel's own context-creating primitive
+ * does. Consequently:
+ *
+ *   - NO RETURN ADDRESS EXISTS. The started context has nothing to return to,
+ *     and a caller shall not write an entry that relies on returning to
+ *     anything. Returning from `entry' ends the context, which is the only
+ *     defined thing that can happen and is not an error.
+ *
+ *   - `arg' is a value the started context receives, and is meaningful in the
+ *     address space the context runs in --- which is the caller's, because that
+ *     is what this interface provides. Copying an address space is
+ *     `openkal.space'.
+ *
+ * The stack is provided by the implementation; its size is a property rather
+ * than a parameter, because an environment that does not allocate stacks
+ * separately cannot honour a request for one. An implementation across a
+ * boundary allocates it too, so the crossed form asks for nothing the linked
+ * form does not. */
 int kal_task_start(void (*entry)(void*), void* arg, struct kal_task* out);
 
 /* Waits for a context to finish. A context is waited for at most once. */
@@ -55,7 +75,7 @@ int kal_task_wait(const kal_u32* word, kal_u32 expected,
  * how many were woken. A count of zero wakes none and is permitted. */
 int kal_task_wake(const kal_u32* word, kal_uintptr count, kal_uintptr* woken);
 
-extern const kal_uintptr kal_task_props;
+kal_uintptr kal_task_props(void);
 
 #ifdef __cplusplus
 }

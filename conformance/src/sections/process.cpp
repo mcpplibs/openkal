@@ -23,7 +23,7 @@ void run() {
                "openkal.env, and that interface was not selected");
     return;
 #else
-    claim("kal_process_props", kal_process_props);
+    claim("kal_process_props()", kal_process_props());
 
     // Starting, awaiting, and the status a program reports.
     {
@@ -102,14 +102,14 @@ void run() {
         observe(kind::behaviour, rc == kal_ok, "a channel is created");
         if (rc == kal_ok) {
             const char msg[] = "through the channel";
-            const kal_io_result w = kal_stream_write(theirs, msg, sizeof msg - 1);
-            observe(kind::behaviour, w.e == kal_ok && w.n == sizeof msg - 1,
+            const kal_intptr w = kal_stream_write(theirs, msg, sizeof msg - 1);
+            observe(kind::behaviour, w == static_cast<kal_intptr>(sizeof msg - 1),
                     "the far end of a channel accepts bytes");
 
             char buf[64] = {0};
-            const kal_io_result r = kal_stream_read(mine, buf, sizeof buf);
-            bool same = r.e == kal_ok && r.n == sizeof msg - 1;
-            for (kal_uintptr i = 0; same && i < r.n; ++i)
+            const kal_intptr r = kal_stream_read(mine, buf, sizeof buf);
+            bool same = r == static_cast<kal_intptr>(sizeof msg - 1);
+            for (kal_intptr i = 0; same && i < r; ++i)
                 if (buf[i] != msg[i]) same = false;
             observe(kind::behaviour, same, "the near end reads what the far end wrote");
 
@@ -118,8 +118,8 @@ void run() {
             // deadlock this pair invites and the reason the release is declared
             // beside the operation rather than left to openkal.stream.
             kal_process_channel_close(theirs);
-            const kal_io_result eof = kal_stream_read(mine, buf, sizeof buf);
-            observe(kind::behaviour, eof.e == kal_ok && eof.n == 0,
+            const kal_intptr eof = kal_stream_read(mine, buf, sizeof buf);
+            observe(kind::behaviour, eof == 0,
                     "closing the far end is observed as end of input on the near one");
             kal_process_channel_close(mine);
         }
@@ -145,7 +145,7 @@ void run() {
                                     | kal::process::grant_dir).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
-        observe(kind::abi, (kal_process_props & ~assigned) == 0,
+        observe(kind::abi, (kal_process_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
     }
 

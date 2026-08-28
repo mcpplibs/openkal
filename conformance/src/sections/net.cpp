@@ -31,7 +31,7 @@ void run() {
     unobserved(kind::behaviour, "openkal.net", "the interface was not selected");
     return;
 #else
-    claim("kal_net_props", kal_net_props);
+    claim("kal_net_props()", kal_net_props());
 
     // A LISTENER ON PORT ZERO, AND THE PORT READ BACK. The environment chooses
     // the port, so a suite that named one would fail on a machine where that
@@ -81,14 +81,14 @@ void run() {
 
     {
         const char msg[] = "openkal";
-        const kal_io_result w = kal_stream_write(cs, msg, sizeof msg - 1);
-        observe(kind::behaviour, w.e == kal_ok && w.n == sizeof msg - 1,
+        const kal_intptr w = kal_stream_write(cs, msg, sizeof msg - 1);
+        observe(kind::behaviour, w == static_cast<kal_intptr>(sizeof msg - 1),
                 "a connection carries bytes through the stream operations");
 
         char buf[16] = {0};
-        const kal_io_result r = kal_stream_read(ss, buf, sizeof buf);
-        bool same = r.e == kal_ok && r.n == sizeof msg - 1;
-        for (kal_uintptr i = 0; same && i < r.n; ++i)
+        const kal_intptr r = kal_stream_read(ss, buf, sizeof buf);
+        bool same = r == static_cast<kal_intptr>(sizeof msg - 1);
+        for (kal_intptr i = 0; same && i < r; ++i)
             if (buf[i] != msg[i]) same = false;
         observe(kind::behaviour, same, "the bytes read are the bytes written");
     }
@@ -115,8 +115,8 @@ void run() {
             observe(kind::behaviour, rc == kal_ok,
                     "a claimed half-closure is performed when asked for");
             char buf[4] = {0};
-            const kal_io_result r = kal_stream_read(ss, buf, sizeof buf);
-            observe(kind::behaviour, r.e == kal_ok && r.n == 0,
+            const kal_intptr r = kal_stream_read(ss, buf, sizeof buf);
+            observe(kind::behaviour, r == 0,
                     "the peer observes end of input after a half-closure");
         } else {
             observe(kind::behaviour, rc == kal_err_not_supported,

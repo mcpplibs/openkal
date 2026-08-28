@@ -61,7 +61,30 @@ void kal_exec_free(void* p, kal_uintptr size);
  * published bytes reserves a second region and abandons the first. */
 #define KAL_EXEC_PROP_REPUBLISH ((kal_uintptr)1u << 0)
 
-extern const kal_uintptr kal_exec_props;
+/* Whether memory this program may execute is available to THIS ARTIFACT in THIS
+ * environment.
+ *
+ * ⚠️⚠️ CLAUSE 6.5 SETTLED THIS AT DEPENDENCY RESOLUTION, AND THAT ANSWER DOES
+ * NOT SURVIVE AN ARTIFACT THAT IS DISTRIBUTED. One system grants such memory
+ * only to a program carrying a signed declaration, applied after the link by
+ * whoever produces the artifact --- so when the artifact is built for its own
+ * machine, the party that decides is the party that resolves the dependency and
+ * 6.5 is right. When the artifact is produced once and run in many
+ * environments, that party decided for all of them, possibly years earlier, and
+ * the consumer resolves nothing.
+ *
+ * ⇒ The interface is provided either way; whether it can be exercised is read
+ * here. This is not the shape clause 6.2 forbids --- an operation present and
+ * always failing is a defect BECAUSE THE CALLER CANNOT TELL, and a position the
+ * caller reads first is exactly what tells it.
+ *
+ * ⚠️ 6.5's own objection stands and is answered elsewhere: a path few artifacts
+ * take is a path little verified. The conformance arrangement answers this
+ * position both ways, which is the only way the unavailable path is exercised
+ * at all. */
+#define KAL_EXEC_PROP_AVAILABLE ((kal_uintptr)1u << 1)
+
+kal_uintptr kal_exec_props(void);
 
 #ifdef __cplusplus
 }

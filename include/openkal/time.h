@@ -23,7 +23,7 @@ kal_duration kal_time_wall(void);
 kal_duration kal_time_monotonic_granularity(void);
 void         kal_time_sleep(kal_duration ns);
 
-extern const kal_uintptr kal_time_props;
+kal_uintptr kal_time_props(void);
 
 #ifdef __cplusplus
 }

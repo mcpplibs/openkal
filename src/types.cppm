@@ -16,6 +16,7 @@ export module openkal.types;
 
 // The width of a machine word, and the three fixed widths the operations use.
 export using ::kal_uintptr;
+export using ::kal_intptr;
 export using ::kal_u32;
 export using ::kal_u64;
 export using ::kal_i64;
@@ -40,8 +41,7 @@ export using ::kal_err_not_empty;
 export using ::kal_err_is_directory;
 export using ::kal_err_not_directory;
 
-// The result of an operation that transfers a count.
-export using ::kal_io_result;
+// Where a connection or a message goes.
 export using ::kal_endpoint;
 
 // Clause 5.3 freezes the layout. The address is twenty-four bytes so that one
@@ -49,20 +49,17 @@ export using ::kal_endpoint;
 // were not would read every address at the wrong offset while still linking.
 static_assert(sizeof(kal_endpoint{}.addr) == 24,
               "clause 5.3: an endpoint address is twenty-four bytes");
-static_assert(sizeof(kal_endpoint) >= 24 + sizeof(kal_uintptr) + sizeof(kal_u32),
-              "clause 5.3: an endpoint holds its address, a length and a port");
+static_assert(sizeof(kal_endpoint) == 24 + sizeof(kal_u32) + sizeof(kal_u32),
+              "clause 5.3: an endpoint holds its address, a length and a port,"
+              " and the length is a fixed width so that the layout does not"
+              " differ between a thirty-two and a sixty-four bit target");
+static_assert(sizeof(kal_intptr) == sizeof(kal_uintptr),
+              "a counting result is one machine word: clause 5.1");
 
-// Clause 5.3 declares the layout of every structure immutable. A declaration
-// that something shall not change is not a mechanism; this is the mechanism.
-// Two machine words are returned in registers on the architectures openkal
-// targets, and a wider result would be returned through a hidden pointer
-// instead --- a change of calling convention that no declaration would report
-// and that a consumer built against the earlier layout would not survive.
-static_assert(sizeof(kal_io_result) == 2 * sizeof(kal_uintptr),
-              "kal_io_result must remain two machine words: clause 5.3");
-static_assert(alignof(kal_io_result) == alignof(kal_uintptr));
-static_assert(__builtin_offsetof(kal_io_result, n) == 0);
-static_assert(__builtin_offsetof(kal_io_result, e) == sizeof(kal_uintptr));
+// A declaration that something shall not change is not a mechanism; this is the
+// mechanism. An operation whose whole result is a count returns one signed
+// machine word, and a caller that read two would read the second from wherever
+// the first left the register file.
 static_assert(sizeof(kal_uintptr) == sizeof(void*),
               "kal_uintptr must hold a pointer: clause 5.1");
 

@@ -14,17 +14,35 @@ undefined references, which is the intended outcome.
 
 | Module | Header | Interface | Class |
 | --- | --- | --- | --- |
-| `openkal.types` | `openkal/types.h` | machine word, error values, transfer result | — |
+| `openkal.types` | `openkal/types.h` | machine word, error values, endpoint | — |
+| `openkal.version` | `openkal/version.h` | what the implementation says about itself | every |
 | `openkal.abort` | `openkal/abort.h` | termination | core |
 | `openkal.stream` | `openkal/stream.h` | byte streams | core |
-| `openkal.memory` | `openkal/memory.h` | allocation | core |
-| `openkal.env` | `openkal/env.h` | the parameters a program receives at inception | standard |
-| `openkal.time` | `openkal/time.h` | monotonic and wall time sources | standard |
-| `openkal.fs` | `openkal/fs.h` | directories and open files, relative throughout | standard |
-| `openkal.process` | `openkal/process.h` | starting a program and waiting for it | standard |
-| `openkal.task` | `openkal/task.h` | execution contexts, and the primitive they are built upon | standard |
+| `openkal.memory` | `openkal/memory.h` | allocation, and the environment's granularity | core |
+| `openkal.env` | `openkal/env.h` | the parameters a program receives at inception | optional |
+| `openkal.time` | `openkal/time.h` | monotonic and wall time sources | optional |
+| `openkal.fs` | `openkal/fs.h` | directories and open files, relative throughout | optional |
+| `openkal.process` | `openkal/process.h` | starting a program and waiting for it | optional |
+| `openkal.task` | `openkal/task.h` | execution contexts, and the primitive they are built upon | optional |
 | `openkal.random` | `openkal/random.h` | a source of unpredictable bytes | optional |
 | `openkal.exec` | `openkal/exec.h` | a region of the address space a program may execute | optional |
+| `openkal.terminal` | `openkal/terminal.h` | an interactive stream's treatment of what is typed | optional |
+| `openkal.net` | `openkal/net.h` | a connection, and a listener for connections | optional |
+| `openkal.datagram` | `openkal/datagram.h` | a message with a boundary | optional |
+| `openkal.space` | `openkal/space.h` | an address space, and a context executing in one | optional |
+| `openkal.timeout` | `openkal/timeout.h` | a bound upon operations that would otherwise wait | optional |
+
+⚠️ **There were three classes and there are two.** Version 0.8 named a middle
+one — *standard*, "an interface an implementation hosting a C library provides"
+— and it was false: an implementation for a machine with firmware and no
+operating system provides none of `openkal.fs`, `openkal.process` or
+`openkal.task`, and a C library is hosted above it. Clause 6.1 makes an
+interface's absence a fact a consumer learns from the linker; no class was
+needed to predict it, and the prediction was wrong.
+
+`openkal.version` is in the table and is not an interface: it provides no
+resource, and every conforming implementation exports its two operations so that
+a consumer with no linker to ask can ask before it calls.
 
 ### One statement of the declarations, two ways to reach it
 

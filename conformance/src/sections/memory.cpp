@@ -33,6 +33,30 @@ void run() {
     unobserved(kind::behaviour, "openkal.memory", "the core set was not selected");
     return;
 #else
+    // The quantum this environment allocates and protects memory in.
+    //
+    // ⭐ AN OPERATION AND NOT A CONSTANT. A C library above this reports it as
+    // its own page size, and one that fixed it when it was built is wrong on
+    // every machine whose quantum differs from the one it was built for --- which
+    // is what a distributed binary meets.
+    {
+        const kal_uintptr g = kal_memory_granularity();
+        claim("kal_memory_granularity", g);
+        observe(kind::behaviour, g >= 1, "the granularity is at least one byte");
+        observe(kind::behaviour, (g & (g - 1)) == 0,
+                "the granularity is a power of two");
+
+        // ⚠️ THE VALUE IS THE ONE THE INTERFACE'S OWN OPERATIONS ACCEPT, which
+        // is the whole of what it promises: an address and a length that are
+        // multiples of it are acceptable. An implementation reporting a
+        // quantum its allocator then refused would be reporting a fact about
+        // the machine rather than about this interface.
+        void* p = kal_alloc(g, g);
+        observe(kind::behaviour, p != nullptr && aligned(p, g),
+                "a region of the granularity, aligned to it, is obtained");
+        if (p) kal_free(p, g, g);
+    }
+
     {
         auto* p = static_cast<unsigned char*>(kal_alloc(1024, 16));
         observe(kind::behaviour, p != nullptr, "a region is obtained");

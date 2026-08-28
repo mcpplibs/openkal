@@ -13,7 +13,7 @@ void run() {
     unobserved(kind::behaviour, "openkal.time", "the interface was not selected");
     return;
 #else
-    claim("kal_time_props", kal_time_props);
+    claim("kal_time_props()", kal_time_props());
 
     // The monotonic source measures elapsed time and never decreases. The
     // observation is made over many reads rather than two, because a source
@@ -77,7 +77,7 @@ void run() {
         const kal_uintptr assigned = (kal::time::wall_available
                                     | kal::time::monotonic_suspends
                                     | kal::time::sleep_precise).bits;
-        observe(kind::abi, (kal_time_props & ~assigned) == 0,
+        observe(kind::abi, (kal_time_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
         observe(kind::abi, sizeof(kal_duration) == 8,
                 "a duration is sixty-four bits, as the interface fixes it");

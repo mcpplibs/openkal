@@ -17,13 +17,15 @@ struct kal_stream kal_stdin (void);
 struct kal_stream kal_stdout(void);
 struct kal_stream kal_stderr(void);
 
-/* Transfers the whole buffer, or reports the condition that prevented it. On
- * failure, n reports how many bytes were transferred before the failure. */
-struct kal_io_result kal_stream_write(struct kal_stream s, const void* buf, kal_uintptr len);
+/* Transfers the whole buffer and reports how many bytes it moved, or the
+ * negated error value when it moved none. Clause 7.4: a partial transfer is not
+ * a successful outcome and the loop that avoids one belongs here rather than in
+ * every caller, so the ordinary result is `len'. */
+kal_intptr kal_stream_write(struct kal_stream s, const void* buf, kal_uintptr len);
 
-/* Transfers at most len bytes and reports how many were transferred. Zero
- * bytes with kal_ok denotes end of input. */
-struct kal_io_result kal_stream_read(struct kal_stream s, void* buf, kal_uintptr len);
+/* Transfers at most len bytes and reports how many it moved, or the negated
+ * error value when it moved none. Zero denotes end of input. */
+kal_intptr kal_stream_read(struct kal_stream s, void* buf, kal_uintptr len);
 
 /* Commits any buffering the implementation performs. */
 int kal_stream_flush(struct kal_stream s);

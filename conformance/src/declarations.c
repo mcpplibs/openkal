@@ -50,12 +50,14 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_fs_close_file);
     (void)sizeof(&kal_fs_file_info);
     (void)sizeof(&kal_fs_info);
+    (void)sizeof(&kal_fs_link_create);
+    (void)sizeof(&kal_fs_link_read);
     (void)sizeof(&kal_fs_list_begin);
     (void)sizeof(&kal_fs_list_next);
+    (void)sizeof(&kal_fs_max_name);
     (void)sizeof(&kal_fs_mkdir);
     (void)sizeof(&kal_fs_open);
     (void)sizeof(&kal_fs_open_dir);
-    (void)sizeof(&kal_fs_open_file);
     (void)sizeof(&kal_fs_preopen);
     (void)sizeof(&kal_fs_preopen_count);
     (void)sizeof(&kal_fs_props);
@@ -65,6 +67,8 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_fs_set_modified);
     (void)sizeof(&kal_fs_stream);
     (void)sizeof(&kal_fs_truncate);
+    (void)sizeof(&kal_interfaces);
+    (void)sizeof(&kal_memory_granularity);
     (void)sizeof(&kal_net_accept);
     (void)sizeof(&kal_net_close);
     (void)sizeof(&kal_net_close_listener);
@@ -109,7 +113,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_time_monotonic);
     (void)sizeof(&kal_time_monotonic_granularity);
     (void)sizeof(&kal_timeout_accept);
-    (void)sizeof(&kal_timeout_granularity_ns);
+    (void)sizeof(&kal_timeout_granularity);
     (void)sizeof(&kal_timeout_read);
     (void)sizeof(&kal_timeout_recv_from);
     (void)sizeof(&kal_timeout_wait_process);
@@ -117,4 +121,5 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_time_props);
     (void)sizeof(&kal_time_sleep);
     (void)sizeof(&kal_time_wall);
+    (void)sizeof(&kal_version);
 }

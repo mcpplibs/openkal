@@ -55,8 +55,11 @@ inline stream in ()  { return kal_stdin();  }
 inline stream out()  { return kal_stdout(); }
 inline stream err()  { return kal_stderr(); }
 
-inline kal_io_result write(stream s, const void* p, kal_uintptr n) { return kal_stream_write(s, p, n); }
-inline kal_io_result read (stream s, void* p, kal_uintptr n)       { return kal_stream_read(s, p, n); }
+// The count, or the negated error value when no byte was produced. One word,
+// so that a caller never inspects two things to learn one thing and so that the
+// result crosses a boundary that returns one register.
+inline kal_intptr write(stream s, const void* p, kal_uintptr n) { return kal_stream_write(s, p, n); }
+inline kal_intptr read (stream s, void* p, kal_uintptr n)       { return kal_stream_read(s, p, n); }
 inline int           flush(stream s)                               { return kal_stream_flush(s); }
 
 // The properties of one stream, as a set that cannot be confused with another

@@ -30,18 +30,18 @@ export using ::kal_timeout_write;
 export using ::kal_timeout_accept;
 export using ::kal_timeout_recv_from;
 export using ::kal_timeout_wait_process;
-export using ::kal_timeout_granularity_ns;
+export using ::kal_timeout_granularity;
 
 export namespace kal::timeout {
 
 // The smallest bound this implementation distinguishes. A caller that asks for
 // less is not refused and does not get less.
-inline kal_uintptr granularity_ns() { return kal_timeout_granularity_ns; }
+inline kal_u64 granularity_ns() { return kal_timeout_granularity(); }
 
-inline kal_io_result read (kal_stream s, void* p, kal_uintptr n, kal_u64 ns) {
+inline kal_intptr read (kal_stream s, void* p, kal_uintptr n, kal_u64 ns) {
     return kal_timeout_read(s, p, n, ns);
 }
-inline kal_io_result write(kal_stream s, const void* p, kal_uintptr n, kal_u64 ns) {
+inline kal_intptr write(kal_stream s, const void* p, kal_uintptr n, kal_u64 ns) {
     return kal_timeout_write(s, p, n, ns);
 }
 
@@ -56,11 +56,11 @@ inline conn_result accept(kal_net_listener l, kal_u64 ns) {
 // Shaped like kal::datagram::recv_from, because it is that operation with a
 // bound: a caller that adds a timeout should not also have to change how it
 // reads the result.
-struct recv_result { kal_io_result r; kal_endpoint from; };
+struct recv_result { kal_intptr n; kal_endpoint from; };
 
 inline recv_result recv_from(kal_datagram d, void* p, kal_uintptr n, kal_u64 ns) {
     kal_endpoint from{};
-    const kal_io_result r = kal_timeout_recv_from(d, p, n, &from, ns);
+    const kal_intptr r = kal_timeout_recv_from(d, p, n, &from, ns);
     return { r, from };
 }
 

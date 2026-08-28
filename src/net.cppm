@@ -48,7 +48,7 @@ using props = kal::props<props_tag>;
 inline constexpr props ipv6     {KAL_NET_PROP_IPV6};
 inline constexpr props halfclose{KAL_NET_PROP_HALFCLOSE};
 
-inline props properties() { return props{kal_net_props}; }
+inline props properties() { return props{kal_net_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 // The directions kal_net_shutdown accepts. An enumeration rather than the bare
@@ -86,7 +86,7 @@ inline conn_result accept(listener l) {
 
 // The stream a connection owns. Named `stream' rather than converted
 // implicitly, so that a caller can see where the borrowing begins.
-inline kal_stream stream(conn c) { return kal_stream{kal_net_stream(c)}; }
+inline kal_stream stream(conn c) { return kal_net_stream(c); }
 
 inline endpoint_result peer (conn     c) { endpoint ep{}; const int e = kal_net_peer (c, &ep); return { ep, e }; }
 inline endpoint_result local(conn     c) { endpoint ep{}; const int e = kal_net_local(c, &ep); return { ep, e }; }

@@ -47,7 +47,7 @@ inline int fill(void* out, kal_uintptr len) {
     return kal_random_fill(out, len);
 }
 
-inline props properties() { return props{kal_random_props}; }
+inline props properties() { return props{kal_random_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 }

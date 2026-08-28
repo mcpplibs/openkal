@@ -1,4 +1,4 @@
-# The C surface of openkal 0.8, one name per line.
+# The C surface of openkal 0.9, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -7,6 +7,12 @@
 # An implementation provides an interface in whole or not at all, so the
 # absence of a group below denotes an interface the implementation does not
 # provide and is not a deviation.
+# openkal --- the specification's own self-description. Not an interface: it
+# provides no resource, so clause 3.2's closure of the core SET is untouched.
+# Every conforming implementation exports both, so that a consumer with no
+# linker to ask can ask before it calls.
+kal_interfaces
+kal_version
 # openkal.abort
 kal_abort
 kal_exit
@@ -21,6 +27,7 @@ kal_stream_write
 # openkal.memory
 kal_alloc
 kal_free
+kal_memory_granularity
 # openkal.env
 kal_env_arg
 kal_env_arg_count
@@ -41,17 +48,19 @@ kal_fs_close_dir
 kal_fs_close_file
 kal_fs_file_info
 kal_fs_info
+kal_fs_link_create
+kal_fs_link_read
 kal_fs_list_begin
 kal_fs_list_next
+kal_fs_max_name
 kal_fs_mkdir
 kal_fs_open
 kal_fs_open_dir
-kal_fs_open_file
+kal_fs_preopen
+kal_fs_preopen_count
 kal_fs_props
 kal_fs_remove
 kal_fs_rename
-kal_fs_preopen
-kal_fs_preopen_count
 kal_fs_seek
 kal_fs_set_modified
 kal_fs_stream
@@ -107,7 +116,7 @@ kal_space_props
 kal_space_start
 # openkal.timeout
 kal_timeout_accept
-kal_timeout_granularity_ns
+kal_timeout_granularity
 kal_timeout_read
 kal_timeout_recv_from
 kal_timeout_wait_process

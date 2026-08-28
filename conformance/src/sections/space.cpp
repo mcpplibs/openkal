@@ -38,7 +38,7 @@ void run() {
     unobserved(kind::behaviour, "openkal.space", "the interface was not selected");
     return;
 #else
-    claim("kal_space_props", kal_space_props);
+    claim("kal_space_props()", kal_space_props());
 
     // THE PROPERTY WORD IS REPORTED BEFORE THE OPERATION, because what it says
     // determines what a caller above this interface may do. An environment whose

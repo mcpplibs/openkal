@@ -147,11 +147,39 @@ stamp="target/.features"
 if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$features" ]; then
     rm -rf target
 fi
+# ⚠️⚠️ AND THE SAME DEFECT AGAIN, IN THE LINE THAT FINDS WHAT WAS BUILT.
+#
+# The selection below was `find … | head -1'. `target' accumulates one directory
+# per fingerprint, and a fingerprint changes when the DEPENDENCIES change and
+# not only when the feature set does --- so the record above does not discard
+# them and two suites sit side by side. `find' reports them in directory order,
+# which is neither the order they were built in nor any order at all, so the run
+# reported on whichever the file system happened to name first.
+#
+# Measured 2026-08-29, while the specification was being changed: a run reported
+# `143 held, 0 did not hold' from a binary built two days earlier, which
+# contained none of the observations that had just been added. It agreed with
+# the previous run because it WAS the previous run, and nothing in its output or
+# its exit status said so.
+#
+# ⇒ Every suite already built is removed before building, so that what is found
+# afterwards is what was just produced. Only the binaries are removed, so the
+# rebuild is a link and not a compile; and finding more than one afterwards is
+# now a condition rather than a choice.
+find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \) \
+    -delete 2> /dev/null || true
+
 mcpp build --features "$features" "$@"
 mkdir -p target && printf '%s' "$features" > "$stamp"
 
-binary="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \) | head -1)"
-[ -n "$binary" ] || { echo "the suite was not produced" >&2; exit 2; }
+produced="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \))"
+count="$(printf '%s\n' "$produced" | grep -c . || true)"
+[ "$count" = 1 ] || {
+    echo "expected exactly one suite to have been produced, found $count:" >&2
+    printf '%s\n' "$produced" >&2
+    exit 2
+}
+binary="$produced"
 
 # openkal.env reads variables and does not set them, so the one observation that
 # requires a variable whose value is empty requires the runner to supply it.
