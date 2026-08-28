@@ -2056,3 +2056,43 @@ of eleven pins**. It now carries a denominator — and a floor that denominator
 cannot supply, since a denominator drawn from the same enumeration cannot report
 that the enumeration is empty: the package's own root manifest must have been
 reached.
+
+### 15.7 ⭐⭐ The same name for two quantities, one layer apart
+
+The last defect this change produced is the clearest instance of what §11 argues
+about, and it was introduced BY the correction §11 recommends.
+
+Decision 5 added `kal_memory_granularity` because a distributed binary must
+learn the machine's quantum at run time rather than have it fixed at build time.
+openkal-musl adopted it and assigned it to `libc.page_size`, replacing the
+constant 4096.
+
+⚠️ **They are not the same quantity.** openkal's granularity is the coarsest
+quantum a caller must respect, and an implementation for a machine with no
+memory management unit answers **one** — correctly: there is no page, and
+nothing needs rounding. openkal-opensbi answers one.
+
+`libc.page_size` is what musl rounds heap growth to, reports as
+`sysconf(_SC_PAGESIZE)` and as `st_blksize`, and whose arithmetic its allocator
+assumes is a power of two no smaller than its own quantum. Given one, the
+allocator asked the environment for one-byte extents.
+
+⭐ **AND THE SYMPTOM WAS THREE CORRECT LINES FOLLOWED BY SILENCE.** The
+same-source example printed `sorted`, `caught` and `unwound` — containers,
+exceptions, and unwinding a destructor all held — and stopped at the fourth
+line, which is the first to format a string and so the first to need an
+allocation large enough to grow the heap. Over openkal-linux, whose answer is
+4096, nothing was wrong.
+
+⚠️ **THE ASSERTION THAT SHOULD HAVE CAUGHT IT PASSED, AND WAS NOT WRONG.** The
+probe said "the page size is a positive power of two obtained from the
+environment". One is positive. One is a power of two. The criterion described
+the shape of the number and not what the number is for. It now states what the
+allocator requires, and asks for several pages in one allocation and writes
+every byte of them.
+
+The reading to carry out of this: **a value that crosses a layer boundary
+acquires the receiving layer's requirements, and the sending layer is not
+obliged to know them.** openkal is right to answer one. musl is wrong to believe
+it. The remedy is not in either interface but at the seam, where the answer is
+taken as a floor to respect rather than as the value.
