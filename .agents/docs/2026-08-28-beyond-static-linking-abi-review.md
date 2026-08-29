@@ -2288,3 +2288,46 @@ being removed.
 ⭐ **BOTH ARCHITECTURES, THROUGH THE PUBLISHED PACKAGES.** The aarch64 leg is the
 one that had never worked: two constants in `openkal-linux/src/sys.h` were the
 x86_64 values on both machines, and no job ran that architecture to notice.
+
+### 16.2 ⭐⭐ Two openkals in one graph, and the build tool kept them apart by the wrong name
+
+Measured while moving the two consumers, and worth recording because it is a
+property of what openkal *is* rather than of this release.
+
+A project naming both `riscv-virt-rt` (which supplied openkal's core set) and
+`std-freestanding` with `alloc-kal` (which reaches openkal through the
+allocator) resolved **two versions of openkal into one graph** — and built:
+
+    Resolved std-freestanding-alloc-kal ^0.1.0 → v0.1.1
+    Mangled openkal.abort v0.5.2 ↔ v0.8.0
+        → openkal.abort__v0_8_0__mcpp (cross-major fallback)
+
+⚠️ **THE MODULE NAMES WERE MANGLED APART AND THE C NAMES WERE NOT.** That
+fallback is reasonable for an ordinary C++ library, where the module name *is*
+the interface. openkal's contract is a C application binary interface — clause
+10 says so — and a C symbol namespace is flat: `kal_alloc` is `kal_alloc` in
+both copies. So one definition was described by two sets of declarations, and
+the link succeeded.
+
+Nothing was wrong in that particular build, because `kal_alloc` and `kal_free`
+happen to be declared identically at 0.5.2 and 0.8.0. Had any declaration moved
+between those versions — and between 0.8.0 and 0.9.0 several did — the call
+would have been made under one convention and answered under another, with no
+diagnostic anywhere.
+
+⭐ **THE SPECIFICATION ALREADY CONTAINS THE REASONING AND DOES NOT CONTAIN THE
+RULE.** Clause 4.2 rejects "a second package carrying the C form" because "one
+contract in two packages can be resolved at two versions, and the property a
+contract has is that there is one of it". The case here is one package at two
+versions, which the same sentence covers and which the clause does not say.
+
+Moving both consumers in the same round removes the instance: the board and the
+allocator now name 0.9.0, the graph holds one openkal, and no fallback fires.
+That is a repair of the instance and not of the class.
+
+⇒ **Open, and deliberately not decided here:** whether openkal should state that
+a graph shall contain exactly one of it, and whether a build tool's
+cross-version fallback should be refused for a package whose contract is a C
+ABI. Both are changes to a specification that was published hours ago and to a
+tool this document does not govern, and the argument for each is above rather
+than in a commit.
