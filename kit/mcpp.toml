@@ -98,4 +98,4 @@ openkal = "0.9.0"
 # same reason: a change spanning the specification and an implementation must be
 # tested against both halves as written, not against whichever half is published.
 [target.'cfg(os = "linux")'.dev-dependencies]
-openkal-linux = { version = "0.7.0", features = ["standalone"] }
+openkal-linux = { version = "0.7.1", features = ["standalone"] }
