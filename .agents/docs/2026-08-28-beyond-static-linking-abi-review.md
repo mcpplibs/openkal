@@ -2200,17 +2200,48 @@ The `mcpp-index` change is one commit for all nine, because each names another
 by version and adding them separately would leave the index, between two merges,
 in a state where a published manifest names a version it does not have.
 
-### 16.1 What is deliberately not in this release
+### 16.1 The two consumers, moved with it
 
-Three packages elsewhere in the ecosystem name openkal by an exact version and
-therefore continue to resolve unchanged: `riscv-virt-rt` (openkal 0.5.2),
-`std-freestanding-alloc-kal` (0.8.0) and `sbase` (openkal-musl 0.6.0). None
-of them uses a range, so none picks 0.9.0 up silently.
+Three packages elsewhere in the ecosystem named openkal by an exact version.
+Two were moved in the same round; one was not, and the difference is what the
+change actually reaches.
 
-⚠️ `sbase` is the one worth naming: it stands on openkal-musl, and the crash
-0.7.0 repairs is one its programs can meet. Moving it is a separate change with
-its own review, and recording that here is the difference between a decision and
-an omission.
+**`riscv-virt-rt` 0.5.2 → 0.6.0.** It is not only a consumer: behind
+`features = ["openkal"]` it *supplies* openkal's core set for QEMU's RISC-V
+`virt` machine, so 0.9's one-word transfers, `kal_memory_granularity` and the
+self-description all had to be implemented. Its granularity answers **1** for
+the same reason openkal-opensbi's does, and its comment now records §15.7 so the
+next C library above it does not repeat that mistake.
+
+⚠️ **AND NOTHING HAD EVER CALLED THAT IMPLEMENTATION.** The feature compiled
+`src/kal/**`, the linker took all fourteen names into the test binary, `nm`
+showed them, and the suite was green — which proves it compiles and links and
+says nothing about what it answers. A wrong result in any of the three changes
+above would have linked and shown green just the same. `tests/openkal.cpp` now
+asks: nine observations on both ISA profiles, measured to fail when the
+granularity and the interface word are made wrong, and written so that it does
+not go quiet when the feature is off — it prints a line only the observed case
+produces, and the workflow greps for that rather than for the exit status.
+
+**`std-freestanding-alloc-kal` 0.1.1 → 0.1.2.** A repin: `kal_alloc` and
+`kal_free` are unchanged, and nothing 0.9 altered is reachable from
+`operator new`. ⭐ Writing it exposed something the dependency does not do — the
+package declares those two ITSELF rather than including openkal's header, so the
+manifest catches a *version* mismatch and not a *declaration* one. Had either
+signature moved, it would compile, link, and produce a silently wrong calling
+convention at the one seam where it matters. The two are now compiled together
+in a translation unit that ships nowhere.
+
+⚠️ And the first spelling of that check had the defect it exists to catch: it
+globbed the package store for an openkal include directory and took the first,
+which on this machine is 0.5.2 — four minors behind the pin — and reported
+agreement with a specification the package does not depend upon. The version now
+comes from the package's own manifest and exactly one directory must match.
+
+**`sbase` is not moved.** It stands on openkal-musl and the crash 0.7.0 repairs
+is one its programs can meet, but moving it is a separate change with its own
+review. Recording that here is the difference between a decision and an
+omission.
 
 ---
 
