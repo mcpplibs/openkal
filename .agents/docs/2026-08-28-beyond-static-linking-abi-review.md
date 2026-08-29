@@ -2321,9 +2321,30 @@ contract in two packages can be resolved at two versions, and the property a
 contract has is that there is one of it". The case here is one package at two
 versions, which the same sentence covers and which the clause does not say.
 
-Moving both consumers in the same round removes the instance: the board and the
-allocator now name 0.9.0, the graph holds one openkal, and no fallback fires.
-That is a repair of the instance and not of the class.
+⚠️⚠️ **AND PUBLISHING THE ALLOCATOR ALONE WOULD HAVE MADE IT WORSE.** The
+allocator is reached through a CARET range — `std-freestanding` names
+`std-freestanding-alloc-kal = "^0.1.0"` — so 0.1.2 is picked up by every
+consumer the moment it exists, with no repin anywhere. Measured in the sandbox
+against the published packages, the same project, before and after moving the
+board:
+
+    board 0.5.2  Resolved std-freestanding-alloc-kal ^0.1.0 → v0.1.2
+                 Mangled openkal.abort v0.5.2 ↔ v0.9.0
+                     → openkal.abort__v0_9_0__mcpp (cross-major fallback)
+
+    board 0.6.0  Resolved std-freestanding-alloc-kal ^0.1.0 → v0.1.2
+                 (no fallback; one openkal in the graph)
+
+The distance grew from `0.5.2 ↔ 0.8.0` to `0.5.2 ↔ 0.9.0` the instant the
+allocator was published, because the range carried it and the board did not
+move. ⭐ **That is the argument for having done the two together rather than in
+sequence**, and it is the reading that the version audit missed: the audit
+looked for range pins on *openkal* and found none, while the range that mattered
+was on a package that reaches openkal.
+
+Moving both in the same round removes the instance: the board and the allocator
+now name 0.9.0, the graph holds one openkal, and no fallback fires. That is a
+repair of the instance and not of the class.
 
 ⇒ **Open, and deliberately not decided here:** whether openkal should state that
 a graph shall contain exactly one of it, and whether a build tool's
