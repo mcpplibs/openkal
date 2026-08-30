@@ -1086,3 +1086,19 @@ The following are recorded so that they are not mistaken for oversights.
     to open the directory for *reading* and set the time on that, outside
     anything stated here. A divergence caused by a missing declaration is a
     defect of the specification and is recorded as one.
+
+    The second, `kal_fs_capacity`, exists for the reason that keeps it in this
+    interface rather than in `openkal.space`: how much room a volume has is a
+    property of the *names* a caller can already reach, not of the memory a
+    program runs in. A C library above answers `statvfs`, and with nothing here
+    to answer it with it reported a fixed number — ⚠️ **which is worse than
+    refusing, because a program that checks for room before writing was told
+    there was room.**
+
+    ⭐ It answers bytes and not blocks, and that is the whole of the design
+    decision. Every environment this specification targets states a block count
+    and a block size, in units of its own choosing, and every one of them
+    differs; a caller wanting bytes multiplies two numbers whose meaning it must
+    first look up. Bytes are what the caller is deciding about, so bytes are
+    what this returns and the multiplication happens once, in the
+    implementation, where the units are known.
