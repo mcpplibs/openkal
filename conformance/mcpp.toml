@@ -1,7 +1,7 @@
 [package]
 namespace   = "mcpplibs"
 name        = "openkal-conformance"
-version     = "0.7.0"
+version     = "0.8.0"
 description = "The behavioural half of clause 9: a suite an implementation of openkal runs against itself, selectable to the interfaces it provides."
 license     = "Apache-2.0"
 authors     = ["mcpplibs"]

@@ -103,6 +103,8 @@ inline constexpr props links         {KAL_FS_PROP_LINKS};
 inline constexpr props modified_time {KAL_FS_PROP_MODIFIED_TIME};
 inline constexpr props atomic_rename {KAL_FS_PROP_ATOMIC_RENAME};
 inline constexpr props make_links    {KAL_FS_PROP_MAKE_LINKS};
+inline constexpr props locks         {KAL_FS_PROP_LOCKS};
+inline constexpr props capacity      {KAL_FS_PROP_CAPACITY};
 
 enum : int { seek_set = KAL_SEEK_SET, seek_current = KAL_SEEK_CURRENT, seek_end = KAL_SEEK_END };
 
