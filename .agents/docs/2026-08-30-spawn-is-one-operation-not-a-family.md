@@ -41,13 +41,11 @@ packages/kaos/src/process.cppm:87
 struct kal_spawn {
     struct kal_dir base;               /* `path' 相对谁解析 */
     struct kal_dir work;               /* 程序在哪个目录里跑 */
+    struct kal_job* job;               /* 进/出:所属单位。见 2.4 */
     const struct kal_preopen* grants;  /* 交给它的目录;可为空,计数为零 */
     kal_uintptr grant_count;
-    kal_uintptr flags;                 /* KAL_SPAWN_* */
+    kal_uintptr flags;                 /* KAL_SPAWN_BOUND_LIFETIME */
 };
-
-#define KAL_SPAWN_BOUND_LIFETIME ((kal_uintptr)1u << 0)
-#define KAL_SPAWN_OWN_JOB        ((kal_uintptr)1u << 1)
 
 int kal_process_spawn(const struct kal_spawn*,
                       const char* path, kal_uintptr path_len,
@@ -56,6 +54,68 @@ int kal_process_spawn(const struct kal_spawn*,
                       const struct kal_spawn_streams* streams,
                       struct kal_process* out);
 ```
+
+### 2.4 ⚠️⚠️ 这一节改过一次,而改它的是 clause 7.1
+
+上面 `job` 那个字段,**第一版是一个位** `KAL_SPAWN_OWN_JOB`:让被起的程序自成一个
+单位,然后由 `kal_process_terminate` 事后够到它。两个实现零状态就能满足——
+`getpgid(pid) == pid` 能从内核把关联**恢复**出来;第三个不行:它**能组建**单位
+(job object 就是),但**无法从进程句柄恢复**一个,而 `kal_process` 只有一个机器字
+且已经装着进程。
+
+⇒ 满足它就得维护一张登记表,而 clause 7.1 把这件事的含义写成了机械判据:
+「an implementation that must maintain a translation table, a registry, or a name
+resolver … indicates that **the specification has taken a shape borrowed from one
+environment, and the shape is at fault**」。⭐ **所以错的是那个位,不是那个实现。**
+
+⚠️ **而显而易见的修法只会把缺陷搬个方向。** 一个「打开一个空单位」的操作,在
+「先建单位再塞成员」的系统上自然,在「单位由第一个成员创建」的系统上**不可能**
+——进程组的标识就是某个进程的标识,没有成员就没有组可开。那是同一条 clause 7.1
+判据换个方向拼写。
+
+⇒ 最终形状:**身份在第一个成员启动时确立并回报给调用者**。`job` 为空 =
+不参与任何单位;指向零 = 新建一个,把身份写回来;指向一个名字 = 加入它。
+两类系统都不需要记住任何东西。
+
+```c
+struct kal_job { kal_uintptr h; };
+int  kal_process_job_enter(struct kal_job*);   /* 把调用者自己放进一个单位 */
+int  kal_process_job_terminate(struct kal_job);
+void kal_process_job_close(struct kal_job);
+```
+
+⭐ **两个不是目标的收益**:`kal_process_terminate` 恢复成「永远只是一个程序」
+（位形式下它的含义取决于句柄上一个不可见的属性,那正是这个接口最反对的隐藏状态）;
+以及**多个程序可以共享一个单位**,位形式说不出这句话。
+
+⚠️ 三处写进声明而不是留给人撞:释放一个单位**不得**结束它（这个系统的 job object
+可以被要求那样做,而一旦那样,同一个操作在两个系统上就是两个意思）;由进程标识命名
+的单位**比由句柄命名的弱**,因为标识会被回收;以及进入一个单位在某些系统上**要付
+代价**（脱离终端前台组），所以它必须是按次选的。
+
+### 2.5 ⭐ 还加了一条:`kal_process_stop_requested`
+
+```c
+const kal_u32* kal_process_stop_requested(void);   /* 零 → 非零,只增不清 */
+```
+
+「信号」不是一个能力,是一个装了八种用途的筐,而这个接口**已经表达了其中七种**:
+终止一个程序、终止一个单位、流的对端没了（`kal_stream_write` 报错）、被起的程序
+结束了（`kal_process_wait`）、等待的期限（`openkal.timeout`）、唤醒另一个上下文
+（`kal_task_wake`）。第八种没有任何拼法——**本程序被请求结束**——而 shell、服务器、
+带超时的 runner 都是围着它写的。
+
+⚠️ **而信号本身不能成为接口**:它是一个环境的形状（编号集合、disposition、打断当前
+栈的 handler）。另一个系统的通知**在它自己起的上下文上到达**,覆盖的原因也不同;
+两个目标根本没有进程可以被 signal。clause 7.1 说的正是这种形状。
+
+⇒ 一个字,而不是一个 handler。读它,或者用 `kal_task_wait` **等**它——这个规范本来
+就有,而 `openkal.timeout` 本来就给它加了期限。**零个新概念**,也没有 handler 强加给
+每个调用者的那套再入规则。
+
+⚠️ 它是**通知不是否决**;它**不说是谁请求的**;它对**无法被观察的终结**（不可拒绝的
+信号、突然终止、`kal_process_job_terminate`）**什么都不说**——因为那些在任何系统上
+都不产生通知。⭐ 正是这个对称性让它在两类系统上都可实现,而不是只在一类上。
 
 **删掉** `kal_process_spawn_with` 与 `kal_process_spawn_bound`。
 
