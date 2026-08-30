@@ -33,7 +33,7 @@
  * older implementation reports conditions this consumer distinguishes as
  * conditions it does not, which is a wrong answer rather than a refusal. */
 #define KAL_VERSION_MAJOR 0u
-#define KAL_VERSION_MINOR 10u
+#define KAL_VERSION_MINOR 11u
 #define KAL_VERSION_PATCH 0u
 
 #define KAL_VERSION_MAKE(major, minor, patch)             \

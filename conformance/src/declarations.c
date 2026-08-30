@@ -89,8 +89,6 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_process_close);
     (void)sizeof(&kal_process_props);
     (void)sizeof(&kal_process_spawn);
-    (void)sizeof(&kal_process_spawn_bound);
-    (void)sizeof(&kal_process_spawn_with);
     (void)sizeof(&kal_process_terminate);
     (void)sizeof(&kal_process_wait);
     (void)sizeof(&kal_random_fill);

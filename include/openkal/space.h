@@ -26,8 +26,8 @@
  * THERE IS NO OPERATION THAT CREATES AN EMPTY SPACE. An empty address space
  * contains no code, so the entry function a caller would name is not in it. A
  * program that wants a child holding only what it grants uses
- * `kal_process_spawn_with', which starts a named program rather than a function
- * of the caller's. */
+ * `kal_process_spawn' with `grants' set, which starts a named program rather
+ * than a function of the caller's. */
 #ifndef OPENKAL_SPACE_H
 #define OPENKAL_SPACE_H
 #include "types.h"

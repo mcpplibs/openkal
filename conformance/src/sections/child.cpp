@@ -218,7 +218,8 @@ bool start_copy_running(const char* first_element, const char* errand_argument,
     for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
 
     const kal_spawn_streams streams{ 0, 0, 0 };
-    return kal_process_spawn(base, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
+    const kal_spawn         how{ base, base, nullptr, 0, 0 };
+    return kal_process_spawn(&how, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
                              &streams, &out) == kal_ok;
 }
 
