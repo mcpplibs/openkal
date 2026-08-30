@@ -81,6 +81,7 @@ inline constexpr kal_uintptr KAL_PROCESS_PROP_CHANNEL_M         = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_PROCESS_PROP_EXIT_STATUS_M     = (kal_uintptr)(KAL_PROCESS_PROP_EXIT_STATUS);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_GRANT_DIR_M       = (kal_uintptr)(KAL_PROCESS_PROP_GRANT_DIR);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_JOB_M             = (kal_uintptr)(KAL_PROCESS_PROP_JOB);
+inline constexpr kal_uintptr KAL_PROCESS_PROP_STOP_REQUESTED_M  = (kal_uintptr)(KAL_PROCESS_PROP_STOP_REQUESTED);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_STREAM_PASSING_M  = (kal_uintptr)(KAL_PROCESS_PROP_STREAM_PASSING);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_TERMINATE_M       = (kal_uintptr)(KAL_PROCESS_PROP_TERMINATE);
 inline constexpr kal_uintptr KAL_RANDOM_PROP_BLOCKING_M         = (kal_uintptr)(KAL_RANDOM_PROP_BLOCKING);

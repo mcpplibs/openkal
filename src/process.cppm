@@ -35,6 +35,7 @@ export using ::kal_process_close;
 export using ::kal_process_job_enter;
 export using ::kal_process_job_terminate;
 export using ::kal_process_job_close;
+export using ::kal_process_stop_requested;
 export using ::kal_process_props;
 
 static_assert(sizeof(kal_process) == sizeof(kal_uintptr), "clause 7.2");
@@ -56,6 +57,7 @@ inline constexpr props channel       {KAL_PROCESS_PROP_CHANNEL};
 inline constexpr props grant_dir     {KAL_PROCESS_PROP_GRANT_DIR};
 inline constexpr props bound_lifetime{KAL_PROCESS_PROP_BOUND_LIFETIME};
 inline constexpr props job           {KAL_PROCESS_PROP_JOB};
+inline constexpr props stop_requested{KAL_PROCESS_PROP_STOP_REQUESTED};
 
 // ⚠️ WHAT A CALLER ASKS FOR, WHICH IS A DIFFERENT WORD FROM WHAT AN
 // IMPLEMENTATION CAN DO. `props' above answers the second; these set the first.

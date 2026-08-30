@@ -144,7 +144,8 @@ void run() {
                                     | kal::process::exit_status | kal::process::channel
                                     | kal::process::grant_dir
                                     | kal::process::bound_lifetime
-                                    | kal::process::job).bits;
+                                    | kal::process::job
+                                    | kal::process::stop_requested).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),

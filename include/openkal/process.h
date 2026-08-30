@@ -79,6 +79,8 @@ struct kal_preopen {
 #define KAL_PROCESS_PROP_BOUND_LIFETIME ((kal_uintptr)1u << 5)
 /* A non-null `job' in kal_spawn is answered here. Version 0.11. */
 #define KAL_PROCESS_PROP_JOB            ((kal_uintptr)1u << 6)
+/* kal_process_stop_requested answers a word rather than null. Version 0.11. */
+#define KAL_PROCESS_PROP_STOP_REQUESTED ((kal_uintptr)1u << 7)
 
 /* ⚠️⚠️ HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -246,6 +248,54 @@ int kal_process_wait(struct kal_process, int* status, int* terminated);
  * unit has an operation of its own and the caller says which it means. */
 int kal_process_terminate(struct kal_process);
 void kal_process_close(struct kal_process);
+
+/* ⭐⭐ A WORD THIS PROGRAM'S ENVIRONMENT SETS WHEN SOMEBODY HAS ASKED IT TO END.
+ * Zero until then, non-zero afterwards, and never cleared. Null where an
+ * implementation does not claim KAL_PROCESS_PROP_STOP_REQUESTED.
+ *
+ * ⚠️ THIS IS NOT A SIGNAL INTERFACE, AND THE DIFFERENCE IS WHY IT CAN EXIST AT
+ * ALL. Signals are one environment's mechanism: a numbered set, a disposition per
+ * program, a handler that interrupts whatever was running. This system has them;
+ * that one has console control events, which arrive on a NEW EXECUTION CONTEXT
+ * and cover a different set of causes; two of the environments this
+ * specification targets have no processes to signal. An interface shaped like
+ * signals would be the borrowed shape clause 7.1 names.
+ *
+ * ⭐ WHAT WAS ACTUALLY MISSING WAS ONE SENTENCE, and it is the only one of the
+ * uses of signals that this interface could not already express:
+ *
+ *     terminating a program            kal_process_terminate
+ *     terminating a unit               kal_process_job_terminate
+ *     the far end of a stream is gone  reported by kal_stream_write
+ *     a started program ended          kal_process_wait
+ *     a bound upon waiting             openkal.timeout
+ *     waking another context           kal_task_wake
+ *     THIS PROGRAM HAS BEEN ASKED TO END        --- nothing, until now
+ *
+ * ⇒ A WORD AND NOT A HANDLER. A handler is a call into arbitrary code at an
+ * arbitrary point, which is the part of signals that does not travel: the other
+ * system runs its notification on a context of its own, and reproducing an
+ * interruption there would be a compatibility layer. A word is read when the
+ * program chooses, or WAITED UPON with `kal_task_wait' --- which this
+ * specification already has, and which `openkal.timeout' already bounds. No new
+ * concept, and none of the re-entrancy rules a handler forces on every caller.
+ *
+ * ⚠️ IT IS A NOTICE AND NOT A VETO. The program is told; whether it ends is its
+ * own affair, and it may still be ended afterwards by something it cannot
+ * observe --- which is true on every system this targets and is why the word says
+ * "requested" rather than "will happen".
+ *
+ * ⚠️ IT DOES NOT SAY WHO ASKED, OR HOW. One word, because a program that is
+ * asked to end does the same thing whoever asked. An implementation that can
+ * distinguish causes may add an enquiry later; this one does not need altering
+ * for that.
+ *
+ * ⚠️ AND IT SAYS NOTHING ABOUT AN END THAT CANNOT BE OBSERVED. Where a program is
+ * ended outright --- the un-declinable signal here, the abrupt termination there,
+ * `kal_process_job_terminate' through this interface --- nothing is set, because
+ * nothing anywhere gets to notice. That symmetry is the reason this is
+ * implementable on both kinds of system rather than on one. */
+const kal_u32* kal_process_stop_requested(void);
 
 /* Puts THE CALLING program into a unit, on the same terms as `kal_spawn.job':
  * a word of zero forms a new unit and receives its identity, and a word that

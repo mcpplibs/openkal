@@ -83,6 +83,7 @@ kal_process_job_close
 kal_process_job_enter
 kal_process_job_terminate
 kal_process_props
+kal_process_stop_requested
 kal_process_spawn
 kal_process_terminate
 kal_process_wait
