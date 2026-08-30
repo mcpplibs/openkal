@@ -158,7 +158,7 @@ void run() {
             kal_process p{};
             const char* argv[1] = { "x" };
             const kal_uintptr lens[1] = { 1 };
-            const int e = kal_process_spawn_bound(here(), "x", 1, argv, lens, 1,
+            const int e = kal_process_spawn_bound(kal::fs::working(), "x", 1, argv, lens, 1,
                                                   nullptr, nullptr, 0, nullptr, &p);
             observe(kind::behaviour, e == kal_err_not_supported,
                     "a lifetime this implementation cannot bind is refused, not ignored");
