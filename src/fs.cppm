@@ -123,6 +123,30 @@ inline constexpr open_flags truncate {KAL_OPEN_TRUNCATE};
 inline constexpr open_flags append   {KAL_OPEN_APPEND};
 }
 
+// The mode of kal_fs_lock, in its own kind for the reason `open_flags' is in
+// one: an intent and a capability word are different things, and a word that
+// serves as both can be passed to the wrong operation.
+//
+// ⚠️⚠️ AND IT IS HERE BECAUSE A `#define' DOES NOT CROSS A MODULE BOUNDARY.
+// The header's macros are invisible to a consumer that writes `import
+// openkal.fs', so a position added to the C header and not to this file is a
+// position half the consumers cannot name. The specification's own conformance
+// suite is such a consumer, and it is what reported the omission:
+//
+//     error: use of undeclared identifier 'KAL_LOCK_EXCLUSIVE'
+struct lock_tag;
+using lock_mode = kal::props<lock_tag>;
+
+namespace lock {
+inline constexpr lock_mode shared   {KAL_LOCK_SHARED};
+inline constexpr lock_mode exclusive{KAL_LOCK_EXCLUSIVE};
+inline constexpr lock_mode wait     {KAL_LOCK_WAIT};
+}
+
+inline int lock_range(file f, kal_u64 start, kal_u64 len, lock_mode mode) {
+    return kal_fs_lock(f, start, len, mode.bits);
+}
+
 inline int open_file(dir base, const char* name, kal_uintptr len,
                      open_flags flags, file* out) {
     return kal_fs_open(base, name, len, flags.bits, out);

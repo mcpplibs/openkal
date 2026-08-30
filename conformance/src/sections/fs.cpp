@@ -496,21 +496,21 @@ void run() {
             const int oa = kal::fs::open_file(here(), kName, length(kName),
                                               kal::fs::open::read | kal::fs::open::write, &a);
             const int taken = oa == kal_ok
-                ? kal_fs_lock(a, 0, 0, KAL_LOCK_EXCLUSIVE) : oa;
+                ? kal::fs::lock_range(a, 0, 0, kal::fs::lock::exclusive) : oa;
             observe(kind::behaviour, taken == kal_ok,
                     "an exclusive lock upon a whole file is taken");
 
             const int ob = kal::fs::open_file(here(), kName, length(kName),
                                               kal::fs::open::read | kal::fs::open::write, &b);
             const int second = ob == kal_ok
-                ? kal_fs_lock(b, 0, 0, KAL_LOCK_EXCLUSIVE) : ob;
+                ? kal::fs::lock_range(b, 0, 0, kal::fs::lock::exclusive) : ob;
             observe(kind::behaviour, second == kal_err_again,
                     "and a second open file of the same name is refused, not granted");
 
             const int freed = taken == kal_ok ? kal_fs_unlock(a, 0, 0) : kal_err_invalid;
             observe(kind::behaviour, freed == kal_ok, "the lock is released");
             const int again = ob == kal_ok
-                ? kal_fs_lock(b, 0, 0, KAL_LOCK_EXCLUSIVE) : ob;
+                ? kal::fs::lock_range(b, 0, 0, kal::fs::lock::exclusive) : ob;
             observe(kind::behaviour, again == kal_ok,
                     "and once released, another open file may take it");
             if (again == kal_ok) kal_fs_unlock(b, 0, 0);
