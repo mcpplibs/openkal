@@ -1144,3 +1144,35 @@ The following are recorded so that they are not mistaken for oversights.
     is none to protect. An equivalent change after this specification has
     consumers is not permitted by clause 8 and this entry is not a precedent for
     one.
+15. **`KAL_SPAWN_OWN_JOB` has a shape borrowed from one environment, and clause
+    7.1 is what says so.** ⚠️ **Open, and recorded before it is settled** — because
+    the flag ships in 0.11 with one implementation refusing it, and a reader is
+    owed the reason.
+
+    The flag asks that a started program and its descendants form one unit, and
+    `kal_process_terminate` end the unit. Two implementations satisfy it with no
+    stored state: a program that called `setpgid(0, 0)` has a group identifier
+    equal to its own, so `getpgid(pid) == pid` **recovers the association from
+    the kernel**.
+
+    ⚠️ **openkal-windows cannot recover it.** It can form the unit — a job object
+    is exactly this — but there is no call there that answers "which job is this
+    process in" with a handle, and `kal_process` is one word already holding the
+    process. Satisfying the flag would require a registry keyed by process
+    handle.
+
+    ⭐ **Clause 7.1 states the consequence mechanically**: an implementation that
+    must maintain a translation table, a registry, or a name resolver in order to
+    satisfy this specification indicates that the specification has taken a shape
+    borrowed from one environment, **and the shape is at fault rather than the
+    implementation**. So this entry is a defect of the flag, not of
+    openkal-windows, and openkal-windows refusing is the correct behaviour under
+    clause 6.2 meanwhile.
+
+    ⇒ **The natural shape makes the unit a resource the caller holds**, created
+    before its members and terminated as a unit, so that nothing has to be
+    recovered on either kind of system. ⚠️ It is not settled here because the two
+    kinds of system create such a unit differently — Windows makes it externally
+    and assigns members, while a process group is made by a member from inside —
+    and a shape that is natural to one and not the other is the same defect
+    again, spelled the other way round.

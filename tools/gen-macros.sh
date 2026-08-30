@@ -34,9 +34,9 @@ cat <<'HEAD'
 // A macro does not cross a module boundary. Twice now a capability word has been
 // added to a header, used from a module consumer, and failed to compile there ---
 // `KAL_LOCK_*' in 0.10 and `KAL_SPAWN_*' in 0.11. The interface modules give the
-// well-named subset (`kal::fs::lock::exclusive'); this gives ALL of them, one per
-// macro, so that a name which exists in the header always exists here
-// too and the two cannot drift.
+// well-named subset (`kal::fs::lock::exclusive'); this gives ALL of them under
+// the C spelling with a `_M' suffix, so that a name in the header always exists
+// here too and the two cannot drift.
 module;
 HEAD
 
@@ -53,15 +53,18 @@ export import openkal.types;
 export namespace kal::macros {
 MID
 
-# ⚠️ THE DECLARED NAME IS NOT THE MACRO'S NAME, and it cannot be: the macro is
-# still defined here, so `constexpr kal_uintptr KAL_VERSION_MAJOR = …' expands on
-# the LEFT as well and becomes `constexpr kal_uintptr 0u = …'. Lower-casing gives
-# an identifier the preprocessor does not touch, and matches the spelling the
-# interface modules already use (`kal::fs::lock::exclusive').
+# ⚠️ THE DECLARED NAME CANNOT BE THE MACRO'S NAME: the macro is still defined
+# here, so `constexpr kal_uintptr KAL_VERSION_MAJOR = …' expands on the LEFT as
+# well and becomes `constexpr kal_uintptr 0u = …'.
+#
+# ⭐ `_M' RATHER THAN LOWER-CASING. The C spelling is what a reader is looking
+# for --- they arrived here because the header said `KAL_SPAWN_OWN_JOB' --- so the
+# name is kept and marked. `KAL_SPAWN_OWN_JOB_M' is a different token, so the
+# preprocessor leaves it alone, and the suffix says what it is: the module
+# spelling of a macro.
 for n in $names; do
     case " $skipped " in *" $n "*) continue;; esac
-    lower=$(printf '%s' "$n" | sed 's/^KAL_//' | tr 'A-Z' 'a-z')
-    printf 'inline constexpr kal_uintptr %-28s = (kal_uintptr)(%s);\n' "$lower" "$n"
+    printf 'inline constexpr kal_uintptr %-34s = (kal_uintptr)(%s);\n' "${n}_M" "$n"
 done
 
 echo '}  // namespace kal::macros'
