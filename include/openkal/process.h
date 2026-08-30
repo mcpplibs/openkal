@@ -247,6 +247,31 @@ int kal_process_wait(struct kal_process, int* status, int* terminated);
 int kal_process_terminate(struct kal_process);
 void kal_process_close(struct kal_process);
 
+/* Puts THE CALLING program into a unit, on the same terms as `kal_spawn.job':
+ * a word of zero forms a new unit and receives its identity, and a word that
+ * names one joins it.
+ *
+ * ⭐⭐ THE CALLER AND NOT A PROGRAM IT STARTS, WHICH IS THE WHOLE DIFFERENCE, and
+ * `kal_spawn.job' alone could not express it.
+ *
+ * A C library above this interface answers `fork'. The copy then wishes to be
+ * the start of a unit BEFORE it replaces itself --- which is what
+ * `setpgid(0, 0); exec…' means, and what every shell and every runner with a
+ * timeout is written as. Expressed only through the spawn, the unit formed
+ * belongs to the program the copy STARTS, whose identity the original never
+ * learns, so the original's request to end that unit names one that does not
+ * exist.
+ *
+ * ⚠️ THIS IS NOT THE MUTABLE AMBIENT STATE openkal DECLINES ELSEWHERE. A working
+ * directory that can be changed is shared between execution contexts and is
+ * refused for that reason. A unit is not shared and not read back: a program
+ * states once which unit it belongs to, and the only thing that can be done with
+ * the answer afterwards is to end the unit.
+ *
+ * An implementation that does not claim KAL_PROCESS_PROP_JOB reports
+ * kal_err_not_supported and leaves the word as it was. */
+int kal_process_job_enter(struct kal_job*);
+
 /* Requests the termination of every program in a unit, including programs
  * started by its members that the caller never held a handle to. That last part
  * is the whole reason a unit exists: a program that starts work in the

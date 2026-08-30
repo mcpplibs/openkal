@@ -32,6 +32,7 @@ export using ::kal_process_channel_close;
 export using ::kal_process_wait;
 export using ::kal_process_terminate;
 export using ::kal_process_close;
+export using ::kal_process_job_enter;
 export using ::kal_process_job_terminate;
 export using ::kal_process_job_close;
 export using ::kal_process_props;
