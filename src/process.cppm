@@ -22,16 +22,20 @@ export import openkal.stream;
 
 export using ::kal_process;
 export using ::kal_spawn_streams;
+export using ::kal_spawn;
+export using ::kal_job;
 export using ::kal_preopen;
 
 export using ::kal_process_spawn;
-export using ::kal_process_spawn_with;
-export using ::kal_process_spawn_bound;
 export using ::kal_process_channel;
 export using ::kal_process_channel_close;
 export using ::kal_process_wait;
 export using ::kal_process_terminate;
 export using ::kal_process_close;
+export using ::kal_process_job_enter;
+export using ::kal_process_job_terminate;
+export using ::kal_process_job_close;
+export using ::kal_process_stop_requested;
 export using ::kal_process_props;
 
 static_assert(sizeof(kal_process) == sizeof(kal_uintptr), "clause 7.2");
@@ -52,6 +56,23 @@ inline constexpr props exit_status   {KAL_PROCESS_PROP_EXIT_STATUS};
 inline constexpr props channel       {KAL_PROCESS_PROP_CHANNEL};
 inline constexpr props grant_dir     {KAL_PROCESS_PROP_GRANT_DIR};
 inline constexpr props bound_lifetime{KAL_PROCESS_PROP_BOUND_LIFETIME};
+inline constexpr props job           {KAL_PROCESS_PROP_JOB};
+inline constexpr props stop_requested{KAL_PROCESS_PROP_STOP_REQUESTED};
+
+// ⚠️ WHAT A CALLER ASKS FOR, WHICH IS A DIFFERENT WORD FROM WHAT AN
+// IMPLEMENTATION CAN DO. `props' above answers the second; these set the first.
+// A module consumer sees neither unless both are named here --- the C spellings
+// are macros, and a macro is invisible across a module boundary.
+struct spawn_flag_tag;
+using spawn_flags = kal::props<spawn_flag_tag>;
+
+inline constexpr spawn_flags bound_lifetime_flag{KAL_SPAWN_BOUND_LIFETIME};
+
+using how = kal_spawn;
+using job_handle = kal_job;
+
+static_assert(sizeof(kal_job) == sizeof(kal_uintptr), "clause 7.2");
+static_assert(sizeof(kal_spawn) == 6 * sizeof(kal_uintptr), "clause 5.3");
 
 inline props properties() { return props{kal_process_props()}; }
 inline bool  has(props p) { return properties().has(p); }

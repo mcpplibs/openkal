@@ -143,29 +143,87 @@ void run() {
         const kal_uintptr assigned = (kal::process::terminate | kal::process::stream_passing
                                     | kal::process::exit_status | kal::process::channel
                                     | kal::process::grant_dir
-                                    | kal::process::bound_lifetime).bits;
+                                    | kal::process::bound_lifetime
+                                    | kal::process::job
+                                    | kal::process::stop_requested).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
+        observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),
+                "the description of a start occupies six machine words");
+        observe(kind::abi, sizeof(kal_job) == sizeof(kal_uintptr),
+                "a unit handle occupies one machine word");
         observe(kind::abi, (kal_process_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 
-        // ⚠️ AN OPERATION THAT IS NOT CLAIMED SHALL REFUSE RATHER THAN PERFORM
+        // ⚠️ A FLAG THAT IS NOT CLAIMED SHALL REFUSE RATHER THAN PERFORM
         // SOMETHING ELSE. A caller that asks for a bound lifetime asked for it;
         // a program started WITHOUT the binding is not the program it asked to
         // start, and an implementation that quietly starts one anyway is the
-        // failure the operation exists to remove.
+        // failure the flag exists to remove.
+        //
+        // ⭐ ONE LOOP OVER BOTH FLAGS RATHER THAN A BLOCK EACH, which is the
+        // shape 0.11 made possible: they are two positions in one word now, so
+        // the observation is written once and reads the same for the next flag
+        // that arrives.
+        // ⚠️⚠️ THIS SUITE OBSERVES THE REFUSAL AND NOT THE EFFECT, AND THAT IS A
+        // LIMIT OF WHAT openkal CAN SEE RATHER THAN AN OMISSION HERE.
+        //
+        // `work' sets the directory a started program runs in, and openkal has no
+        // operation that READS a working directory --- deliberately: it has no
+        // ambient one. `KAL_SPAWN_OWN_JOB' makes a started program and its
+        // descendants one unit, and openkal has no operation that enumerates
+        // processes. So a conforming implementation could honour both, or
+        // neither, and nothing written against openkal alone could tell.
+        //
+        // ⇒ They are in the same category as the streams a spawn is given:
+        // configuration of a program that openkal does not introspect, because a
+        // started program need not be an openkal program at all. The effects are
+        // observed where they can be --- openkal-musl's probes call `getcwd' and
+        // start a process tree --- and this suite observes what IT can, which is
+        // that an implementation not claiming a position refuses rather than
+        // starting a program that lacks what was asked for.
+        //
+        // ⚠️ THE MODULE SPELLINGS AND NOT THE MACROS. `KAL_SPAWN_*' are macros,
+        // and a macro does not cross a module boundary --- this suite consumes
+        // openkal as a module, so the C spelling is simply not in scope here.
+        // The same thing caught `KAL_LOCK_*' one release ago, which is why
+        // `kal::process::*_flag' exists at all.
         if ((kal_process_props() & kal::process::bound_lifetime.bits) == 0) {
             kal_process p{};
             const char* argv[1] = { "x" };
             const kal_uintptr lens[1] = { 1 };
-            const int e = kal_process_spawn_bound(kal::fs::working(), "x", 1, argv, lens, 1,
-                                                  nullptr, nullptr, 0, nullptr, &p);
+            const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr,
+                                 nullptr, 0, kal::process::bound_lifetime_flag.bits };
+            const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
+                                            nullptr, nullptr, 0, nullptr, &p);
             observe(kind::behaviour, e == kal_err_not_supported,
                     "a lifetime this implementation cannot bind is refused, not ignored");
         } else {
             unobserved(kind::behaviour,
                        "a lifetime this implementation cannot bind is refused, not ignored",
                        "the implementation claims prop_bound_lifetime");
+        }
+
+        // ⭐ THE UNIT IS ASKED FOR BY A POINTER AND NOT BY A FLAG, so an
+        // implementation that cannot form one refuses a NON-NULL `job' --- there
+        // is no bit to set and none to test.
+        if ((kal_process_props() & kal::process::job.bits) == 0) {
+            kal_process p{};
+            kal_job unit{};
+            const char* argv[1] = { "x" };
+            const kal_uintptr lens[1] = { 1 };
+            const kal_spawn how{ kal::fs::working(), kal::fs::working(), &unit,
+                                 nullptr, 0, 0 };
+            const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
+                                            nullptr, nullptr, 0, nullptr, &p);
+            observe(kind::behaviour, e == kal_err_not_supported,
+                    "a unit this implementation cannot form is refused, not ignored");
+            observe(kind::behaviour, unit.h == 0,
+                    "and the caller's unit handle is left as it was");
+        } else {
+            unobserved(kind::behaviour,
+                       "a unit this implementation cannot form is refused, not ignored",
+                       "the implementation claims prop_job");
         }
     }
 

@@ -249,10 +249,16 @@ int main() {
         if (!haveRoot) {
             say("openkal: not observed: no directory denoting the whole of the name space was supplied\n");
         } else {
+            // `work' is the same directory as `base' here, which is what a
+            // caller that does not care about the working directory passes ---
+            // there is no "unset", because openkal has no ambient one that a
+            // default could mean.
+            const kal_spawn how{ root, root, nullptr, nullptr, 0, 0 };
+
             kal_process p{};
             const char*       argv[] = { "sh", "-c", "exit 0" };
             const kal_uintptr lens[] = { 2, 2, 6 };
-            bool spawned = kal_process_spawn(root, "bin/sh", 6, argv, lens, 3,
+            bool spawned = kal_process_spawn(&how, "bin/sh", 6, argv, lens, 3,
                                              nullptr, nullptr, 0, nullptr, &p) == kal_ok;
             int status = -1, terminated = 1;
             if (spawned) { kal_process_wait(p, &status, &terminated); kal_process_close(p); }
@@ -261,7 +267,7 @@ int main() {
             // so that a status of zero is evidence rather than a default.
             kal_process q{};
             const char*       argv2[] = { "sh", "-c", "exit 3" };
-            bool second = kal_process_spawn(root, "bin/sh", 6, argv2, lens, 3,
+            bool second = kal_process_spawn(&how, "bin/sh", 6, argv2, lens, 3,
                                             nullptr, nullptr, 0, nullptr, &q) == kal_ok;
             int status2 = -1, terminated2 = 1;
             if (second) { kal_process_wait(q, &status2, &terminated2); kal_process_close(q); }

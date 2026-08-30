@@ -1,4 +1,4 @@
-# openkal Specification, version 0.10
+# openkal Specification, version 0.11
 
 ## 1. Scope
 
@@ -50,7 +50,7 @@ provides an interface in whole or not at all.
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.10 specifies the core and optional interfaces. The reserved row is not
+Version 0.11 specifies the core and optional interfaces. The reserved row is not
 specified, and its name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1057,7 +1057,8 @@ The following are recorded so that they are not mistaken for oversights.
     the line: a caller can build exclusion out of `KAL_OPEN_EXCLUSIVE` and a
     name, and nothing then releases that name when its holder dies.
 11. **A started program that does not outlive its caller.** ⚠️ **Settled in
-    0.10.** `kal_process_spawn_bound`.
+    0.10** as `kal_process_spawn_bound`, **and respelled in 0.11** as
+    `KAL_SPAWN_BOUND_LIFETIME` — see entry 14.
 
     Clause 7.1 declines to replace a running image, and that stands. The
     consequence, which this entry did not previously record, is that a C library
@@ -1102,3 +1103,76 @@ The following are recorded so that they are not mistaken for oversights.
     first look up. Bytes are what the caller is deciding about, so bytes are
     what this returns and the multiplication happens once, in the
     implementation, where the units are known.
+14. **Starting a program was becoming a family, and 0.11 stopped it.** ⚠️ **This
+    is the first entry that records a REMOVAL**, and it is recorded here for the
+    same reason the additions are: so that the next reader meets the reasoning in
+    the specification rather than in a diff.
+
+    0.10 ended with three declarations — `kal_process_spawn`,
+    `kal_process_spawn_with` and `kal_process_spawn_bound` — which were never
+    three operations. They were one operation and three *modifiers* of it,
+    spelled apart for exactly one reason: clause 8 forbids adding an argument to
+    a declaration that exists, so each modifier had to arrive as a new name.
+
+    ⭐ **The 0.10 text on `..._bound` predicted where that ends, in terms**:
+    "Declaring every combination is how an interface acquires four spawns and
+    then eight." Two more modifiers then arrived together — the directory a
+    program runs in, and terminating what a started program itself started — and
+    the evidence that they arrive *together* was a single consumer signature
+    whose child calls `setpgid(0, 0)` and `chdir(cwd)` on adjacent lines. Four
+    orthogonal modifiers is sixteen declarations, each written in every
+    implementation.
+
+    ⇒ So the modifiers moved into `struct kal_spawn` and the family collapsed to
+    one declaration. **`..._with` and `..._bound` were removed rather than kept
+    beside it.** openkal has no users outside this ecosystem, so there was no one
+    to keep a second spelling for; an interface that offers two ways to say one
+    thing must explain the difference for ever, and this one had no difference to
+    explain. A caller written against the old shape fails to **compile** —
+    different arity, different types — which is the loud failure and not the
+    quiet one.
+
+    ⚠️ **What this costs, stated rather than glossed.** `struct kal_spawn` is
+    frozen by clause 5.3, so a future modifier that carries a *parameter* rather
+    than a flag cannot be added to it and will need its own declaration after
+    all. This entry does not claim to have solved that; it claims that one
+    general form plus a flag word is a better place to meet the problem than
+    sixteen names, and that the modifiers wanted so far are all flags.
+
+    ⚠️ **And clause 8 was set aside to do it**, deliberately and once. Clause 8
+    exists to protect written code, and 0.11 is the last version at which there
+    is none to protect. An equivalent change after this specification has
+    consumers is not permitted by clause 8 and this entry is not a precedent for
+    one.
+15. **`KAL_SPAWN_OWN_JOB` has a shape borrowed from one environment, and clause
+    7.1 is what says so.** ⚠️ **Open, and recorded before it is settled** — because
+    the flag ships in 0.11 with one implementation refusing it, and a reader is
+    owed the reason.
+
+    The flag asks that a started program and its descendants form one unit, and
+    `kal_process_terminate` end the unit. Two implementations satisfy it with no
+    stored state: a program that called `setpgid(0, 0)` has a group identifier
+    equal to its own, so `getpgid(pid) == pid` **recovers the association from
+    the kernel**.
+
+    ⚠️ **openkal-windows cannot recover it.** It can form the unit — a job object
+    is exactly this — but there is no call there that answers "which job is this
+    process in" with a handle, and `kal_process` is one word already holding the
+    process. Satisfying the flag would require a registry keyed by process
+    handle.
+
+    ⭐ **Clause 7.1 states the consequence mechanically**: an implementation that
+    must maintain a translation table, a registry, or a name resolver in order to
+    satisfy this specification indicates that the specification has taken a shape
+    borrowed from one environment, **and the shape is at fault rather than the
+    implementation**. So this entry is a defect of the flag, not of
+    openkal-windows, and openkal-windows refusing is the correct behaviour under
+    clause 6.2 meanwhile.
+
+    ⇒ **The natural shape makes the unit a resource the caller holds**, created
+    before its members and terminated as a unit, so that nothing has to be
+    recovered on either kind of system. ⚠️ It is not settled here because the two
+    kinds of system create such a unit differently — Windows makes it externally
+    and assigns members, while a process group is made by a member from inside —
+    and a shape that is natural to one and not the other is the same defect
+    again, spelled the other way round.
