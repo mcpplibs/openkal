@@ -67,7 +67,7 @@ kind = "lib"
 # published packages, which is the only place this could be observed: no
 # continuous integration in this ecosystem resolves a published package,
 # because they all substitute working trees by design.
-openkal = "0.9.0"
+openkal = "0.10.0"
 
 # ⚠️ NO `include_dirs` HERE EITHER. It named `../include`, which reaches out of
 # this package into whatever happens to sit above it. With the specification
@@ -98,4 +98,4 @@ openkal = "0.9.0"
 # same reason: a change spanning the specification and an implementation must be
 # tested against both halves as written, not against whichever half is published.
 [target.'cfg(os = "linux")'.dev-dependencies]
-openkal-linux = { version = "0.7.1", features = ["standalone"] }
+openkal-linux = { version = "0.9.0", features = ["standalone"] }

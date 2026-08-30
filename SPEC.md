@@ -1,4 +1,4 @@
-# openkal Specification, version 0.9
+# openkal Specification, version 0.10
 
 ## 1. Scope
 
@@ -50,7 +50,7 @@ provides an interface in whole or not at all.
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.9 specifies the core and optional interfaces. The reserved row is not
+Version 0.10 specifies the core and optional interfaces. The reserved row is not
 specified, and its name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1033,3 +1033,56 @@ The following are recorded so that they are not mistaken for oversights.
    general mechanism for passing a handle to a context in another space is not
    defined by this version. It is the question `openkal.space` reaches first and
    is not peculiar to it.
+10. **Exclusion upon a range of a file.** ⚠️ **Settled in 0.10.** `kal_fs_lock`
+    and `kal_fs_unlock` are operations of `openkal.fs`, admitted on exactly the
+    grounds entry 7 records for links: whether a *volume* can exclude is a
+    property of the format rather than of the environment, so `kal_fs_props`
+    answers it and a caller asks before it calls.
+
+    ⭐ **And this one is the opposite of entry 6, which is why the two are next
+    to each other.** Permission was declined because the environments do not
+    agree that an identity exists. Every environment this specification targets
+    locks a byte range, and spells it almost identically. What was missing was a
+    word, not a capability.
+
+    ⚠️ **What its absence cost, and it was not a refusal.** A C library above
+    this interface answers `fcntl(F_SETLK)`. With nothing here to answer it
+    with, one returned success and took no lock — **two programs held one
+    exclusive lock and neither could find out**. Measured against a host. This
+    entry exists so that "a specification with no operation for X" is not
+    mistaken for "consumers of it will simply not do X".
+
+    ⭐ **Release upon the holder's end is required rather than observed**, and
+    that requirement is the whole reason the operation cannot be composed above
+    the line: a caller can build exclusion out of `KAL_OPEN_EXCLUSIVE` and a
+    name, and nothing then releases that name when its holder dies.
+11. **A started program that does not outlive its caller.** ⚠️ **Settled in
+    0.10.** `kal_process_spawn_bound`.
+
+    Clause 7.1 declines to replace a running image, and that stands. The
+    consequence, which this entry did not previously record, is that a C library
+    asked for `execve` composes it — and the composition leaves **three** images
+    where a system with the operation has two: the caller, a copy that waits,
+    and the program.
+
+    ⚠️ **A signal reaches the middle one.** `kal_process_terminate` upon the
+    identifier the caller holds terminates the waiter; measured with a host as
+    control, the caller is told the program died on the signal it sent while the
+    program runs to completion, unsupervised. The termination operation was not
+    at fault — it was asked to terminate one started program and did. What was
+    missing was a way to *say* the thing `execve` means.
+12. **How many contexts run at once.** ⚠️ **Settled in 0.10.**
+    `kal_task_parallelism`. `KAL_TASK_PROP_PARALLEL` says *whether* and not *how
+    many*, and a C library above had nowhere else to look: `hardware_concurrency`
+    answered 1 with no error, so a program sizing a pool of workers got one
+    worker and no way to know. ⭐ Zero means "cannot say" and is distinct from
+    one, because an environment with one processor and an environment that will
+    not answer call for different behaviour.
+13. **The time of a name, and the size of a volume.** ⚠️ **Settled in 0.10.**
+    `kal_fs_set_modified_at` and `kal_fs_capacity`. The first exists because
+    `kal_fs_set_modified` is stated on an open *file* while a directory is
+    opened as a `kal_dir` — so this interface had no route to a directory's time
+    at all, and a consumer that stamps a lock directory drove one implementation
+    to open the directory for *reading* and set the time on that, outside
+    anything stated here. A divergence caused by a missing declaration is a
+    defect of the specification and is recorded as one.

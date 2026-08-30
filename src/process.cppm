@@ -26,6 +26,7 @@ export using ::kal_preopen;
 
 export using ::kal_process_spawn;
 export using ::kal_process_spawn_with;
+export using ::kal_process_spawn_bound;
 export using ::kal_process_channel;
 export using ::kal_process_channel_close;
 export using ::kal_process_wait;

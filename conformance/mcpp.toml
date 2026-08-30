@@ -18,7 +18,7 @@ repo        = "https://github.com/mcpplibs/openkal"
 # What it depends upon is therefore openkal and the language. The formatting in
 # okc.report is the price of that, and it is sixty lines.
 [dependencies]
-openkal = "0.9.0"
+openkal = "0.10.0"
 
 # The implementation under examination is not named here.
 #
