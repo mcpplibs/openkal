@@ -144,11 +144,13 @@ void run() {
                                     | kal::process::exit_status | kal::process::channel
                                     | kal::process::grant_dir
                                     | kal::process::bound_lifetime
-                                    | kal::process::own_job).bits;
+                                    | kal::process::job).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
-        observe(kind::abi, sizeof(kal_spawn) == 5 * sizeof(kal_uintptr),
-                "the description of a start occupies five machine words");
+        observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),
+                "the description of a start occupies six machine words");
+        observe(kind::abi, sizeof(kal_job) == sizeof(kal_uintptr),
+                "a unit handle occupies one machine word");
         observe(kind::abi, (kal_process_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 
@@ -185,25 +187,42 @@ void run() {
         // openkal as a module, so the C spelling is simply not in scope here.
         // The same thing caught `KAL_LOCK_*' one release ago, which is why
         // `kal::process::*_flag' exists at all.
-        struct { kal_uintptr bit; const char* what; } const asks[] = {
-            { kal::process::bound_lifetime_flag.bits,
-              "a lifetime this implementation cannot bind is refused, not ignored" },
-            { kal::process::own_job_flag.bits,
-              "a job this implementation cannot form is refused, not ignored"      },
-        };
-        for (const auto& ask : asks) {
-            if ((kal_process_props() & ask.bit) == 0) {
-                kal_process p{};
-                const char* argv[1] = { "x" };
-                const kal_uintptr lens[1] = { 1 };
-                const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr, 0, ask.bit };
-                const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
-                                                nullptr, nullptr, 0, nullptr, &p);
-                observe(kind::behaviour, e == kal_err_not_supported, ask.what);
-            } else {
-                unobserved(kind::behaviour, ask.what,
-                           "the implementation claims this position");
-            }
+        if ((kal_process_props() & kal::process::bound_lifetime.bits) == 0) {
+            kal_process p{};
+            const char* argv[1] = { "x" };
+            const kal_uintptr lens[1] = { 1 };
+            const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr,
+                                 nullptr, 0, kal::process::bound_lifetime_flag.bits };
+            const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
+                                            nullptr, nullptr, 0, nullptr, &p);
+            observe(kind::behaviour, e == kal_err_not_supported,
+                    "a lifetime this implementation cannot bind is refused, not ignored");
+        } else {
+            unobserved(kind::behaviour,
+                       "a lifetime this implementation cannot bind is refused, not ignored",
+                       "the implementation claims prop_bound_lifetime");
+        }
+
+        // ⭐ THE UNIT IS ASKED FOR BY A POINTER AND NOT BY A FLAG, so an
+        // implementation that cannot form one refuses a NON-NULL `job' --- there
+        // is no bit to set and none to test.
+        if ((kal_process_props() & kal::process::job.bits) == 0) {
+            kal_process p{};
+            kal_job unit{};
+            const char* argv[1] = { "x" };
+            const kal_uintptr lens[1] = { 1 };
+            const kal_spawn how{ kal::fs::working(), kal::fs::working(), &unit,
+                                 nullptr, 0, 0 };
+            const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
+                                            nullptr, nullptr, 0, nullptr, &p);
+            observe(kind::behaviour, e == kal_err_not_supported,
+                    "a unit this implementation cannot form is refused, not ignored");
+            observe(kind::behaviour, unit.h == 0,
+                    "and the caller's unit handle is left as it was");
+        } else {
+            unobserved(kind::behaviour,
+                       "a unit this implementation cannot form is refused, not ignored",
+                       "the implementation claims prop_job");
         }
     }
 

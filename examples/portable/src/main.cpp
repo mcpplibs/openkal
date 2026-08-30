@@ -253,7 +253,7 @@ int main() {
             // caller that does not care about the working directory passes ---
             // there is no "unset", because openkal has no ambient one that a
             // default could mean.
-            const kal_spawn how{ root, root, nullptr, 0, 0 };
+            const kal_spawn how{ root, root, nullptr, nullptr, 0, 0 };
 
             kal_process p{};
             const char*       argv[] = { "sh", "-c", "exit 0" };

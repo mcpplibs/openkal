@@ -77,8 +77,8 @@ struct kal_preopen {
 #define KAL_PROCESS_PROP_GRANT_DIR      ((kal_uintptr)1u << 4)
 /* KAL_SPAWN_BOUND_LIFETIME is answered here. Version 0.10. */
 #define KAL_PROCESS_PROP_BOUND_LIFETIME ((kal_uintptr)1u << 5)
-/* KAL_SPAWN_OWN_JOB is answered here. Version 0.11. */
-#define KAL_PROCESS_PROP_OWN_JOB        ((kal_uintptr)1u << 6)
+/* A non-null `job' in kal_spawn is answered here. Version 0.11. */
+#define KAL_PROCESS_PROP_JOB            ((kal_uintptr)1u << 6)
 
 /* ⚠️⚠️ HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -131,6 +131,42 @@ struct kal_spawn {
      * applied to stating, once, at the moment of starting, where a program runs. */
     struct kal_dir work;
 
+    /* ⭐⭐ THE UNIT THIS PROGRAM BELONGS TO, AND IT IS THE ONE FIELD HERE THAT IS
+     * WRITTEN AS WELL AS READ.
+     *
+     *   null            this program belongs to no unit of the caller's making
+     *   *job == 0       a new unit is formed, and its identity is written here
+     *   *job != 0       this program joins the unit that word names
+     *
+     * ⚠️ IN AND OUT BECAUSE NEITHER KIND OF SYSTEM CAN DO IT THE OTHER WAY. This
+     * system creates the unit first and puts members into it; that one has the
+     * unit created BY its first member --- a process group's identity is a
+     * process's --- so there is nothing to create beforehand. An operation that
+     * opened an empty unit would be natural to one and impossible to the other,
+     * and clause 7.1 says which of the two is then at fault. Establishing the
+     * identity at the first start is the only shape both perform without keeping
+     * a table.
+     *
+     * ⇒ Unchanged if the start fails. An implementation that does not claim
+     * KAL_PROCESS_PROP_JOB reports kal_err_not_supported for a non-null `job'
+     * rather than starting a program outside the unit that was asked for.
+     *
+     * ⚠️ ENTERING A UNIT HAS A COST ON SOME SYSTEMS AND THAT IS WHY IT IS PER
+     * START. Where the unit is a process group, entering a new one LEAVES THE
+     * TERMINAL'S FOREGROUND GROUP, so a program with an interface whose child
+     * then reads the terminal stops on SIGTTIN. A caller that has given the
+     * started program pipes for all three streams wants a unit; an interactive
+     * caller must never be given one silently.
+     *
+     * ⚠️ AND THE TWO KINDS OF UNIT ARE NOT EQUALLY STRONG. A job is named by a
+     * handle that is never reused; a process group is named by a process
+     * identifier, which is reused once the leader has ended and the numbers have
+     * wrapped. Terminating a unit whose leader is long gone can therefore reach a
+     * different unit on such a system. This is what those systems do --- every
+     * program that calls `killpg' lives with it --- and it is recorded rather than
+     * hidden behind an interface that reads as though it were not so. */
+    struct kal_job* job;
+
     /* The directories the started program receives, read back through
      * `kal_fs_preopen'. A count of zero starts a program with no preopens at
      * all, which is a different thing from not asking. */
@@ -152,21 +188,9 @@ struct kal_spawn {
  * program runs to completion, unsupervised. openkal-linux#13. */
 #define KAL_SPAWN_BOUND_LIFETIME ((kal_uintptr)1u << 0)
 
-/* The started program and everything IT starts form one unit, which
- * `kal_process_terminate' ends as a unit.
- *
- * ⚠️ ASKED FOR PER START, AND THAT IS NOT A CONVENIENCE. On the systems beneath
- * this interface the unit is a process group or a job, and entering a new one
- * LEAVES THE TERMINAL'S FOREGROUND GROUP --- so a program with an interface, whose
- * child then reads the terminal, stops on SIGTTIN. A caller that has given the
- * started program pipes for all three streams wants this; an interactive caller
- * must never get it. Neither a default nor a property of the implementation can
- * express that difference; a bit the caller sets can.
- *
- * ⭐ It is not what BOUND_LIFETIME does. That binds the started program to the
- * caller's life and reaches no further --- a grandchild outlives both. This is the
- * one a timeout needs: kill what was started, and what it started. */
-#define KAL_SPAWN_OWN_JOB        ((kal_uintptr)1u << 1)
+/* A set of started programs that end together --- see `kal_spawn.job'. One
+ * machine word, as every handle here is. */
+struct kal_job { kal_uintptr h; };
 
 #ifdef __cplusplus
 extern "C" {
@@ -211,8 +235,31 @@ int  kal_process_channel(struct kal_stream* mine, struct kal_stream* theirs);
 void kal_process_channel_close(struct kal_stream s);
 
 int kal_process_wait(struct kal_process, int* status, int* terminated);
+
+/* Requests the termination of ONE started program, whatever unit it is in.
+ *
+ * ⭐ ITS MEANING DOES NOT DEPEND ON HOW THAT PROGRAM WAS STARTED, and 0.11 is
+ * where that became true. The shape this replaced was a flag on the spawn, after
+ * which this operation reached one program or a whole tree according to a
+ * property of the handle that no caller could see. An operation whose meaning
+ * turns on invisible state is the thing this interface exists to avoid, so the
+ * unit has an operation of its own and the caller says which it means. */
 int kal_process_terminate(struct kal_process);
 void kal_process_close(struct kal_process);
+
+/* Requests the termination of every program in a unit, including programs
+ * started by its members that the caller never held a handle to. That last part
+ * is the whole reason a unit exists: a program that starts work in the
+ * background leaves nothing for a caller to terminate one at a time. */
+int kal_process_job_terminate(struct kal_job);
+
+/* Releases the caller's reference to a unit. ⚠️ IT DOES NOT END THE UNIT, and an
+ * implementation must take care that it does not: this system's job objects can
+ * be asked to end their members when the last handle closes, and one that asked
+ * for that would make this operation mean something different here from what it
+ * means where the unit is a process group and closing is releasing a number.
+ * Terminating is `kal_process_job_terminate' and nothing else is. */
+void kal_process_job_close(struct kal_job);
 
 kal_uintptr kal_process_props(void);
 
