@@ -126,6 +126,11 @@ struct kal_node_info {
 #define KAL_FS_PROP_ATOMIC_RENAME  ((kal_uintptr)1u << 3)
 #define KAL_FS_PROP_MAKE_LINKS     ((kal_uintptr)1u << 4)  /* kal_fs_link_create
                                                             * is answered here */
+#define KAL_FS_PROP_LOCKS          ((kal_uintptr)1u << 5)  /* kal_fs_lock and
+                                                            * kal_fs_unlock are
+                                                            * answered here. 0.10 */
+#define KAL_FS_PROP_CAPACITY       ((kal_uintptr)1u << 6)  /* kal_fs_capacity is
+                                                            * answered here. 0.10 */
 
 /* Positions in the flags word of kal_fs_open. */
 #define KAL_OPEN_READ      ((kal_uintptr)1u << 0)
@@ -280,6 +285,105 @@ int kal_fs_file_info(struct kal_file, kal_u32 wanted,
  * here. An implementation that claims the position shall be able to perform
  * this. */
 int kal_fs_set_modified(struct kal_file, kal_u64 modified_ns);
+
+/* Sets the time a NAME's node reports. Version 0.10.
+ *
+ * ⚠️⚠️ A SECOND DECLARATION BECAUSE THE FIRST CANNOT REACH A DIRECTORY, AND THE
+ * GAP WAS FOUND BY A CONSUMER RATHER THAN HERE.
+ *
+ * The operation above is stated on an open FILE, for a reason that remains
+ * good. But a directory is opened by `kal_fs_open_dir', which yields a
+ * `kal_dir', and there is no form of the operation above that takes one --- so
+ * this interface had no route at all to a directory's time, while `kal_fs_info'
+ * reports one perfectly well.
+ *
+ * ⭐ MEASURED THREE LAYERS UP. A consumer takes a lock by making a directory and
+ * refreshes the lock by stamping it. Reading the stamp worked; writing it could
+ * not be expressed, and openkal-musl reached it by opening the directory for
+ * READING and setting the time on that --- which Linux and macOS perform and
+ * which this interface does not sanction. That divergence exists because this
+ * declaration did not.
+ *
+ * The name is resolved, as opening resolves. Where the name refers to a FILE the
+ * effect is that of the operation above; the file-taking form remains for a
+ * caller that holds one and does not want the name resolved again.
+ *
+ * An implementation that does not claim KAL_FS_PROP_MODIFIED_TIME for the volume
+ * reports kal_err_not_supported. */
+int kal_fs_set_modified_at(struct kal_dir base, const char* name, kal_uintptr len,
+                           kal_u64 modified_ns);
+
+/* Excluding other holders from a range of a file. Version 0.10.
+ *
+ * ⚠️⚠️ ADDED BECAUSE ITS ABSENCE WAS SILENTLY UNSAFE ONE LAYER UP, AND THE
+ * ADMISSIBILITY ARGUMENT IS THE ONE THE LINK OPERATIONS BELOW ALREADY MAKE.
+ *
+ * A C library above this interface answers `fcntl(F_SETLK)'. With nothing here
+ * to answer it with, openkal-musl returned success and took no lock: two
+ * programs held one exclusive lock and neither could find out. Measured against
+ * the host, and it is the shape this specification exists to exclude --- an
+ * answer that is not true, given to a caller with no way to check it.
+ *
+ * ⭐ AND IT IS NOT THE `chmod' CASE, WHICH IS WHY IT IS HERE AND THAT IS NOT.
+ * A permission operation was declined because a FAT volume, a UEFI system
+ * partition and a Windows access-control list do not share a model. Every
+ * environment this specification targets locks a byte range and spells it
+ * almost identically. What was missing was a word, not a capability.
+ *
+ * ⚠️ Whether a VOLUME can is a property of the format rather than of the
+ * environment, exactly as it is for links --- a network volume may not, and a
+ * read-only medium need not. So it is an operation of this interface answered by
+ * `kal_fs_props' and not an interface of its own, which is what clause 6.2
+ * requires and what makes it admissible: a caller asks first.
+ *
+ * `mode' is KAL_LOCK_SHARED or KAL_LOCK_EXCLUSIVE, optionally with KAL_LOCK_WAIT.
+ * Without KAL_LOCK_WAIT an operation that would block reports kal_err_again,
+ * which is the answer `fcntl' spells EAGAIN and the one a caller polls upon.
+ *
+ * A length of zero means "from `start' to the end, however far that comes to
+ * be", which is the whole-file convention every environment beneath spells the
+ * same way.
+ *
+ * ⭐⭐ A LOCK IS HELD BY THE FILE AND ENDS WITH IT, AND THAT IS REQUIRED RATHER
+ * THAN OBSERVED. It is released by `kal_fs_close_file' and by the end of the
+ * program that holds it, however that program ends.
+ *
+ * That requirement is the whole reason this belongs here rather than above the
+ * line: a caller CAN build exclusion for itself out of KAL_OPEN_EXCLUSIVE and a
+ * name, and nothing then releases that name when its holder dies --- so a
+ * program that ends abnormally while holding one locks itself out of its own
+ * file for ever. Release upon death is what only the environment can supply.
+ *
+ * ⚠️ AND IT IS THE FILE AND NOT THE PROGRAM, WHICH IS NARROWER THAN ONE
+ * ENVIRONMENT'S OLDEST FORM OF THIS. That form releases every lock a program
+ * holds upon a node as soon as the program closes ANY descriptor for it, so a
+ * library that opened the same file twice destroyed its own lock. An
+ * implementation shall not expose that: the holder is this `kal_file'. The
+ * environments that have the older form also have a newer one whose holder is
+ * exactly the open file, and that is the one to build upon.
+ *
+ * Two locks upon one file: an implementation may replace the earlier with the
+ * later where the ranges meet, which is what every environment beneath does.
+ * A caller that requires them distinct opens the file twice. */
+#define KAL_LOCK_SHARED    ((kal_uintptr)1u << 0)
+#define KAL_LOCK_EXCLUSIVE ((kal_uintptr)1u << 1)
+#define KAL_LOCK_WAIT      ((kal_uintptr)1u << 2)
+
+int kal_fs_lock(struct kal_file, kal_u64 start, kal_u64 len, kal_uintptr mode);
+int kal_fs_unlock(struct kal_file, kal_u64 start, kal_u64 len);
+
+/* How much the volume a directory is on holds, and how much of that is free,
+ * in bytes. Version 0.10.
+ *
+ * An implementation that does not claim KAL_FS_PROP_CAPACITY for the volume
+ * reports kal_err_not_supported. One that claims it answers, and writes zero
+ * into a position it cannot distinguish --- which is the same convention
+ * `kal_task_parallelism' uses, and for the same reason: a caller must be able
+ * to tell "nothing available" from "not answered", and only one of the two is
+ * a number to act upon.
+ *
+ * Either pointer may be null, for a caller that wants one of the two. */
+int kal_fs_capacity(struct kal_dir, kal_u64* total, kal_u64* available);
 
 /* Nodes whose content is another name.
  *

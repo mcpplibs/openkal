@@ -46,6 +46,10 @@ export using ::kal_fs_truncate;
 export using ::kal_fs_info;
 export using ::kal_fs_file_info;
 export using ::kal_fs_set_modified;
+export using ::kal_fs_set_modified_at;
+export using ::kal_fs_lock;
+export using ::kal_fs_unlock;
+export using ::kal_fs_capacity;
 export using ::kal_fs_mkdir;
 export using ::kal_fs_remove;
 export using ::kal_fs_rename;
@@ -99,6 +103,8 @@ inline constexpr props links         {KAL_FS_PROP_LINKS};
 inline constexpr props modified_time {KAL_FS_PROP_MODIFIED_TIME};
 inline constexpr props atomic_rename {KAL_FS_PROP_ATOMIC_RENAME};
 inline constexpr props make_links    {KAL_FS_PROP_MAKE_LINKS};
+inline constexpr props locks         {KAL_FS_PROP_LOCKS};
+inline constexpr props capacity      {KAL_FS_PROP_CAPACITY};
 
 enum : int { seek_set = KAL_SEEK_SET, seek_current = KAL_SEEK_CURRENT, seek_end = KAL_SEEK_END };
 
@@ -115,6 +121,30 @@ inline constexpr open_flags create   {KAL_OPEN_CREATE};
 inline constexpr open_flags exclusive{KAL_OPEN_EXCLUSIVE};
 inline constexpr open_flags truncate {KAL_OPEN_TRUNCATE};
 inline constexpr open_flags append   {KAL_OPEN_APPEND};
+}
+
+// The mode of kal_fs_lock, in its own kind for the reason `open_flags' is in
+// one: an intent and a capability word are different things, and a word that
+// serves as both can be passed to the wrong operation.
+//
+// ⚠️⚠️ AND IT IS HERE BECAUSE A `#define' DOES NOT CROSS A MODULE BOUNDARY.
+// The header's macros are invisible to a consumer that writes `import
+// openkal.fs', so a position added to the C header and not to this file is a
+// position half the consumers cannot name. The specification's own conformance
+// suite is such a consumer, and it is what reported the omission:
+//
+//     error: use of undeclared identifier 'KAL_LOCK_EXCLUSIVE'
+struct lock_tag;
+using lock_mode = kal::props<lock_tag>;
+
+namespace lock {
+inline constexpr lock_mode shared   {KAL_LOCK_SHARED};
+inline constexpr lock_mode exclusive{KAL_LOCK_EXCLUSIVE};
+inline constexpr lock_mode wait     {KAL_LOCK_WAIT};
+}
+
+inline int lock_range(file f, kal_u64 start, kal_u64 len, lock_mode mode) {
+    return kal_fs_lock(f, start, len, mode.bits);
 }
 
 inline int open_file(dir base, const char* name, kal_uintptr len,

@@ -142,11 +142,31 @@ void run() {
                 "the stream selection occupies three machine words");
         const kal_uintptr assigned = (kal::process::terminate | kal::process::stream_passing
                                     | kal::process::exit_status | kal::process::channel
-                                    | kal::process::grant_dir).bits;
+                                    | kal::process::grant_dir
+                                    | kal::process::bound_lifetime).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, (kal_process_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
+
+        // ⚠️ AN OPERATION THAT IS NOT CLAIMED SHALL REFUSE RATHER THAN PERFORM
+        // SOMETHING ELSE. A caller that asks for a bound lifetime asked for it;
+        // a program started WITHOUT the binding is not the program it asked to
+        // start, and an implementation that quietly starts one anyway is the
+        // failure the operation exists to remove.
+        if ((kal_process_props() & kal::process::bound_lifetime.bits) == 0) {
+            kal_process p{};
+            const char* argv[1] = { "x" };
+            const kal_uintptr lens[1] = { 1 };
+            const int e = kal_process_spawn_bound(kal::fs::working(), "x", 1, argv, lens, 1,
+                                                  nullptr, nullptr, 0, nullptr, &p);
+            observe(kind::behaviour, e == kal_err_not_supported,
+                    "a lifetime this implementation cannot bind is refused, not ignored");
+        } else {
+            unobserved(kind::behaviour,
+                       "a lifetime this implementation cannot bind is refused, not ignored",
+                       "the implementation claims prop_bound_lifetime");
+        }
     }
 
     if (performs(kind::stability)) {

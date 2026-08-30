@@ -72,6 +72,8 @@ struct kal_preopen {
 #define KAL_PROCESS_PROP_EXIT_STATUS    ((kal_uintptr)1u << 2)
 #define KAL_PROCESS_PROP_CHANNEL        ((kal_uintptr)1u << 3)
 #define KAL_PROCESS_PROP_GRANT_DIR      ((kal_uintptr)1u << 4)
+/* kal_process_spawn_bound is answered here. Version 0.10. */
+#define KAL_PROCESS_PROP_BOUND_LIFETIME ((kal_uintptr)1u << 5)
 
 #ifdef __cplusplus
 extern "C" {
@@ -125,6 +127,52 @@ void kal_process_channel_close(struct kal_stream s);
 int kal_process_wait(struct kal_process, int* status, int* terminated);
 int kal_process_terminate(struct kal_process);
 void kal_process_close(struct kal_process);
+
+/* Starts a program whose lifetime is BOUND to the caller's: when the calling
+ * image ends, however it ends, the started program ends too. Version 0.10.
+ *
+ * ⚠️⚠️ ADDED BECAUSE A LIBRARY ABOVE THIS INTERFACE HAD TO COMPOSE SOMETHING IT
+ * COULD NOT THEN CONTROL, AND A CALLER WAS TOLD A FALSEHOOD ABOUT IT.
+ *
+ * Clause 7.1 declines to replace a running image, correctly. A C library asked
+ * for `execve' therefore composes it: start the program, wait for it, end with
+ * its status. That composition leaves THREE images where a system with the
+ * operation has two --- the caller, the copy that is waiting, and the program.
+ *
+ * ⭐ AND THE MIDDLE ONE IS THE ONE A SIGNAL REACHES. `kal_process_terminate'
+ * upon the identifier the caller holds terminates the WAITER. Measured, with a
+ * host as control: identical status words, opposite outcomes --- the caller is
+ * told the program died on the signal it sent, while the program runs to
+ * completion, unsupervised. openkal-linux#13.
+ *
+ * ⚠️ `kal_process_terminate' is not at fault: it was asked to terminate one
+ * started program and did. What was missing was a way to SAY the thing `execve'
+ * means --- this program stands in for me, so it does not outlive me.
+ *
+ * Otherwise identical to kal_process_spawn. An implementation that cannot bind a
+ * lifetime does not claim KAL_PROCESS_PROP_BOUND_LIFETIME and reports
+ * kal_err_not_supported here rather than starting a program it cannot bind: a
+ * caller that asked for the binding asked for it, and a program started without
+ * it is not the program the caller asked to start.
+ *
+ * A SECOND DECLARATION RATHER THAN A FLAG ON THE FIRST, because clause 8 forbids
+ * altering an existing one --- the same reason `kal_process_spawn_with' is a
+ * declaration and not an argument.
+ *
+ * ⚠️ WHICH MEANS THE TWO ADDITIONS DO NOT COMBINE, AND THAT IS DELIBERATE. There
+ * is no form that both grants directories and binds a lifetime. Declaring every
+ * combination is how an interface acquires four spawns and then eight, so the
+ * combination is declared when something needs it and not before; clause 8
+ * permits adding it then. What a caller must not do meanwhile is take
+ * `kal_process_spawn_with' and assume the binding: it does not bind, and a
+ * program that outlives its caller is exactly the failure this exists to
+ * remove. */
+int kal_process_spawn_bound(struct kal_dir base,
+                            const char*  path,  kal_uintptr path_len,
+                            const char** argv,  const kal_uintptr* argv_lens, kal_uintptr argc,
+                            const char** envp,  const kal_uintptr* envp_lens, kal_uintptr envc,
+                            const struct kal_spawn_streams* streams,
+                            struct kal_process* out);
 
 kal_uintptr kal_process_props(void);
 

@@ -220,6 +220,17 @@ void run() {
                                     | kal::task::thread_local_storage).bits;
         observe(kind::abi, (kal_task_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
+        // ⭐ ZERO IS `CANNOT SAY' AND IS DISTINCT FROM ONE, which is the whole
+        // reason this enquiry exists: before it, a C library above answered 1
+        // with no error and a program sizing a pool of workers got one worker.
+        // An implementation that will not say must say so, and not say "one".
+        const kal_uintptr n = kal_task_parallelism();
+        observe(kind::behaviour,
+                (kal_task_props() & kal::task::parallel.bits) == 0 ? n == 1 : true,
+                "an implementation whose contexts do not run at once reports one");
+        observe(kind::behaviour, kal_task_parallelism() == n,
+                "how many contexts can run at once is the same answer each time");
+
         observe(kind::abi, kal_task_current() == kal_task_current(),
                 "the identity of the calling context is stable within it");
 

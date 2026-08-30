@@ -26,6 +26,7 @@ export using ::kal_preopen;
 
 export using ::kal_process_spawn;
 export using ::kal_process_spawn_with;
+export using ::kal_process_spawn_bound;
 export using ::kal_process_channel;
 export using ::kal_process_channel_close;
 export using ::kal_process_wait;
@@ -50,6 +51,7 @@ inline constexpr props stream_passing{KAL_PROCESS_PROP_STREAM_PASSING};
 inline constexpr props exit_status   {KAL_PROCESS_PROP_EXIT_STATUS};
 inline constexpr props channel       {KAL_PROCESS_PROP_CHANNEL};
 inline constexpr props grant_dir     {KAL_PROCESS_PROP_GRANT_DIR};
+inline constexpr props bound_lifetime{KAL_PROCESS_PROP_BOUND_LIFETIME};
 
 inline props properties() { return props{kal_process_props()}; }
 inline bool  has(props p) { return properties().has(p); }

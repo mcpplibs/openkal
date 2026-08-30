@@ -64,6 +64,24 @@ void kal_task_yield(void);
  * same moment; may be reused after one finishes. */
 kal_uintptr kal_task_current(void);
 
+/* How many contexts this environment can run at the same moment, or zero where
+ * it cannot say. Version 0.10.
+ *
+ * ⚠️⚠️ ADDED BECAUSE ITS ABSENCE WAS A WRONG ANSWER RATHER THAN A REFUSAL.
+ * KAL_TASK_PROP_PARALLEL says WHETHER contexts run at the same moment and not
+ * HOW MANY can, and a C library above has no other place to look --- so
+ * `sysconf(_SC_NPROCESSORS_ONLN)' fell back to 1 and
+ * `std::thread::hardware_concurrency()' answered 1, with no error. A program
+ * sizing a pool of workers got one worker and no way to know. Measured: 1 here
+ * against 32 on the same machine's own C library.
+ *
+ * ⭐ ZERO IS "CANNOT SAY" AND IS NOT ONE. A caller must be able to tell an
+ * environment that has one processor from one that will not answer, because the
+ * two call for different behaviour: the first is a fact to size against, and
+ * the second is a reason to ask the operator. An implementation that does not
+ * claim KAL_TASK_PROP_PARALLEL answers 1, which is the truth there. */
+kal_uintptr kal_task_parallelism(void);
+
 /* Suspends the calling context while the word at the given address holds the
  * given value, until another context wakes it or the timeout elapses. The
  * comparison and the suspension occur without an intervening opportunity for

@@ -478,13 +478,119 @@ void run() {
         }
     }
 
+    // --- exclusion upon a range of a file, version 0.10 ---------------------
+    //
+    // ⭐⭐ THE OBSERVATION THAT TELLS THE TWO FORMS OF THIS APART NEEDS NO SECOND
+    // PROGRAM, AND THAT IS WHY IT IS WRITTEN THIS WAY.
+    //
+    // openkal states the holder as the open FILE. One environment's oldest form
+    // holds it by the PROCESS and releases every lock upon a node as soon as the
+    // program closes any descriptor for it --- so a library that opened one file
+    // twice destroyed its own lock. An implementation built on that form passes
+    // "a lock can be taken" and "it can be released" and fails only here: a
+    // SECOND OPEN FILE of one name, in this program, must be refused.
+    if (performs(kind::behaviour)) {
+        if ((kal_fs_props(here()) & kal::fs::locks.bits) != 0) {
+            put_file(kName, "xxxx");
+            kal_file a{}, b{};
+            const int oa = kal::fs::open_file(here(), kName, length(kName),
+                                              kal::fs::open::read | kal::fs::open::write, &a);
+            const int taken = oa == kal_ok
+                ? kal::fs::lock_range(a, 0, 0, kal::fs::lock::exclusive) : oa;
+            observe(kind::behaviour, taken == kal_ok,
+                    "an exclusive lock upon a whole file is taken");
+
+            const int ob = kal::fs::open_file(here(), kName, length(kName),
+                                              kal::fs::open::read | kal::fs::open::write, &b);
+            const int second = ob == kal_ok
+                ? kal::fs::lock_range(b, 0, 0, kal::fs::lock::exclusive) : ob;
+            observe(kind::behaviour, second == kal_err_again,
+                    "and a second open file of the same name is refused, not granted");
+
+            const int freed = taken == kal_ok ? kal_fs_unlock(a, 0, 0) : kal_err_invalid;
+            observe(kind::behaviour, freed == kal_ok, "the lock is released");
+            const int again = ob == kal_ok
+                ? kal::fs::lock_range(b, 0, 0, kal::fs::lock::exclusive) : ob;
+            observe(kind::behaviour, again == kal_ok,
+                    "and once released, another open file may take it");
+            if (again == kal_ok) kal_fs_unlock(b, 0, 0);
+
+            // Neither kind and both kinds are the same mistake: a caller that
+            // asked for neither did not say what it wanted.
+            observe(kind::behaviour,
+                    oa != kal_ok || kal_fs_lock(a, 0, 0, 0) == kal_err_invalid,
+                    "asking for a lock that is neither shared nor exclusive is refused");
+
+            if (ob == kal_ok) kal_fs_close_file(b);
+            if (oa == kal_ok) kal_fs_close_file(a);
+            kal_fs_remove(here(), kName, length(kName));
+        } else {
+            unobserved(kind::behaviour,
+                       "an exclusive lock upon a whole file is taken",
+                       "the implementation does not claim prop_locks for this volume");
+        }
+
+        // --- how much the volume holds --------------------------------------
+        if ((kal_fs_props(here()) & kal::fs::capacity.bits) != 0) {
+            kal_u64 total = 0, available = 0;
+            const int e = kal_fs_capacity(here(), &total, &available);
+            observe(kind::behaviour, e == kal_ok && total > 0,
+                    "the volume reports how much it holds");
+            observe(kind::behaviour, e == kal_ok && available <= total,
+                    "and what is available is no more than that");
+            // Either pointer may be null, for a caller that wants one of the two.
+            kal_u64 one = 0;
+            observe(kind::behaviour,
+                    kal_fs_capacity(here(), nullptr, &one) == kal_ok,
+                    "and a caller may ask for one of the two");
+        } else {
+            unobserved(kind::behaviour, "the volume reports how much it holds",
+                       "the implementation does not claim prop_capacity for this volume");
+        }
+
+        // --- the modification time of a NAME, including a directory ----------
+        //
+        // ⭐ THE DIRECTORY IS THE POINT. `kal_fs_set_modified' takes a `kal_file'
+        // and a directory is a `kal_dir', so before this declaration there was no
+        // route to a directory's time at all --- and an implementation reached one
+        // anyway, outside anything this specification stated.
+        if ((kal_fs_props(here()) & kal::fs::modified_time.bits) != 0) {
+            kal_fs_mkdir(here(), kDir, length(kDir));
+            const kal_u64 chosen = 1600000000ull * 1000000000ull;
+            const int e = kal_fs_set_modified_at(here(), kDir, length(kDir), chosen);
+            kal_node_info after = fresh();
+            const int read_back =
+                kal_fs_info(here(), kDir, length(kDir), 0, kal::fs::field::all, &after);
+            observe(kind::behaviour,
+                    e == kal_ok && read_back == kal_ok
+                        && after.modified_ns / 1000000000u == chosen / 1000000000u,
+                    "the time a DIRECTORY reports as its last modification is set by name");
+            kal_fs_remove(here(), kDir, length(kDir));
+
+            put_file(kName, "x");
+            const int fe = kal_fs_set_modified_at(here(), kName, length(kName), chosen);
+            kal_node_info fa = fresh();
+            const int fr = kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &fa);
+            observe(kind::behaviour,
+                    fe == kal_ok && fr == kal_ok
+                        && fa.modified_ns / 1000000000u == chosen / 1000000000u,
+                    "and so is a file's, by the same operation");
+            kal_fs_remove(here(), kName, length(kName));
+        } else {
+            unobserved(kind::behaviour,
+                       "the time a DIRECTORY reports as its last modification is set by name",
+                       "the implementation does not claim prop_modified_time");
+        }
+    }
+
     if (performs(kind::abi)) {
         observe(kind::abi, sizeof(kal_dir) == sizeof(kal_uintptr)
                         && sizeof(kal_file) == sizeof(kal_uintptr),
                 "a directory and a file handle each occupy one machine word");
         const kal_uintptr assigned = (kal::fs::case_sensitive | kal::fs::links
                                     | kal::fs::modified_time | kal::fs::atomic_rename
-                                    | kal::fs::make_links).bits;
+                                    | kal::fs::make_links
+                                    | kal::fs::locks | kal::fs::capacity).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 

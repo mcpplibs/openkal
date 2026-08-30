@@ -23,6 +23,7 @@ export using ::kal_task_start;
 export using ::kal_task_join;
 export using ::kal_task_yield;
 export using ::kal_task_current;
+export using ::kal_task_parallelism;
 export using ::kal_task_wait;
 export using ::kal_task_wake;
 export using ::kal_task_props;
