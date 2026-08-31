@@ -48,7 +48,20 @@ fi
 status=0
 while read -r name; do
     [ -n "$name" ] || continue
-    if ! printf '%s\n' "$spec" | grep -qx "$name"; then
+    # ⚠️⚠️ A HERE-STRING AND NOT A PIPE, AND THE DIFFERENCE IS A FALSE RED.
+    #
+    # `grep -q' exits at the FIRST match, which closes the pipe under a `printf'
+    # that may still be writing; the printf then dies of SIGPIPE, and `pipefail'
+    # at the top of this file makes the whole pipeline report failure. The `!'
+    # inverts that into "not in the specification" --- for a name that IS in it.
+    #
+    # ⚠️ It depends on whether the list fits in the pipe buffer before grep
+    # exits, so it fires occasionally and passes on a re-run, which is the worst
+    # shape a check can have: openkal-macos reported `kal_stdin' missing on one
+    # run and clean on the next with no change between them. The name is the
+    # twenty-seventh line of SURFACE.txt --- an early match is exactly the case
+    # that leaves the most left to write.
+    if ! grep -qxF -- "$name" <<< "$spec"; then
         echo "exported name is not in the specification: $name" >&2
         status=1
     fi
@@ -74,7 +87,10 @@ if [ "$complete" -eq 1 ]; then
         local present=0 absent=0 missing=''
         while read -r name; do
             [ -n "$name" ] || continue
-            if printf '%s\n' "$found" | grep -qx "$name"; then present=$((present+1))
+            # A here-string for the reason given above. Here the same SIGPIPE
+            # would UNDER-COUNT what is exported, so a complete interface would
+            # be reported as half of one.
+            if grep -qxF -- "$name" <<< "$found"; then present=$((present+1))
             else absent=$((absent+1)); missing="$missing $name"; fi
         done <<< "$want"
         if [ "$present" -gt 0 ] && [ "$absent" -gt 0 ]; then

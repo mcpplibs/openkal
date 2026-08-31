@@ -166,7 +166,23 @@ struct kal_spawn {
      * wrapped. Terminating a unit whose leader is long gone can therefore reach a
      * different unit on such a system. This is what those systems do --- every
      * program that calls `killpg' lives with it --- and it is recorded rather than
-     * hidden behind an interface that reads as though it were not so. */
+     * hidden behind an interface that reads as though it were not so.
+     *
+     * ⭐⭐ AND THIS IS WHERE A UNIT IS ESTABLISHED --- AT THE START, BY WHOEVER
+     * STARTS. A caller names the unit here and the implementation performs the
+     * placement, so the unit and the program that can name it are on the same
+     * side of the boundary. `kal_process_job_enter' is the other half and is not
+     * a way around this: it places THE CALLER, for the sake of the spawns the
+     * caller goes on to perform.
+     *
+     * ⚠️ IT FOLLOWS THAT A COPY'S UNIT CANNOT BE NAMED BY THE ORIGINAL, and a C
+     * library composing job control meets this rather than reading it. Duplicate
+     * the image, have the copy form a unit, then signal that unit from the
+     * original: the copy's handle is the copy's --- clause 6.7 builds it from an
+     * index into the copy's own table --- and clause 11 entry 9 conveys nothing
+     * back. The composition has no closure, and the entry records what an
+     * implementation did when it met the dead end rather than leaving the next
+     * one to repeat it. */
     struct kal_job* job;
 
     /* The directories the started program receives, read back through

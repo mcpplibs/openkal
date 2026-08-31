@@ -1,4 +1,4 @@
-# openkal Specification, version 0.11
+# openkal Specification, version 0.12
 
 ## 1. Scope
 
@@ -50,7 +50,7 @@ provides an interface in whole or not at all.
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.11 specifies the core and optional interfaces. The reserved row is not
+Version 0.12 specifies the core and optional interfaces. The reserved row is not
 specified, and its name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1033,6 +1033,27 @@ The following are recorded so that they are not mistaken for oversights.
    general mechanism for passing a handle to a context in another space is not
    defined by this version. It is the question `openkal.space` reaches first and
    is not peculiar to it.
+
+   ⭐ **What this costs, named in 0.12 because an implementation paid it.** A
+   unit is established by whoever starts a program, at the moment of starting it:
+   `kal_spawn.job` is where a caller says which unit a started program belongs
+   to, and the implementation performs the placement. It follows that a program
+   cannot name a unit that a *copy of itself* went on to form — the copy's handle
+   is the copy's, constructed by clause 6.7 from an index into the copy's own
+   table, and nothing above conveys it back. So the sequence a C library reaches
+   for when it composes job control — duplicate the image, have the copy form a
+   unit of its own, then signal that unit from the original — has no closure
+   here, and this is the reason rather than an omission.
+
+   ⚠️ **The failure this produces is not a refusal, which is why it is recorded.**
+   An implementation that meets the dead end is invited to reach for the nearest
+   unit it *can* name, which is its own; openkal-musl 0.12.0 did exactly that,
+   and every negative identifier that matched no child named the caller's own
+   unit. A program asking after a unit that did not exist was told it did, and
+   one signalling it ended itself together with everything it led. The composition
+   that does work is the one this entry began with: start the program with
+   `kal_spawn.job`, where the unit and the caller that knows its name are on the
+   same side of the boundary.
 10. **Exclusion upon a range of a file.** ⚠️ **Settled in 0.10.** `kal_fs_lock`
     and `kal_fs_unlock` are operations of `openkal.fs`, admitted on exactly the
     grounds entry 7 records for links: whether a *volume* can exclude is a

@@ -198,7 +198,22 @@ int kal_fs_open_dir(struct kal_dir base, const char* name, kal_uintptr len,
  * behind if the program stops in between; exclusion tested before opening is
  * not exclusion; and appending performed by seeking is not appending when a
  * second writer exists. Clause 3.1 classifies each of those as a simulation, so
- * the specification states the intent instead. */
+ * the specification states the intent instead.
+ *
+ * ⭐⭐ AND THE WORD DOES NOT CARRY A PERMISSION, WHICH IS STATED HERE BECAUSE
+ * HERE IS WHERE IT IS LOOKED FOR. A caller creating a file and meaning "only I
+ * may read this" finds no flag for it, and clause 11 entry 6 gives the reason: a
+ * permission presupposes an identity, and the environments this specification
+ * targets do not agree that one exists. That entry also gives the three answers
+ * a program has instead, sorted by whom it is defending against --- another part
+ * of the same program, which the capability already excludes, since a handle not
+ * given cannot be reached; another user of the machine, which is the party that
+ * STARTED the program, through the preopens it supplies and withholds; a
+ * location the program does not trust, which is encryption.
+ *
+ * ⚠️ Read as a gap this reads as one. It is a position, and the position is
+ * WASI's: `fs_rights_base' there attaches to a handle and not to a file, and the
+ * analogue here is the word above. */
 int kal_fs_open(struct kal_dir base, const char* name, kal_uintptr len,
                 kal_uintptr flags, struct kal_file* out);
 
@@ -252,6 +267,10 @@ int kal_fs_truncate(struct kal_file, kal_u64 size);
 int kal_fs_info(struct kal_dir base, const char* name, kal_uintptr len,
                 kal_uintptr flags, kal_u32 wanted,
                 struct kal_node_info* out);
+/* Creating a directory, which takes no permission for the reason `kal_fs_open'
+ * above states in full and clause 11 entry 6 gives: a directory meant to be
+ * private is one whose PREOPEN was not handed to anybody else, and that is the
+ * decision of the party that starts a program rather than of the program. */
 int kal_fs_mkdir (struct kal_dir base, const char* name, kal_uintptr len);
 int kal_fs_remove(struct kal_dir base, const char* name, kal_uintptr len);
 int kal_fs_rename(struct kal_dir from, const char* a, kal_uintptr alen,
