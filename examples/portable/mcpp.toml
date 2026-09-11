@@ -9,13 +9,66 @@ name    = "portable"
 version = "0.1.0"
 
 [dependencies]
-openkal = "0.10.0"
+openkal = "0.12.0"
 
+# AND THE VERSIONS HAVE TO FOLLOW THE SOURCE, which is the reason this example
+# is a criterion rather than an assumption.
+#
+# `src/main.cpp` was updated for 0.11's `kal_spawn` --- one struct where there
+# had been three declarations --- and these four pins were not. So the example
+# built nothing on any target:
+#
+#   src/main.cpp:256:19: error: 'kal_spawn' does not name a type
+#
+# A version pin in an example is a claim about what that example builds
+# against, and nothing checked it: the example is not in any package's build,
+# so no repository's continuous integration compiled it. The platform legs
+# below exist so that it cannot go stale silently again.
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.9.0"
+openkal-linux = "0.12.0"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.7.0"
+openkal-macos = "0.9.0"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.5.0"
+openkal-windows = "0.7.0"
+
+# ANDROID IS NOT A LINE HERE, AND THAT IS THE POINT.
+#
+# `aarch64-linux-android` and `x86_64-linux-android` have `os = "linux"`,
+# because the kernel IS Linux: bionic is a C library above it, and an
+# implementation written on the kernel's own system-call interface does not
+# know which C library sits above it. So `cfg(os = "linux")` above already
+# selects `openkal-linux` for both Android rows, and adding an Android line
+# would be adding a second name for one answer.
+#
+# Verified against the released engine rather than assumed: both ABIs build
+# over `openkal-linux` and their objects name no C library symbol, and a
+# program over openkal alone ran on an emulator.
+
+# iOS REUSES THE macOS IMPLEMENTATION, AND THAT NEEDED A LINE BECAUSE THE OS
+# SEGMENT DIFFERS.
+#
+# Darwin is Darwin: the same Mach traps, the same BSD call numbers, the same
+# calling convention. What differs between macOS and iOS is the SDK and the
+# deployment-target flag, which are the build tool's business and not the
+# implementation's -- so this is one `cfg` line and no new package.
+#
+# All three iOS rows match: the device and both simulator arches carry
+# `os = "ios"`.
+[target.'cfg(os = "ios")'.dependencies]
+openkal-macos = "0.9.0"
+
+# THE WEB IS THE ONE PLATFORM THAT NEEDED NEW SOFTWARE.
+#
+# Emscripten has no kernel to issue a call to, so an implementation cannot be
+# written the way the other four are -- beneath a C library -- and must sit
+# ABOVE one, which clause 2 permits. `openkal-emscripten` is that
+# implementation.
+#
+# It provides twelve of the fifteen interfaces. This program uses eight, all of
+# which are among them; a program that used `openkal.process` would fail at
+# LINK naming the symbol, which is clause 6.2's second time and is how a
+# partial surface reports itself.
+[target.'cfg(os = "emscripten")'.dependencies]
+openkal-emscripten = "0.1.0"

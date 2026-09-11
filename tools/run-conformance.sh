@@ -108,6 +108,47 @@ if [ -n "$impl_features" ]; then
     impl_line="$package = { path = \"$implementation_native\", features = [\"$impl_features\"] }"
 fi
 
+# FLAGS THE SUITE ITSELF HAS TO CARRY, WHICH IS NOT THE SAME AS FLAGS THE
+# IMPLEMENTATION CARRIES.
+#
+# `OPENKAL_CONFORMANCE_IMPL_FEATURES` above names features of the
+# IMPLEMENTATION, and for every platform so far that has been the whole of what
+# an unusual arrangement needed. Emscripten is the first where it is not: its
+# thread support is selected by `-pthread`, which chooses a different C library
+# build, a different memory model and a different loader contract --- so it is a
+# property of the WHOLE LINK, and a suite compiled without it cannot start a
+# context however the implementation was compiled.
+#
+# Measured 2026-09-11, with the implementation's `threads` feature active and
+# the suite built without the flag:
+#
+#   DID NOT HOLD  an execution context starts
+#   DID NOT HOLD  four execution contexts start
+#   DID NOT HOLD  contexts that ran at the same time have identities distinct
+#
+# which is the suite being right: if `openkal.task` is provided, a context
+# starts. The flags therefore belong to the suite as well, and they are named in
+# the environment for the same reason the runner and the features are ---
+# whoever runs the suite knows the arrangement and the suite cannot.
+#
+# Added to BOTH sides deliberately: a flag that selects a memory model must
+# reach every translation unit and the link, and a variable that reached one of
+# them would produce a suite whose halves disagree.
+suite_flags="${OPENKAL_CONFORMANCE_SUITE_FLAGS:-}"
+if [ -n "$suite_flags" ]; then
+    quoted=""
+    for f in $suite_flags; do
+        [ -n "$quoted" ] && quoted="$quoted, "
+        quoted="$quoted\"$f\""
+    done
+    {
+        printf '\n[build]\n'
+        printf 'cxxflags = [%s]\n' "$quoted"
+        printf 'ldflags  = [%s]\n' "$quoted"
+    } >> "$suite/mcpp.toml"
+    echo "--- the suite carries: $suite_flags ---"
+fi
+
 if ! grep -q "^$package = " "$suite/mcpp.toml"; then
     # Appended immediately after openkal, which is inside [dependencies]. A
     # plain append would land under [features].
@@ -143,8 +184,22 @@ cd "$suite"
 # The remedy is to remember which set the build in `target' was made for, and to
 # discard the build when the answer changes. Re-running the same set still
 # builds incrementally, which is what the record is for.
+# AND THE SUITE'S FLAGS ARE PART OF WHAT THE RECORD HAS TO REMEMBER.
+#
+# The paragraph above is about the feature set; `OPENKAL_CONFORMANCE_SUITE_FLAGS`
+# is a second axis with the same property, and the first run that used it
+# reported the previous run's build:
+#
+#   error: POSIX thread support was disabled in precompiled file
+#          '.../pcm.cache/openkal.types.pcm' but is currently enabled
+#
+# which is the module cache from a build made without the flag. The remedy is
+# the one already written here, applied to both axes rather than to one: a
+# record of what the build in `target' was made for, and a discard when the
+# answer changes.
 stamp="target/.features"
-if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$features" ]; then
+want_stamp="$features|$suite_flags"
+if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$want_stamp" ]; then
     rm -rf target
 fi
 # ⚠️⚠️ AND THE SAME DEFECT AGAIN, IN THE LINE THAT FINDS WHAT WAS BUILT.
@@ -170,7 +225,7 @@ find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance
     -delete 2> /dev/null || true
 
 mcpp build --features "$features" "$@"
-mkdir -p target && printf '%s' "$features" > "$stamp"
+mkdir -p target && printf '%s' "$want_stamp" > "$stamp"
 
 produced="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \))"
 count="$(printf '%s\n' "$produced" | grep -c . || true)"

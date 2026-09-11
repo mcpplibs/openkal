@@ -32,7 +32,20 @@ spec="$(grep -vE '^[[:space:]]*(#|$)' "$list" | sort -u)"
 # would find no names at all on one of them — and would report that as success,
 # because an empty surface contains nothing unspecified. The defect was found by
 # writing a second implementation, which is what a second implementation is for.
-found="$(nm --defined-only "$@" \
+# THE SYMBOL READER IS NAMED, BECAUSE `nm` DOES NOT READ EVERY OBJECT THIS
+# ECOSYSTEM PRODUCES.
+#
+# A wasm object is not an ELF, and the host's binutils `nm` reports
+# "file format not recognized" for one. The reader that does read it ships with
+# the toolchain that produced it -- `llvm-nm` inside the emsdk payload -- so it
+# is named in the environment rather than assumed, in the same way the runner
+# and the features are. The default is unchanged, so every existing caller is.
+#
+# This is the same class of defect as the leading-underscore note above, found
+# the same way: by writing another implementation.
+NM="${NM:-nm}"
+
+found="$($NM --defined-only "$@" \
   | awk '$2=="T"||$2=="W"||$2=="R"||$2=="D"||$2=="B"||$2=="S"{print $3}' \
   | sed 's/^_//' \
   | grep '^kal_' | sort -u || true)"
