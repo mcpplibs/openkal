@@ -35,7 +35,7 @@ different ways:
 | macOS | `cfg(os = "macos")` | `openkal-macos` |
 | iOS, both simulator arches | `cfg(os = "ios")` | `openkal-macos`, unchanged |
 | Windows | `cfg(windows)` | `openkal-windows` |
-| Web (Emscripten) | `cfg(os = "emscripten")` | `openkal-emscripten` |
+| Web (Emscripten) | `cfg(os = "emscripten")` | `openkal-emscripten`, which provides twelve of fifteen |
 
 **Android needs no line of its own**, because `aarch64-linux-android` has
 `os = "linux"`: the kernel IS Linux, bionic is a C library above it, and an
@@ -48,12 +48,40 @@ same call numbers, the same calling convention — and what differs between macO
 and iOS is the SDK and the deployment-target flag, which belong to the build
 tool. So one `cfg` line selects the macOS implementation for all three iOS rows.
 
-**The Web needed new software.** Emscripten has no kernel to issue a call to,
-so an implementation there cannot be written beneath a C library and has to sit
-above one. `openkal-emscripten` provides twelve of the fifteen interfaces; this
-program uses eight, all of which are among them. A program that used
-`openkal.process` would fail at link naming the symbol, which is how a partial
-surface reports itself.
+**The Web needed new software, and this program does not fit on it.**
+Emscripten has no kernel to issue a call to, so an implementation there cannot
+be written beneath a C library and has to sit above one. `openkal-emscripten`
+is that implementation, and it provides twelve of the fifteen interfaces: there
+is no fork, no exec and no second address space on this platform, so
+`openkal.process`, `openkal.exec` and `openkal.space` are absent. This program
+uses `openkal.process` and `openkal.task`.
+
+So the Web line is here to show the BOUNDARY, and the boundary is a link error.
+Measured:
+
+```
+$ mcpp build --target wasm32-emscripten
+wasm-ld: error: obj/main.o: undefined symbol: kal_process_spawn
+wasm-ld: error: obj/main.o: undefined symbol: kal_process_wait
+wasm-ld: error: obj/main.o: undefined symbol: kal_process_close
+wasm-ld: error: obj/main.o: undefined symbol: kal_task_start
+wasm-ld: error: obj/main.o: undefined symbol: kal_task_join
+wasm-ld: error: obj/main.o: undefined symbol: kal_task_wait
+wasm-ld: error: obj/main.o: undefined symbol: kal_task_wake
+```
+
+Seven names, each one the program used and the platform does not have. That is
+clause 6.2's second time and it is the mechanism rather than a defect: the
+dependency RESOLVED, the compile succeeded, and the report arrived at the
+earliest moment the information existed. An implementation that had provided
+those seven so that they returned an error would have produced a program that
+links, runs, and fails somewhere a reader cannot connect to a missing facility.
+
+`openkal.task` is a second question on this platform and has the same answer
+here. It is carried by `openkal-emscripten`'s `threads` feature, because
+`-pthread` selects a different C library build and memory model; with that
+feature the four `kal_task_*` names above resolve. The three `kal_process_*`
+names never will.
 
 ## The version pins here are a claim, and they were wrong
 

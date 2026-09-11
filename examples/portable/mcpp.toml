@@ -66,9 +66,20 @@ openkal-macos = "0.9.0"
 # ABOVE one, which clause 2 permits. `openkal-emscripten` is that
 # implementation.
 #
-# It provides twelve of the fifteen interfaces. This program uses eight, all of
-# which are among them; a program that used `openkal.process` would fail at
-# LINK naming the symbol, which is clause 6.2's second time and is how a
-# partial surface reports itself.
+# IT PROVIDES TWELVE OF THE FIFTEEN INTERFACES, AND THIS PROGRAM DOES NOT FIT
+# ON IT. There is no fork, no exec and no second address space on this
+# platform, so `openkal.process`, `openkal.exec` and `openkal.space` are
+# absent -- and this program uses `openkal.process` and `openkal.task`.
+#
+# The line stays, because what it demonstrates is the BOUNDARY. Measured:
+#
+#   wasm-ld: error: obj/main.o: undefined symbol: kal_process_spawn
+#   ... and six more, one per name the program used and the platform lacks
+#
+# The dependency resolved and the compile succeeded; the report arrived at the
+# earliest moment the information existed, which is clause 6.2's second time.
+# An implementation that had provided those names so that they returned an
+# error would have produced a program that links, runs, and fails where a
+# reader cannot connect it to a missing facility. See the README.
 [target.'cfg(os = "emscripten")'.dependencies]
 openkal-emscripten = "0.1.0"
