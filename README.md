@@ -134,12 +134,26 @@ Four rules follow, and they bind packages rather than this specification.
    the other runtime, `errno`) across the boundary. A context created by a
    platform library rather than by `kal_task_start` has no C library state, and
    code reached from such a context shall not rely on it.
-4. **Source does not identify the implementation.** No macro states that a
-   program is built on openkal. A difference in headers is adapted to on
-   `c-abi`; a difference in facilities (for example, the absence of `epoll`) is
-   adapted to by a feature of the package, or where a manifest must select it,
-   on `cfg(all(kernel-abi = "openkal", c-abi = "musl"))`. Both are decided when
+4. **Each macro answers one question, and source does not identify the
+   implementation.** Three families state three different facts. The kernel
+   interface is stated by `__openkal__`, defined wherever the resolved
+   `kernel-abi` is openkal; it says that `kal_*` may be called and says nothing
+   about which implementation supplies it, because every implementation supplies
+   the same operations. The C environment is stated by the C library layer
+   (`__unix__`, `_WIN32`); the system is stated by the target triple
+   (`__linux__`, `__APPLE__`).
+
+   `__openkal__` may gate a call to a `kal_*` operation. It shall not be used to
+   select a header, to infer whether `_WIN32` is true, or to tell one target from
+   another: a difference in headers is adapted to on `c-abi`, and a difference in
+   facilities (for example, the absence of `epoll`) by a feature of the package
+   or, where a manifest must select it, on
+   `cfg(all(kernel-abi = "openkal", c-abi = "musl"))`. Both are decided when
    dependencies are resolved, not when the source is compiled.
+
+   A package that must work with and without openkal reaches the same decision
+   with `__has_include(<openkal/version.h>)`: this package declares and does not
+   define, so the header is present exactly when the declarations are.
 
 ## How an implementation is written
 
