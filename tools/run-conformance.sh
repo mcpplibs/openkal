@@ -57,7 +57,7 @@ point_at_the_specification() {
     sed "s|^openkal = .*$|openkal = { path = \"$here_native\" }|" "$1" > "$1.next"
     mv "$1.next" "$1"
 }
-# ⚠️ THE REWRITE IS UNDONE ON THE WAY OUT, AND THAT IS NOT TIDINESS.
+# THE REWRITE IS UNDONE ON THE WAY OUT, AND THAT IS NOT TIDINESS.
 #
 # Both manifests are rewritten to name this working tree by an absolute path,
 # which is right for the run and wrong for everything after it. Before this
@@ -83,7 +83,7 @@ trap restore_the_manifests EXIT INT TERM
 point_at_the_specification "$suite/mcpp.toml"
 point_at_the_specification "$implementation/mcpp.toml"
 
-# ⭐ THE FEATURES THE IMPLEMENTATION NEEDS WHEN NOTHING ELSE IS BENEATH THE
+# THE FEATURES THE IMPLEMENTATION NEEDS WHEN NOTHING ELSE IS BENEATH THE
 # PROGRAM.
 #
 # An implementation of a hosted system is reached through a C library, and the
@@ -98,7 +98,7 @@ point_at_the_specification "$implementation/mcpp.toml"
 # in the environment for the same reason the runner is, and empty by default so
 # that a hosted run is unchanged.
 #
-# ⚠️ Measured 2026-08-23: without it the suite builds for `riscv64-none-elf` and
+# Measured 2026-08-23: without it the suite builds for `riscv64-none-elf` and
 # produces an image whose entry point is 0x0, because nothing defined `_start`.
 # A build that succeeds and cannot start is the failure this variable exists to
 # prevent.
@@ -163,7 +163,7 @@ echo "--- the suite's dependencies ---"
 sed -n '/^\[dependencies\]/,/^$/p' "$suite/mcpp.toml"
 
 cd "$suite"
-# ⚠️ A CHANGE OF FEATURE SET DOES NOT INVALIDATE THE BUILD.
+# A CHANGE OF FEATURE SET DOES NOT INVALIDATE THE BUILD.
 #
 # Measured 2026-08-22, three runs in one working tree with nothing else changed:
 #
@@ -202,7 +202,7 @@ want_stamp="$features|$suite_flags"
 if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$want_stamp" ]; then
     rm -rf target
 fi
-# ⚠️⚠️ AND THE SAME DEFECT AGAIN, IN THE LINE THAT FINDS WHAT WAS BUILT.
+# AND THE SAME DEFECT AGAIN, IN THE LINE THAT FINDS WHAT WAS BUILT.
 #
 # The selection below was `find … | head -1'. `target' accumulates one directory
 # per fingerprint, and a fingerprint changes when the DEPENDENCIES change and

@@ -1,6 +1,6 @@
 // openkal.random --- a source of unpredictable bytes.
 //
-// ⭐ THE INTERFACE EXISTS BECAUSE NOTHING ELSE HERE CAN SUPPLY IT, WHICH IS THE
+// THE INTERFACE EXISTS BECAUSE NOTHING ELSE HERE CAN SUPPLY IT, WHICH IS THE
 // ONLY REASON ANY INTERFACE HERE EXISTS.
 //
 // Entropy is not derivable from the other eight. A clock reading is
@@ -11,7 +11,7 @@
 // rather than the whole namespace, so that refusal is the model working rather
 // than a gap in it.
 //
-// ⚠️ NOT UNIVERSAL, AND THAT IS WHY IT IS ITS OWN INTERFACE RATHER THAN AN
+// NOT UNIVERSAL, AND THAT IS WHY IT IS ITS OWN INTERFACE RATHER THAN AN
 // OPERATION ON AN EXISTING ONE. Every hosted platform has a source; a
 // bare-metal machine has one only if its board does. Clause 6.1 already
 // expresses exactly that shape: an implementation with no source omits these
@@ -36,7 +36,7 @@ using props = kal::props<props_tag>;
 // against a later specification behaves correctly against an earlier
 // implementation.
 //
-// ⚠️ THERE IS NO `available` POSITION. Whether an environment has a source is
+// THERE IS NO `available` POSITION. Whether an environment has a source is
 // answered by whether this module can be imported and its names linked, not by
 // a word read after linking — see the note on the header.
 inline constexpr props blocking{KAL_RANDOM_PROP_BLOCKING};

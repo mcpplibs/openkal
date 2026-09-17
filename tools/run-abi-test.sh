@@ -3,7 +3,7 @@
 #
 #   run-abi-test.sh <path-to-openkal-linux>
 #
-# ⚠️⚠️ WHY THIS IS SEPARATE FROM THE CONFORMANCE SUITE, AND WHY IT HAD TO BE
+# WHY THIS IS SEPARATE FROM THE CONFORMANCE SUITE, AND WHY IT HAD TO BE
 # BUILT BEFORE THE INTERFACE COULD BE CHANGED.
 #
 # The suite asserts that one artifact, built and run in one place, behaves as the
@@ -53,7 +53,7 @@ ln -sf libopenkal.so.0 "$work/one/libopenkal.so"
 echo "--- a second implementation, over the first ---"
 mkdir -p "$work/obj2"
 for o in "$work/obj"/*.o; do
-    # ⚠️ RENAMED AND NOT REMOVED. The four are still there, still doing what they
+    # RENAMED AND NOT REMOVED. The four are still there, still doing what they
     # did; what changes is which name reaches them, so the second implementation
     # is the first one plus four answers rather than the first one minus four.
     "$objcopy" \
@@ -75,7 +75,7 @@ echo "--- one probe, built once, against neither by name ---"
 $cc -std=c11 -O1 -I"$here/include" "$here/conformance/abi/probe.c" \
     -o "$work/probe" -L"$work/one" -lopenkal -Wl,-rpath,'$ORIGIN'
 
-# ⭐ THE ONE OBSERVATION THAT MAKES THIS A TEST OF DISTRIBUTION. The binary is
+# THE ONE OBSERVATION THAT MAKES THIS A TEST OF DISTRIBUTION. The binary is
 # not rebuilt between the two runs, and this is where that is asserted rather
 # than assumed --- a script that rebuilt it would be running two builds and
 # reporting on one.
@@ -119,7 +119,7 @@ expect "$one_out" exec-available  yes    "and grants executable memory"
 expect "$one_out" knows-identity  yes    "and distinguishes one node from another"
 expect "$one_out" kind-is-dir     yes    "and answers an enquiry"
 
-# ⭐ THE SAME BINARY, AND EVERY ONE OF THESE IS THE OPPOSITE. Each is a branch
+# THE SAME BINARY, AND EVERY ONE OF THESE IS THE OPPOSITE. Each is a branch
 # that no artifact in this ecosystem had ever taken, because nothing could
 # produce an implementation that answers this way.
 expect "$two_out" satisfies-floor no     "the second is older than the declarations"

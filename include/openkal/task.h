@@ -29,7 +29,7 @@ extern "C" {
 
 /* Starts a context.
  *
- * ⭐ `entry' IS AN ADDRESS AT WHICH A CONTEXT BEGINS, NOT A FUNCTION THAT IS
+ * `entry' IS AN ADDRESS AT WHICH A CONTEXT BEGINS, NOT A FUNCTION THAT IS
  * CALLED, AND THE DIFFERENCE IS WHAT LETS THIS CROSS A BOUNDARY. An
  * implementation on the far side of one does not call into the program; it
  * establishes a context whose program counter is `entry' and whose first
@@ -67,7 +67,7 @@ kal_uintptr kal_task_current(void);
 /* How many contexts this environment can run at the same moment, or zero where
  * it cannot say. Version 0.10.
  *
- * ⚠️⚠️ ADDED BECAUSE ITS ABSENCE WAS A WRONG ANSWER RATHER THAN A REFUSAL.
+ * ADDED BECAUSE ITS ABSENCE WAS A WRONG ANSWER RATHER THAN A REFUSAL.
  * KAL_TASK_PROP_PARALLEL says WHETHER contexts run at the same moment and not
  * HOW MANY can, and a C library above has no other place to look --- so
  * `sysconf(_SC_NPROCESSORS_ONLN)' fell back to 1 and
@@ -75,7 +75,7 @@ kal_uintptr kal_task_current(void);
  * sizing a pool of workers got one worker and no way to know. Measured: 1 here
  * against 32 on the same machine's own C library.
  *
- * ⭐ ZERO IS "CANNOT SAY" AND IS NOT ONE. A caller must be able to tell an
+ * ZERO IS "CANNOT SAY" AND IS NOT ONE. A caller must be able to tell an
  * environment that has one processor from one that will not answer, because the
  * two call for different behaviour: the first is a fact to size against, and
  * the second is a reason to ask the operator. An implementation that does not

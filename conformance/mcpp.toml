@@ -73,7 +73,7 @@ datagram = []
 space    = ["process"]   # a started context is waited for as a process
 timeout  = []
 
-# ⚠️ `hosted' AND `standard' WERE HERE AND ARE GONE, BECAUSE THE SPECIFICATION'S
+# `hosted' AND `standard' WERE HERE AND ARE GONE, BECAUSE THE SPECIFICATION'S
 # OWN NAME FOR THAT SET IS GONE.
 #
 # Version 0.8 named a set of interfaces after a class of environment, and a name
@@ -93,7 +93,7 @@ timeout  = []
 # rather than an observation that did not hold. The caller names this set for an
 # implementation that provides these interfaces, and omits it for one that does
 # not --- which is the same choice the implementation itself made.
-# ⚠️ `random` IS HERE AND NOT AMONG THE INTERFACES `full` NAMES, AND THE NOTE
+# `random` IS HERE AND NOT AMONG THE INTERFACES `full` NAMES, AND THE NOTE
 # ABOVE ALREADY SAID WHY.
 #
 # It was named there first, and the suite then failed to LINK against every
@@ -130,7 +130,7 @@ stability = []
 # declared rather than assumed, so that requesting cost without time selects
 # time instead of failing to link.
 cost      = ["time"]
-# ⚠️⚠️ THE INTERFACES ARE NAMED HERE AND NOT THROUGH ANOTHER SET, BECAUSE A SET
+# THE INTERFACES ARE NAMED HERE AND NOT THROUGH ANOTHER SET, BECAUSE A SET
 # DEFINED IN TERMS OF A SET CAN SHRINK WITHOUT ANYTHING SAYING SO.
 #
 # This was `["standard", …]`, and `standard` was a name the specification has

@@ -60,7 +60,7 @@ namespace {
 // object whose destructor writes is the shortest thing that would betray an
 // implementation calling a C library's exit instead of terminating.
 //
-// ⚠️ GUARDED ON `openkal.process`, WHICH IS THE INTERFACE THAT MAKES THE
+// GUARDED ON `openkal.process`, WHICH IS THE INTERFACE THAT MAKES THE
 // OBSERVATION RATHER THAN THE ONE THE OBJECT USES.
 //
 // The object is armed only by a copy this program starts, and only
@@ -69,7 +69,7 @@ namespace {
 // unreachable — while still costing the program a `__cxa_atexit`, which is a
 // facility of the C++ ABI rather than of openkal.
 //
-// ⚠️ Measured 2026-08-23, building this suite for `riscv64-none-elf` against
+// Measured 2026-08-23, building this suite for `riscv64-none-elf` against
 // `openkal-opensbi` — the only thing standing between the suite and a machine
 // with no operating system:
 //

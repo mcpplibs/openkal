@@ -1,20 +1,20 @@
 /* openkal.env --- the parameters a program receives at inception.
  *
- * ⭐ EVERY VALUE IS COPIED INTO THE CALLER'S BUFFER, and none is returned by
+ * EVERY VALUE IS COPIED INTO THE CALLER'S BUFFER, and none is returned by
  * pointer. An earlier form answered with a pointer into the implementation's
  * own storage, which is meaningful only while the implementation shares the
  * caller's address space. Copying costs one buffer and makes the interface say
  * the same thing whether the implementation is linked in, loaded beside, or on
  * the far side of a boundary (clause 4.4).
  *
- * ⭐ THE SHAPE IS THE ONE EVERY COUNTING OPERATION HAS. Each of these returns
+ * THE SHAPE IS THE ONE EVERY COUNTING OPERATION HAS. Each of these returns
  * the length the value HAS --- not the length it wrote --- or the negated error
  * value. So a caller with a buffer large enough is done in one call, a caller
  * that wants to size first passes a capacity of zero, and a caller whose buffer
  * was too small learns it by comparing. Nothing is truncated silently and
  * nothing needs a second out-parameter to say so.
  *
- * ⚠️ THE SET DOES NOT CHANGE while the program runs. It is what the program was
+ * THE SET DOES NOT CHANGE while the program runs. It is what the program was
  * started with. A consumer may therefore enumerate names and then look each one
  * up, which is what makes two small operations sufficient where one large one
  * with two buffers would otherwise be needed.

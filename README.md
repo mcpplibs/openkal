@@ -32,7 +32,7 @@ undefined references, which is the intended outcome.
 | `openkal.space` | `openkal/space.h` | an address space, and a context executing in one | optional |
 | `openkal.timeout` | `openkal/timeout.h` | a bound upon operations that would otherwise wait | optional |
 
-⚠️ **There were three classes and there are two.** Version 0.8 named a middle
+**There were three classes and there are two.** Version 0.8 named a middle
 one — *standard*, "an interface an implementation hosting a C library provides"
 — and it was false: an implementation for a machine with firmware and no
 operating system provides none of `openkal.fs`, `openkal.process` or
@@ -77,16 +77,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.12.0"
+openkal = "0.13.0"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.9.0"
+openkal-linux = "0.13.0"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.7.0"
+openkal-macos = "0.10.0"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.5.0"
+openkal-windows = "0.8.0"
 ```
 
 The program imports the interface and names no implementation.
@@ -103,6 +103,43 @@ int main() {
 
 Changing the implementation is a change to one line of the manifest. The source
 does not change, and this property is the reason the specification exists.
+
+## What a program built on openkal may assume
+
+A build that selects openkal resolves several layers, and each guarantees only
+its own. The layer names are those of the build tool (`mcpp`, *The Target Side*).
+
+| Layer | Supplied by | Guarantees | Does not guarantee |
+| --- | --- | --- | --- |
+| `kernel-abi = openkal` | this specification and one implementation per target | the behaviour of every `kal_*` operation is independent of the platform; a missing interface is a link failure; a varying property is answered by an enquiry | which C library is present; whether a platform SDK is available; that the rest of the program is portable |
+| `c-abi = musl` | `openkal-musl` | a POSIX-shaped C environment built on `kal_*`; what it cannot provide it refuses and lists | the platform's own C runtime headers (`io.h`, `TargetConditionals.h`); facilities openkal does not define (`epoll`, signal handlers) |
+| `c++-abi = libc++` | `openkal-llvm-runtime` | a C++ runtime configured for that C library | |
+| build tool | `mcpp` | a layer supplied by the dependency graph is supplied wholly by it: the host's headers and libraries are not searched | whether a package's source compiles against that C library |
+
+Four rules follow, and they bind packages rather than this specification.
+
+1. **openkal is not openkal-musl.** The headers of this package include nothing
+   and conflict with no platform header. A package that fails to find
+   `winsock2.h` or `TargetConditionals.h` has met the C library layer, and
+   adapts on `cfg(c-abi = "musl")`, not on `kernel-abi`.
+2. **A platform dependency is permitted and is the package's own.** A package
+   may call a platform's system interfaces, provided the headers and libraries
+   it needs come from the dependency graph (a feature-scoped dependency) and are
+   not visible to its consumers. openkal is responsible only for what crosses
+   `kal_*`.
+3. **One C runtime and one C++ runtime per image.** A platform dependency means
+   the platform's system interfaces, across which only handles and values pass.
+   It does not include a static library compiled against the platform's C
+   runtime, nor passing an object that runtime owns (`FILE*`, memory released by
+   the other runtime, `errno`) across the boundary. A context created by a
+   platform library rather than by `kal_task_start` has no C library state, and
+   code reached from such a context shall not rely on it.
+4. **Source does not identify the implementation.** No macro states that a
+   program is built on openkal. A difference in headers is adapted to on
+   `c-abi`; a difference in facilities (for example, the absence of `epoll`) is
+   adapted to by a feature of the package, or where a manifest must select it,
+   on `cfg(all(kernel-abi = "openkal", c-abi = "musl"))`. Both are decided when
+   dependencies are resolved, not when the source is compiled.
 
 ## How an implementation is written
 
@@ -129,7 +166,7 @@ names against `SURFACE.txt`. It detects the one freedom an implementation retain
 after the language has removed the others: the addition of names.
 
 **The behaviour.** [`conformance/`](conformance/) is a program an implementation
-runs against itself — 97 observations across eight interfaces, in four kinds:
+runs against itself — 193 observations across fifteen interfaces, in four kinds:
 behaviour, ABI, stability and cost.
 
 ```bash
@@ -140,7 +177,7 @@ bash /path/to/openkal/tools/run-conformance.sh openkal-linux . full
 It is composable, because openkal is: an implementation provides an interface in
 whole or not at all, so each interface is a feature and a run reports on what was
 selected. It reports three counts, and the third is the one to read —
-`97 held, 0 did not hold, 0 not observed` — because a suite that reported only
+`190 held, 0 did not hold, 3 not observed` — because a suite that reported only
 the first two cannot distinguish an interface that behaved from one it never
 examined.
 

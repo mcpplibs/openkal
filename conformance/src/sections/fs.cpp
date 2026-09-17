@@ -76,7 +76,7 @@ void run() {
             kal_stream_write(kal_stdout(), name, len); put("\n");
         }
 
-        // ⭐ THE NAME IS COPIED AND THE LENGTH IS THE NAME'S. A capacity of zero
+        // THE NAME IS COPIED AND THE LENGTH IS THE NAME'S. A capacity of zero
         // reports the length without writing, which is what lets a caller size
         // a buffer before it has one.
         {
@@ -331,7 +331,7 @@ void run() {
 
     // --- what an enquiry answers, and what it does not --------------------
     //
-    // ⭐ THREE MECHANISMS, THREE OBSERVATIONS. The size the caller states, the
+    // THREE MECHANISMS, THREE OBSERVATIONS. The size the caller states, the
     // fields the implementation filled, and the fields the caller asked for are
     // three different questions, and the defect this shape replaces was a
     // structure that answered none of them.
@@ -352,7 +352,7 @@ void run() {
                     && (full.present & ~kal::fs::field::all) == 0,
                 "it reports no position the specification has not assigned");
 
-        // ⚠️ AN IMPLEMENTATION WRITES NO MORE THAN THE CALLER SAID EXISTS. A
+        // AN IMPLEMENTATION WRITES NO MORE THAN THE CALLER SAID EXISTS. A
         // consumer built against a later revision holds a larger structure than
         // an earlier implementation knows; a consumer built against an earlier
         // one holds a smaller structure than a later implementation would fill,
@@ -402,7 +402,7 @@ void run() {
 
     // --- nodes whose content is another name ------------------------------
     //
-    // ⚠️ WHETHER THIS VOLUME HAS THEM IS ASKED FIRST, WHICH IS WHY THE ENQUIRY
+    // WHETHER THIS VOLUME HAS THEM IS ASKED FIRST, WHICH IS WHY THE ENQUIRY
     // TAKES THE DIRECTORY. The same implementation succeeds on one volume and
     // fails on another, so a word per implementation could state neither
     // honestly, and an operation that cannot be performed here is not clause
@@ -427,7 +427,7 @@ void run() {
                 if (target[i] != kName[i]) matches = false;
             observe(kind::behaviour, matches, "its content reads back as it was written");
 
-            // ⭐⭐ THE OBSERVATION THE WHOLE OF THIS EXISTS FOR. Asking resolves
+            // THE OBSERVATION THE WHOLE OF THIS EXISTS FOR. Asking resolves
             // and opening resolves, so the two agree; asking with
             // KAL_FS_NO_RESOLVE reports the node itself. An implementation in
             // which asking did not resolve while opening did reported a link
@@ -480,7 +480,7 @@ void run() {
 
     // --- exclusion upon a range of a file, version 0.10 ---------------------
     //
-    // ⭐⭐ THE OBSERVATION THAT TELLS THE TWO FORMS OF THIS APART NEEDS NO SECOND
+    // THE OBSERVATION THAT TELLS THE TWO FORMS OF THIS APART NEEDS NO SECOND
     // PROGRAM, AND THAT IS WHY IT IS WRITTEN THIS WAY.
     //
     // openkal states the holder as the open FILE. One environment's oldest form
@@ -550,7 +550,7 @@ void run() {
 
         // --- the modification time of a NAME, including a directory ----------
         //
-        // ⭐ THE DIRECTORY IS THE POINT. `kal_fs_set_modified' takes a `kal_file'
+        // THE DIRECTORY IS THE POINT. `kal_fs_set_modified' takes a `kal_file'
         // and a directory is a `kal_dir', so before this declaration there was no
         // route to a directory's time at all --- and an implementation reached one
         // anyway, outside anything this specification stated.
@@ -581,6 +581,73 @@ void run() {
                        "the time a DIRECTORY reports as its last modification is set by name",
                        "the implementation does not claim prop_modified_time");
         }
+        // --- whether a node may be started, version 0.13 ---------------------
+        //
+        // A property of the node, answered per volume. Where the volume records
+        // it, it is set, read back and cleared by name; where it does not, the
+        // operation is refused and the enquiry does not report it. A directory
+        // is refused in either case, because on the environments that store the
+        // property for a directory it means something else.
+        {
+            const char* kRunnable = "okc-conformance-runnable.tmp";
+            put_file(kRunnable, "not a program\n");
+            if ((kal_fs_props(here()) & kal::fs::executable.bits) != 0) {
+                const int on = kal_fs_set_executable_at(here(), kRunnable,
+                                                        length(kRunnable), 1);
+                kal_node_info a = fresh();
+                const int ra = kal_fs_info(here(), kRunnable, length(kRunnable), 0,
+                                           kal::fs::field::all, &a);
+                observe(kind::behaviour,
+                        on == kal_ok && ra == kal_ok
+                            && (a.present & kal::fs::field::executable) != 0
+                            && a.executable != 0,
+                        "a node is recorded as one that may be started, by name");
+
+                const int off = kal_fs_set_executable_at(here(), kRunnable,
+                                                         length(kRunnable), 0);
+                kal_node_info b = fresh();
+                const int rb = kal_fs_info(here(), kRunnable, length(kRunnable), 0,
+                                           kal::fs::field::executable, &b);
+                observe(kind::behaviour,
+                        off == kal_ok && rb == kal_ok
+                            && (b.present & kal::fs::field::executable) != 0
+                            && b.executable == 0,
+                        "and the record is cleared by the same operation");
+
+                // A caller whose structure ends before the field is not given
+                // the position, and is not written to beyond what it stated.
+                kal_node_info old{};
+                old.self_size = static_cast<kal_u32>(
+                    __builtin_offsetof(kal_node_info, executable));
+                const int ro = kal_fs_info(here(), kRunnable, length(kRunnable), 0,
+                                           kal::fs::field::all, &old);
+                observe(kind::behaviour,
+                        ro == kal_ok && (old.present & kal::fs::field::executable) == 0
+                            && old.executable == 0,
+                        "a caller whose structure predates the field is not given it");
+            } else {
+                unobserved(kind::behaviour,
+                           "a node is recorded as one that may be started, by name",
+                           "the implementation does not claim prop_executable for this volume");
+                observe(kind::behaviour,
+                        kal_fs_set_executable_at(here(), kRunnable, length(kRunnable), 1)
+                            == kal_err_not_supported,
+                        "recording a property the volume does not store is refused");
+                kal_node_info c = fresh();
+                kal_fs_info(here(), kRunnable, length(kRunnable), 0,
+                            kal::fs::field::all, &c);
+                observe(kind::behaviour, (c.present & kal::fs::field::executable) == 0,
+                        "and the enquiry does not report a property the volume does not store");
+            }
+            kal_fs_remove(here(), kRunnable, length(kRunnable));
+
+            kal_fs_mkdir(here(), kDir, length(kDir));
+            const int d = kal_fs_set_executable_at(here(), kDir, length(kDir), 1);
+            observe(kind::behaviour,
+                    d == kal_err_is_directory || d == kal_err_not_supported,
+                    "a directory is not recorded as a program");
+            kal_fs_remove(here(), kDir, length(kDir));
+        }
     }
 
     if (performs(kind::abi)) {
@@ -590,7 +657,8 @@ void run() {
         const kal_uintptr assigned = (kal::fs::case_sensitive | kal::fs::links
                                     | kal::fs::modified_time | kal::fs::atomic_rename
                                     | kal::fs::make_links
-                                    | kal::fs::locks | kal::fs::capacity).bits;
+                                    | kal::fs::locks | kal::fs::capacity
+                                    | kal::fs::executable).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 

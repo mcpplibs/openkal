@@ -4,7 +4,7 @@
 #
 #   sandbox-closure.sh <subos-name> [NAME=VERSION]...
 #
-# ⚠️⚠️ EVERY CONTINUOUS-INTEGRATION WORKFLOW IN THIS ECOSYSTEM SUBSTITUTES ITS
+# EVERY CONTINUOUS-INTEGRATION WORKFLOW IN THIS ECOSYSTEM SUBSTITUTES ITS
 # SIBLINGS' WORKING TREES FOR THE VERSIONS ITS MANIFESTS NAME. That is
 # deliberate --- these repositories change together, and a run must assert what
 # is written today rather than what agreed when it was published. The
@@ -12,7 +12,7 @@
 # defect belonging to the published FORM is invisible until someone outside
 # meets it.
 #
-# ⚠️ That is not hypothetical. `openkal-kit` 0.1.0 shipped naming the
+# That is not hypothetical. `openkal-kit` 0.1.0 shipped naming the
 # specification by a path, which is true inside its own tarball and false for
 # any consumer that also names an implementation: the specification was then
 # reached by two routes, and the engine refused. Eight packages published, nine
@@ -27,7 +27,7 @@
 # index. `xlings subos <name> --sandbox --cmd` gives an environment of its own,
 # and a `/tmp` of its own with it --- so nothing may be staged from outside.
 #
-# ⚠️ SEPARATE IS NOT FRESH, AND THIS COMMENT SAID FRESH. Measured 2026-08-27:
+# SEPARATE IS NOT FRESH, AND THIS COMMENT SAID FRESH. Measured 2026-08-27:
 # two invocations of the same environment, and the second found the directory
 # the first had made; the host's `/tmp` had neither. So the `/tmp` is not the
 # host's --- which is what matters for staging --- and it is not new each time,
@@ -56,7 +56,7 @@ MUSL=0.6.0
 LINUX=0.6.0
 RUNTIME=0.3.1
 MIRROR=GLOBAL
-# ⚠️ WHICH MIRROR THE SANDBOX DOWNLOADS FROM, AND IT IS NOT THE SAME ANSWER
+# WHICH MIRROR THE SANDBOX DOWNLOADS FROM, AND IT IS NOT THE SAME ANSWER
 # EVERYWHERE. A runner outside China reaches the global one fastest and a
 # machine inside it does not; the two are a property of where this is run rather
 # than of what is being checked, so it is an argument with the runner's answer as
@@ -77,7 +77,7 @@ done
 xlings subos list 2>/dev/null | grep -q "  $subos " \
   || { echo "::error::the environment $subos does not exist"; exit 1; }
 
-# ⚠️⚠️ THE INDEX IS REACHED THROUGH A POINTER THAT IS CACHED UPSTREAM, AND
+# THE INDEX IS REACHED THROUGH A POINTER THAT IS CACHED UPSTREAM, AND
 # REMOVING THE LOCAL COPY DOES NOT TOUCH IT.
 #
 # mcpp-index publishes a content-hash artifact and a rolling pointer file. A
@@ -127,7 +127,7 @@ say() { printf '\n=== %s ===\n' "$*"; }
 
 say "the engine, from the index"
 
-# ⚠️⚠️ `xlings update' REPORTS SUCCESS WITHOUT HAVING REFRESHED ANYTHING, and
+# `xlings update' REPORTS SUCCESS WITHOUT HAVING REFRESHED ANYTHING, and
 # this script is the one place where that matters most.
 #
 # Measured three times in one day, in three shapes: the artifact pointer served
@@ -147,14 +147,14 @@ for base in "${XLINGS_HOME:-}" "$HOME/.xlings"; do
         && echo "  removed $base/data/xim-pkgindex so that the index is fetched again"
 done
 xlings update > /dev/null 2>&1 || true
-# ⚠️ THE INDEX IS NAMED. `mcpp@<v>` alone is AMBIGUOUS wherever more than one
+# THE INDEX IS NAMED. `mcpp@<v>` alone is AMBIGUOUS wherever more than one
 # index repository carries the name --- measured: local, scode and xim all
 # answer, and xlings refuses rather than choosing. The engine is published in
 # xim.
 xlings config --mirror __MIRROR__ > /dev/null 2>&1 || true
 xlings install "xim:mcpp@__MCPP__" -y -g
 
-# ⚠️⚠️ INSTALLING IS NOT BECOMING WHAT RUNS. In an environment that already has
+# INSTALLING IS NOT BECOMING WHAT RUNS. In an environment that already has
 # another mcpp the install succeeds and `mcpp` keeps resolving to the previous
 # one --- xlings says so plainly and carries on. Without the assertion below
 # this check would build the whole ecosystem with the OLD engine and report the
@@ -178,7 +178,7 @@ version = "0.1.0"
 
 [dependencies]
 openkal-llvm-runtime = "__RUNTIME__"
-# ⭐ THE SUBDIRECTORY PACKAGE, WHICH IS THE POINT OF NAMING IT HERE.
+# THE SUBDIRECTORY PACKAGE, WHICH IS THE POINT OF NAMING IT HERE.
 #
 # openkal-kit is published out of the specification's own tarball through
 # \`mcpp = "*/kit/mcpp.toml"\`, so its manifest is located within an archive
@@ -189,9 +189,9 @@ openkal-kit = "__KIT__"
 cxx_runtime = "self-contained"
 TOML
 
-# ⭐ ONE PROGRAM, EVERY CHANGE OF THIS RELEASE.
+# ONE PROGRAM, EVERY CHANGE OF THIS RELEASE.
 cat > src/main.cpp <<'CPP'
-// ⚠️ THE C HEADERS ARE INCLUDED ON PURPOSE. They are what pull musl's headers
+// THE C HEADERS ARE INCLUDED ON PURPOSE. They are what pull musl's headers
 // in, which is what makes the include path under examination the one used.
 #include <stdio.h>
 #include <string.h>
@@ -213,7 +213,7 @@ extern char** environ;
 import std;
 import openkal.kit.endpoint;
 
-// ⭐ THE THREE NAMES A PROGRAM ABOVE THIS STACK MAY USE. musl's internal
+// THE THREE NAMES A PROGRAM ABOVE THIS STACK MAY USE. musl's internal
 // overlay defines them, and openkal-musl used to publish the directory that
 // does (openkal-musl#13). If any is a macro again this file does not compile.
 static int hidden = 7;
@@ -221,7 +221,7 @@ static int weak = 11;
 struct weak_alias { int value; };
 
 int main(int argc, char** argv) {
-    // ⭐ THE PROGRAM THIS ONE STARTS IS ITSELF. A criterion that shelled out to
+    // THE PROGRAM THIS ONE STARTS IS ITSELF. A criterion that shelled out to
     // `/bin/sh` would be asserting something about the sandbox rather than about
     // the C library, and would report the absence of a shell as a defect of the
     // release.
@@ -247,7 +247,7 @@ int main(int argc, char** argv) {
                  ep.ok, !bad.ok, static_cast<unsigned>(ep.ep.addr[3]),
                  static_cast<unsigned long long>(ep.ep.port));
 
-    // ⭐⭐ AND THE ROUTES THIS RELEASE ADDS, THROUGH POSIX AND NAMING NO OPENKAL
+    // AND THE ROUTES THIS RELEASE ADDS, THROUGH POSIX AND NAMING NO OPENKAL
     // SYMBOL. A published C library whose sockets do not work would satisfy
     // every line above.
     const int lis = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
                      && WIFEXITED(status) && WEXITSTATUS(status) == 23;
     std::println("the calling image is duplicated: {}", reaped);
 
-    // ⭐⭐ AND WHAT openkal-musl 0.6.0 ANSWERS, WHICH A CONSUMER REPORTED AND
+    // AND WHAT openkal-musl 0.6.0 ANSWERS, WHICH A CONSUMER REPORTED AND
     // NOT THIS ECOSYSTEM (openkal-linux#13). Each of the three was measured
     // from outside, on packages that had been published and were green here.
 
@@ -342,12 +342,12 @@ grep -q 'sorted: 2 4 7'                              /tmp/out.log
 grep -q 'names: 7 11 3'                              /tmp/out.log
 grep -q 'openkal 0.8 terminal interface linked:'     /tmp/out.log
 grep -q 'kit parses true and refuses true: 255 8080' /tmp/out.log
-# ⚠️ THE PORT IS NOT ASSERTED AS A VALUE --- the environment chooses it --- but
+# THE PORT IS NOT ASSERTED AS A VALUE --- the environment chooses it --- but
 # everything else on the line is, and a port of zero would mean `getsockname`
 # reported nothing.
 grep -qE 'sockets: port [1-9][0-9]* connected true readable true carried true' /tmp/out.log
 grep -q 'the calling image is duplicated: true'      /tmp/out.log
-# ⭐ THE THREE openkal-musl 0.6.0 ANSWERS. Each was red on 0.5.0.
+# THE THREE openkal-musl 0.6.0 ANSWERS. Each was red on 0.5.0.
 grep -q 'a redirection reaches the started program: true' /tmp/out.log \
   || { echo "::error::a started program did not receive the caller's redirection"; exit 1; }
 grep -q 'an uncaught exception ends on SIGABRT: true'     /tmp/out.log \
@@ -356,7 +356,7 @@ grep -q 'asking without waiting returned true times, then named it: true' /tmp/o
   || { echo "::error::waitpid(WNOHANG) blocked, or did not name the program"; exit 1; }
 
 say "what the engine believes each layer is"
-# ⭐ THE VERSION IS THE FIELD THAT DISCRIMINATES. That the engine knows a layer
+# THE VERSION IS THE FIELD THAT DISCRIMINATES. That the engine knows a layer
 # called `c-abi` says nothing about which package supplies it, and an older
 # install answers the layer question exactly as this one does.
 mcpp why toolchain 2>&1 | tee /tmp/layers.log
@@ -367,9 +367,9 @@ grep -qE "openkal-llvm-runtime@__RUNTIME__" /tmp/layers.log \
 grep -qE "openkal-linux@__LINUX__"          /tmp/layers.log \
   || { echo "::error::the kernel-abi layer is not openkal-linux@__LINUX__"; exit 1; }
 
-# ⭐⭐ private_include_dirs: THE CRITERION IS THE DIRECTORY, AND IT IS PER UNIT.
+# private_include_dirs: THE CRITERION IS THE DIRECTORY, AND IT IS PER UNIT.
 #
-# ⚠️ A grep over the whole compile database can only ever fail: openkal-musl's
+# A grep over the whole compile database can only ever fail: openkal-musl's
 # OWN sources are built in this same graph and appear in the same file, and they
 # MUST carry those directories --- that is what the overlay is for. The question
 # is whether a unit that is NOT openkal-musl's sees them.
@@ -389,7 +389,7 @@ for e in d:
     else:
         outside += 1
         if has: leaked.append(e["file"])
-# ⚠️ DENOMINATORS BOTH WAYS. Zero units outside the package makes the absence
+# DENOMINATORS BOTH WAYS. Zero units outside the package makes the absence
 # vacuous; zero inside it carrying the directories means the overlay was never
 # in use and the comparison is empty.
 print(f"  {len(d)} entries: {outside} outside openkal-musl, {own_with} of its own carry the private directories")

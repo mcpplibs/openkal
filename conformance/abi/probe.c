@@ -26,7 +26,7 @@ int main(void) {
            (unsigned long long)((kal_version() >> 16) & 0xffffu),
            (unsigned long long)(kal_version() & 0xffffu));
 
-    /* ⭐ THE FLOOR. A consumer holds declarations of one version and may meet an
+    /* THE FLOOR. A consumer holds declarations of one version and may meet an
      * implementation of another; an older one reports conditions this consumer
      * distinguishes as conditions it does not, which is a wrong answer rather
      * than a refusal. */
@@ -39,7 +39,7 @@ int main(void) {
     printf("has-exec        %s\n", yn((have & KAL_IFACE_EXEC) != 0));
     printf("has-fs          %s\n", yn((have & KAL_IFACE_FS) != 0));
 
-    /* ⚠️ AND THE WORD IS CHECKED AGAINST WHAT IS ACTUALLY THERE. A word that
+    /* AND THE WORD IS CHECKED AGAINST WHAT IS ACTUALLY THERE. A word that
      * claimed an interface the object does not export would mislead exactly the
      * consumer that has no linker to ask --- which is this one. */
     printf("exec-available  %s\n",

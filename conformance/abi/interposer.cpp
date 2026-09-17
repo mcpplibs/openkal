@@ -1,7 +1,7 @@
 // A second implementation of openkal for one target, and the only one there has
 // ever been.
 //
-// ⚠️⚠️ WHY THIS EXISTS. Everything else in this repository asserts that ONE
+// WHY THIS EXISTS. Everything else in this repository asserts that ONE
 // artifact, built and run in one place, behaves as the specification says. The
 // property a distributed binary rests upon is different and stronger: that ONE
 // BINARY, BUILT ONCE, behaves as specified against an implementation IT WAS NOT
@@ -26,7 +26,7 @@
 //   the version              older than the declarations a consumer holds, so
 //                            its floor check is exercised
 //
-// ⭐ AND `KAL_EXEC_PROP_AVAILABLE' IS CLEARED HERE. Clause 6.5 objects to
+// AND `KAL_EXEC_PROP_AVAILABLE' IS CLEARED HERE. Clause 6.5 objects to
 // reporting availability at run time on the ground that a path no artifact takes
 // is a path nothing has verified. This is the artifact that takes it.
 #include <openkal.h>

@@ -3,6 +3,8 @@ module okc.net;
 import openkal.types;
 import openkal.stream;
 import openkal.net;
+import openkal.task;
+import openkal.time;
 import okc.report;
 import okc.spec;
 
@@ -21,6 +23,28 @@ kal_endpoint loopback_v4(kal_u32 port) {
     ep.port = port;
     return ep;
 }
+
+#if defined(MCPP_FEATURE_TASK) && defined(MCPP_FEATURE_TIME)
+// The two contexts of the observation that a connection's directions are
+// independent. One reads from the client end and waits; the other, after a
+// bound, writes from the server end so that the reader is released whatever
+// the implementation did. The bound is what turns a serialised implementation
+// into an observation that does not hold rather than a suite that never ends.
+kal_stream g_reader_stream{};
+kal_stream g_releaser_stream{};
+constexpr kal_u64 kReleaseAfterNs = 2000ull * 1000ull * 1000ull;
+
+void reads_and_waits(void*) {
+    char b[8];
+    kal_stream_read(g_reader_stream, b, sizeof b);
+}
+
+void releases_the_reader(void*) {
+    kal_time_sleep(kReleaseAfterNs);
+    const char x = 'r';
+    kal_stream_write(g_releaser_stream, &x, 1);
+}
+#endif
 
 }  // namespace
 #endif
@@ -92,6 +116,51 @@ void run() {
             if (buf[i] != msg[i]) same = false;
         observe(kind::behaviour, same, "the bytes read are the bytes written");
     }
+
+    // A CONNECTION HAS TWO INDEPENDENT DIRECTIONS. Version 0.13, clause 6.6.
+    //
+    // A context waits in a read on the client end. Another context writes on
+    // the same end, and that write shall complete without waiting for the read.
+    // A third context releases the reader after two seconds, so an
+    // implementation that serialises the directions makes the write take that
+    // long, which is observed, instead of waiting for ever.
+#if defined(MCPP_FEATURE_TASK) && defined(MCPP_FEATURE_TIME)
+    {
+        g_reader_stream = cs;
+        g_releaser_stream = ss;
+        kal_task reader{}, releaser{};
+        const int re = kal_task_start(reads_and_waits, nullptr, &reader);
+        const int le = re == kal_ok
+            ? kal_task_start(releases_the_reader, nullptr, &releaser) : re;
+        if (re == kal_ok && le == kal_ok) {
+            kal_time_sleep(200ull * 1000ull * 1000ull);
+            const kal_duration t0 = kal_time_monotonic();
+            const char y = 'w';
+            const kal_intptr w = kal_stream_write(cs, &y, 1);
+            const kal_duration elapsed = kal_time_monotonic() - t0;
+            observe(kind::behaviour,
+                    w == 1 && elapsed < kReleaseAfterNs / 2,
+                    "a write is not delayed by a read waiting on the same connection");
+            char b[4];
+            kal_stream_read(ss, b, 1);
+            kal_task_join(releaser);
+            kal_task_join(reader);
+        } else {
+            if (re == kal_ok) {
+                const char x = 'r';
+                kal_stream_write(ss, &x, 1);
+                kal_task_join(reader);
+            }
+            unobserved(kind::behaviour,
+                       "a write is not delayed by a read waiting on the same connection",
+                       "an execution context could not be started");
+        }
+    }
+#else
+    unobserved(kind::behaviour,
+               "a write is not delayed by a read waiting on the same connection",
+               "the observation needs openkal.task and openkal.time");
+#endif
 
     // The peer of each end is the other end. Observed on the accepted side,
     // whose peer is the client's local address; the two are the same machine

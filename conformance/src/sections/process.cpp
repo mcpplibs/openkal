@@ -90,6 +90,73 @@ void run() {
                    "the implementation does not claim prop_terminate");
     }
 
+    // A START THAT DID NOT HAPPEN IS REPORTED, AND BY ITS REASON. Version 0.13.
+    //
+    // A name that does not exist needs no file to be created, so this is
+    // observed on every implementation that provides the interface. An
+    // implementation that reported kal_ok and a handle here would leave the
+    // caller to discover the failure as an exit status, which cannot be told
+    // apart from a program that ran and returned it.
+    {
+        kal_process p{};
+        const char* name = "okc-conformance-no-such-program";
+        const kal_uintptr len = 31;
+        const char* argv[1] = { name };
+        const kal_uintptr lens[1] = { len };
+        const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr,
+                             nullptr, 0, 0 };
+        const int e = kal_process_spawn(&how, name, len, argv, lens, 1,
+                                        nullptr, nullptr, 0, nullptr, &p);
+        observe(kind::behaviour, e != kal_ok,
+                "a start that did not happen is not reported as success");
+        observe(kind::behaviour, e == kal_err_not_found,
+                "and a name that is not there is reported as absent");
+        if (e == kal_ok) { int st = 0, te = 0; kal_process_wait(p, &st, &te); kal_process_close(p); }
+    }
+
+    // A name that is there and is not a program. Where the volume records
+    // whether a node may be started, the record is set first, so that what the
+    // start meets is the form of the content and not a refusal to start it.
+    // Where it does not, the environment decides from the name or the content,
+    // and a text file is not a program on any of them.
+    {
+        const char* name = "okc-conformance-not-a-program.tmp";
+        const kal_uintptr len = 33;
+        kal_file f{};
+        const int oe = kal::fs::open_file(kal::fs::working(), name, len,
+                                          kal::fs::open::write | kal::fs::open::create
+                                              | kal::fs::open::truncate, &f);
+        if (oe == kal_ok) {
+            const char text[] = "this file is text and is not a program\n";
+            kal_stream_write(kal_fs_stream(f), text, sizeof text - 1);
+            kal_fs_close_file(f);
+            const bool recorded =
+                (kal_fs_props(kal::fs::working()) & kal::fs::executable.bits) != 0;
+            if (recorded) kal_fs_set_executable_at(kal::fs::working(), name, len, 1);
+
+            kal_process p{};
+            const char* argv[1] = { name };
+            const kal_uintptr lens[1] = { len };
+            const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr,
+                                 nullptr, 0, 0 };
+            const int e = kal_process_spawn(&how, name, len, argv, lens, 1,
+                                            nullptr, nullptr, 0, nullptr, &p);
+            observe(kind::behaviour, e != kal_ok,
+                    "a file that is not a program is not reported as started");
+            if (recorded)
+                observe(kind::behaviour, e == kal_err_not_program,
+                        "and one recorded as startable is reported as not a program");
+            else
+                observe(kind::behaviour, e != kal_err_io,
+                        "and the reason is not reported as a failure of the medium");
+            if (e == kal_ok) { int st = 0, te = 0; kal_process_wait(p, &st, &te); kal_process_close(p); }
+            kal_fs_remove(kal::fs::working(), name, len);
+        } else {
+            unobserved(kind::behaviour, "a file that is not a program is not reported as started",
+                       "the file could not be created in the working directory");
+        }
+    }
+
     // THE THREE OPERATIONS VERSION 0.8 ADDS TO THIS INTERFACE.
     //
     // They are examined here and not in a section of their own, because they are
@@ -155,17 +222,17 @@ void run() {
         observe(kind::abi, (kal_process_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 
-        // ⚠️ A FLAG THAT IS NOT CLAIMED SHALL REFUSE RATHER THAN PERFORM
+        // A FLAG THAT IS NOT CLAIMED SHALL REFUSE RATHER THAN PERFORM
         // SOMETHING ELSE. A caller that asks for a bound lifetime asked for it;
         // a program started WITHOUT the binding is not the program it asked to
         // start, and an implementation that quietly starts one anyway is the
         // failure the flag exists to remove.
         //
-        // ⭐ ONE LOOP OVER BOTH FLAGS RATHER THAN A BLOCK EACH, which is the
+        // ONE LOOP OVER BOTH FLAGS RATHER THAN A BLOCK EACH, which is the
         // shape 0.11 made possible: they are two positions in one word now, so
         // the observation is written once and reads the same for the next flag
         // that arrives.
-        // ⚠️⚠️ THIS SUITE OBSERVES THE REFUSAL AND NOT THE EFFECT, AND THAT IS A
+        // THIS SUITE OBSERVES THE REFUSAL AND NOT THE EFFECT, AND THAT IS A
         // LIMIT OF WHAT openkal CAN SEE RATHER THAN AN OMISSION HERE.
         //
         // `work' sets the directory a started program runs in, and openkal has no
@@ -183,7 +250,7 @@ void run() {
         // that an implementation not claiming a position refuses rather than
         // starting a program that lacks what was asked for.
         //
-        // ⚠️ THE MODULE SPELLINGS AND NOT THE MACROS. `KAL_SPAWN_*' are macros,
+        // THE MODULE SPELLINGS AND NOT THE MACROS. `KAL_SPAWN_*' are macros,
         // and a macro does not cross a module boundary --- this suite consumes
         // openkal as a module, so the C spelling is simply not in scope here.
         // The same thing caught `KAL_LOCK_*' one release ago, which is why
@@ -204,7 +271,7 @@ void run() {
                        "the implementation claims prop_bound_lifetime");
         }
 
-        // ⭐ THE UNIT IS ASKED FOR BY A POINTER AND NOT BY A FLAG, so an
+        // THE UNIT IS ASKED FOR BY A POINTER AND NOT BY A FLAG, so an
         // implementation that cannot form one refuses a NON-NULL `job' --- there
         // is no bit to set and none to test.
         if ((kal_process_props() & kal::process::job.bits) == 0) {

@@ -30,7 +30,7 @@ inline constexpr kal_uintptr capacity = 4096;
 static_assert((capacity & (capacity - 1)) == 0, "the wrap is a mask");
 
 struct ring {
-    // ⚠️ THE INDICES ARE THE WORDS THAT ARE WAITED UPON, so they are the width
+    // THE INDICES ARE THE WORDS THAT ARE WAITED UPON, so they are the width
     // kal_task_wait takes and not a machine word. A wait upon a word of another
     // width is not a question the interface can be asked.
     kal_u32 head;      // written by the writer, read by the reader
@@ -139,7 +139,7 @@ inline kal_uintptr channel_read(channel_end e, void* buf, kal_uintptr len) {
         const kal_uintptr used = static_cast<kal_uintptr>(head - tail);
 
         if (used == 0) {
-            // ⚠️ THE CLOSE IS TESTED AFTER THE INDICES AND NOT BEFORE. A writer
+            // THE CLOSE IS TESTED AFTER THE INDICES AND NOT BEFORE. A writer
             // that filled the ring and closed in the same breath leaves bytes
             // behind it; a reader that saw the close first would discard them
             // and report an end of input that lost data.

@@ -4,7 +4,7 @@
 **Scope**: openkal 0.8, its five implementations, and the two consumers on it
 **Status**: proposal for review. Nothing here is implemented.
 
-⚠️ **Sections 0–8 were written before the premise was stated in full, and are
+**Sections 0–8 were written before the premise was stated in full, and are
 left as they were.** Section 9 is a self-review against the premise that a
 program built on this interface may one day be **distributed as a binary** and
 meet an implementation it was not compiled against. Three of the earlier
@@ -34,7 +34,7 @@ Four inputs, and the fourth reorders the other three.
    openkal ABI. A redundant declaration can be deleted rather than carried, and
    a structure can gain a field. This window is open now and will not reopen:
    clause 8 forbids altering a declaration, and clause 5.3 freezes layouts.
-4. ⚠️⚠️ **openkal is intended to be more than a set of symbols a program links.
+4. **openkal is intended to be more than a set of symbols a program links.
    It is intended to become a kernel ABI — a runtime interface crossed by a
    trap, a dynamic import, or a service boundary.**
 
@@ -87,7 +87,7 @@ only when `sig == SIGABRT`. It sits at `-0x20(%rbp)` in a frame of `0x30`, so
 the write reaches the saved frame pointer and the return address. `__sigaction`
 then returns to zero.
 
-⚠️ The blast radius is larger than installing a handler. Measured: a plain
+The blast radius is larger than installing a handler. Measured: a plain
 **query**, `sigaction(SIGABRT, NULL, &old)`, dies as well, as does
 `signal(SIGABRT, SIG_IGN)`. Any program that reads or writes the disposition of
 SIGABRT — a test framework's death tests, a crash reporter, a terminal UI
@@ -99,7 +99,7 @@ other signal, and a C++ probe of the reported shape (six signals, a global
 `std::stack<std::function<void()>>`, twelve forks, four threads) runs to
 completion.
 
-⭐ **Why the port's own probe did not catch it.** `examples/subprocess` has
+**Why the port's own probe did not catch it.** `examples/subprocess` has
 thirty-six observations, three of them about `abort`. It contains **no call to
 `signal` or `sigaction` anywhere.** It tested whether `abort` ends the program;
 it did not test whether a program may touch SIGABRT's disposition. This is the
@@ -161,14 +161,14 @@ Two causes, and neither is the absence of a link operation:
 missing operation. It is an operation that reports success having answered a
 different question, which is the one outcome this ecosystem's own rule forbids.
 
-⭐ **And it is fixable with no new atom.** `kal_fs_open` resolves the link and
+**And it is fixable with no new atom.** `kal_fs_open` resolves the link and
 `kal_fs_file_info` then answers about what was opened. Composing the two gives
 `stat` its POSIX meaning. **Measured** on a patched build: every row above
 matches the host except the last, and `fs::copy(recursive)` — the form that does
 *not* ask for `copy_symlinks` — succeeds. Only `copy_symlinks`, which preserves
 the link rather than following it, still needs an operation that does not exist.
 
-⚠️ But the composition rests on `kal_fs_open` resolving a link, which
+But the composition rests on `kal_fs_open` resolving a link, which
 `fs.h` does not state. See §4.6.
 
 ### 1.4 Two different files are `equivalent` — openkal-linux
@@ -182,7 +182,7 @@ identity, so `fill_kstat` writes `st_ino = 0, st_dev = 1` for every node.
 This is the only silently wrong answer in the filesystem surface. `fs::space` and
 `fs::create_hard_link` report `ENOSYS`, which a program can act on.
 
-⭐ Identity is not permission and not links. It presupposes no principal and no
+Identity is not permission and not links. It presupposes no principal and no
 format feature: **no resource can fail to answer whether it is the same resource
 as another**, so clause 6.4 does not exclude it. Every format has a form of it —
 inode, NTFS file index, APFS object id.
@@ -206,7 +206,7 @@ properties of the **format**, not of the implementation:
   while declining to claim it.
 - `KAL_FS_PROP_ATOMIC_RENAME` has the same problem for a cross-device rename.
 
-⭐ The specification already names the right mechanism and does not apply it
+The specification already names the right mechanism and does not apply it
 here. Clause 6.2: *"A property that varies between the resources of an interface
 rather than between implementations cannot be a word… Such a property is
 reported by an enquiry taking the resource. `kal_stream_props` is the example."*
@@ -240,14 +240,14 @@ on this build read zero, because the stack happened to be zero.
 
 Two sentences cover all of them.
 
-> ⭐⭐ **A size or a semantic taken from the type declared locally, rather than
+> **A size or a semantic taken from the type declared locally, rather than
 > from the contract being answered.**
 > §1.1 takes 128 from `sizeof(sigset_t)` when the caller said 8. §1.7 takes 24
 > from a local struct when the ABI says 32. §1.3 takes "do not follow" from one
 > call site and "follow" from another. §1.5 takes one answer per implementation
 > for a question whose answer is per resource.
 
-> ⭐⭐ **An operation that reports success having answered a different question.**
+> **An operation that reports success having answered a different question.**
 > §1.3's `stat`, §1.4's `equivalent`, §1.6's `getpgrp`, §1.5's
 > `CASE_SENSITIVE`. Each is worse than a refusal, because a refusal is
 > actionable and a wrong answer is not.
@@ -260,7 +260,7 @@ proposes both.
 
 ---
 
-## 3. ⚠️⚠️ Shapes that do not survive becoming a kernel ABI
+## 3. Shapes that do not survive becoming a kernel ABI
 
 An interface that is *linked* may pass anything the C ABI permits. An interface
 that is *crossed* — a trap, a dynamic import, a call into another address space —
@@ -321,7 +321,7 @@ int kal_space_start(void (*entry)(void*), void* arg, void* stack_top,
 A kernel does not call into a program. Starting a context across a boundary is
 expressed as a program counter and a stack pointer, not as a callback.
 
-⚠️ This one is not a mechanical change and this document does not settle it.
+This one is not a mechanical change and this document does not settle it.
 `openkal.task`'s present shape is the *reason* clause 7.1 gives for not taking a
 stack: an environment that does not allocate stacks separately cannot honour a
 request for one. A kernel-ABI form must take the stack, and a bare-metal form
@@ -394,7 +394,7 @@ struct kal_node_info {
 };
 ```
 
-Discharges §1.4. ⚠️ The `size` change is not cosmetic: `kal_uintptr` on a 32-bit
+Discharges §1.4. The `size` change is not cosmetic: `kal_uintptr` on a 32-bit
 target truncates at 4 GiB with nothing reporting it, while `kal_fs_seek` on the
 same target is already 64-bit. The two disagree today.
 
@@ -429,7 +429,7 @@ change first, because clause 5.3 will hold it afterwards.
 
 ### 4.6 Links: two operations inside `openkal.fs`, not a new interface
 
-⚠️ **An earlier draft of this analysis proposed `openkal.link` as an optional
+**An earlier draft of this analysis proposed `openkal.link` as an optional
 interface. That was wrong by the specification's own reasoning and is withdrawn.**
 
 Clause 6.2 sorts variability three ways: an operation an *implementation* may
@@ -465,7 +465,7 @@ why two call sites in one file chose opposite directions.
 
 ### 4.7 Permissions stay out, and the substitute is recorded
 
-⚠️ **A `kal_fs_restrict` operation was proposed in the same earlier draft and is
+**A `kal_fs_restrict` operation was proposed in the same earlier draft and is
 also withdrawn.** Clause 11 item 6 is stronger than it was given credit for, and
 this measurement is why:
 
@@ -537,7 +537,7 @@ version, because five separate ABI breaks cost five migrations and one costs one
 ### openkal-macos
 
 - the same four, over `symlinkat`/`readlinkat` and `st_dev`/`st_ino`;
-- ⚠️ it is the row where the fork composition already diverges
+- it is the row where the fork composition already diverges
   (`kal_task_current` answers a new value in a copy), so it is the row where
   §3.3's decision must be tested, not the Linux one.
 
@@ -553,7 +553,7 @@ version, because five separate ABI breaks cost five migrations and one costs one
 
 Independent of everything above, and shippable first:
 
-1. ⚠️ **`SYS_rt_sigprocmask` honours `a4`** (§1.1). One line. Highest priority in
+1. **`SYS_rt_sigprocmask` honours `a4`** (§1.1). One line. Highest priority in
    the ecosystem: it is a crash, it is reached by ordinary C++ programs, and the
    fix is verified.
 2. `SYS_rt_sigaction` takes its size from `struct k_sigaction`, not from a local
@@ -573,7 +573,7 @@ Independent of everything above, and shippable first:
    result is assigned to nothing**; it is trace noise and nothing else. One of
    the six numbers the consumer reported is a false alarm, and the cost of that
    falls on them.
-7. ⭐ a probe that calls `sigaction` for every signal number, in all three forms —
+7. a probe that calls `sigaction` for every signal number, in all three forms —
    install, ignore, query — and admits only two answers: success, or −1 with
    `ENOSYS`. The third answer, which is what happens today, is that the process
    no longer exists.
@@ -592,7 +592,7 @@ links or identity**, and an earlier version of this analysis wrongly cited them
 as the reason links must be optional. The reason is a future format-limited
 implementation, not these two.
 
-⚠️ They are, however, the rows that §3.3 and §3.5 must not break. A bare machine
+They are, however, the rows that §3.3 and §3.5 must not break. A bare machine
 has no boundary to cross and no loader to negotiate with; a change made for the
 kernel-ABI case that costs the bare-metal case its static form has traded the
 whole premise.
@@ -620,7 +620,7 @@ a dangling link — and asserts that `stat`, `lstat`, `readlink`, `fs::exists`,
 `fs::is_regular_file`, `fs::file_size`, `fs::equivalent` and `fs::copy` **agree
 field for field**.
 
-⭐ This criterion needs no ability to *create* a link, so it can be added before
+This criterion needs no ability to *create* a link, so it can be added before
 4.6 and keeps its value afterwards. It catches §1.3, §1.4 and §1.6 at once, and
 it is a criterion a consumer can contribute — which is worth more than one the
 implementer writes, because it does not inherit the implementer's assumptions.
@@ -645,7 +645,7 @@ implementer writes, because it does not inherit the implementer's assumptions.
 
 ## 8. What this document does not settle
 
-1. ⚠️⚠️ **What "kernel ABI" means concretely.** A trap, a dynamic import and a
+1. **What "kernel ABI" means concretely.** A trap, a dynamic import and a
    call into a service are three different boundaries with three different sets
    of admissible shapes. §3 lists what fails under *any* of them; it cannot list
    what is required until one is chosen. **This is the prerequisite for
@@ -676,7 +676,7 @@ extension and testing — none of which sections 0–8 address.
 
 Twelve findings. Three overturn a recommendation this document already made.
 
-### 9.1 ⚠️⚠️ The document proposes a cleanup where a mechanism is needed — and one mechanism replaces three of its proposals
+### 9.1 The document proposes a cleanup where a mechanism is needed — and one mechanism replaces three of its proposals
 
 §4.2 adds fields to `kal_node_info` "while nothing is owed". That is correct for
 today and answers nothing about tomorrow: a program compiled against a 48-byte
@@ -693,7 +693,7 @@ int kal_fs_info(struct kal_dir base, const char* name, kal_uintptr len,
                 kal_uintptr* got);         /* which answers were in fact given */
 ```
 
-⭐ **This single shape subsumes three separate proposals in §4.** Extension:
+**This single shape subsumes three separate proposals in §4.** Extension:
 the implementation writes no more than `out->struct_size` and reports what it
 filled. Per-resource variability (§4.1, §1.5): "does this resource have links,
 is it case-sensitive" is answered by the same `got` word, per call, on the
@@ -705,7 +705,7 @@ for.
 The per-resource `kal_fs_props(kal_dir)` of §4.1 is still needed for properties
 that are not about a node, but the node-level ones move here.
 
-### 9.2 ⚠️⚠️ Nothing in the ecosystem has the shape the premise requires, and the criterion cannot be constructed today
+### 9.2 Nothing in the ecosystem has the shape the premise requires, and the criterion cannot be constructed today
 
 openkal's conformance CI is a matrix of `{os, toolchain, implementation}`:
 
@@ -721,7 +721,7 @@ implementation, and §6.2's criterion — same source, two targets — does not 
 that either. The property binary distribution *promises* is: **the same binary,
 two implementations of one target.**
 
-⚠️ And it cannot be written today, because **there is exactly one implementation
+And it cannot be written today, because **there is exactly one implementation
 per target.** Late binding has no second party. Worse, the choice is made at
 dependency resolution and compiled in — openkal-musl names
 `openkal-linux = { features = ["standalone"] }` in its manifest — so there is no
@@ -736,7 +736,7 @@ without the statement — every repository's CI substitutes the working tree, an
 the published form was found to differ from the development form only after
 eight packages had shipped.
 
-### 9.3 ⚠️⚠️ Clause 3.2 forbids the one primitive a late-bound consumer needs, and clause 6.2 contradicts a trap ABI
+### 9.3 Clause 3.2 forbids the one primitive a late-bound consumer needs, and clause 6.2 contradicts a trap ABI
 
 §3.5 said "a third row is needed". The sharper statement is that two existing
 clauses now conflict with the premise.
@@ -763,7 +763,7 @@ wrongly-placed core interface excludes a bare machine from conformance — still
 holds and is not being argued against; what is being argued is that a
 *negotiation* operation is not an interface in that sense.
 
-### 9.4 ⚠️ Clause 6.5 inverts, and the document never mentions it
+### 9.4 Clause 6.5 inverts, and the document never mentions it
 
 *"An operation whose availability is decided by how the artifact is produced is
 not reported at run time."* `openkal.exec` is the case: memory a program may
@@ -780,7 +780,7 @@ its environment. Remove that assumption and the argument reverses.
 ⇒ Either `openkal.exec` is not distributable, or 6.5 needs a distributed form.
 Not decided here; recorded because §3 omitted it entirely.
 
-### 9.5 ⚠️ The artifact must carry its own floor, and nothing does
+### 9.5 The artifact must carry its own floor, and nothing does
 
 Clause 5.2 grew the error set by five values in 0.5. A program compiled against
 0.8 that distinguishes `kal_err_not_found` from `kal_err_invalid` gets
@@ -793,7 +793,7 @@ artifact itself — an ELF note, or a first call that states the requirement and
 is refused — so that skew is a refusal at load rather than a wrong answer at
 run. §4 has no item for this and should.
 
-### 9.6 ⚠️ A binary-distribution defect that already exists: no operation reports the mapping granularity
+### 9.6 A binary-distribution defect that already exists: no operation reports the mapping granularity
 
 `openkal.memory` is `kal_alloc` and `kal_free` and nothing else. `exec.h` refers
 to *"the environment's page granularity"* and does not expose it. **No operation
@@ -858,7 +858,7 @@ and a required interface as the control.
 the premise**, and it works because it was written for the opposite extreme.
 Worth stating in §3.5, which presently reads as though nothing survives.
 
-### 9.12 ⚠️⚠️ §7's sequencing is wrong
+### 9.12 §7's sequencing is wrong
 
 §7 puts the ABI break (items 1–5) at step 3 and the boundary questions at step 6,
 "as a separate document". Under this premise that spends the one window on a
@@ -908,7 +908,7 @@ intent that arrived after them and that change several answers:
 - openkal is to be **compatible, general, simple and elegant**;
 - **static linking now, a runtime ABI later**, and the second must not be a
   break of the first;
-- ⚠️⚠️ **no operating system decides how openkal is designed.** openkal states a
+- **no operating system decides how openkal is designed.** openkal states a
   model; others implement it and use it;
 - the design is to be **good for the implementer and good for the user**, and
   where those pull apart the pull is itself the thing to design against;
@@ -918,7 +918,7 @@ intent that arrived after them and that change several answers:
 Three of this document's own recommendations do not survive that, and one of its
 findings was simply wrong.
 
-### 11.0 ⚠️ §9.2 was wrong
+### 11.0 §9.2 was wrong
 
 §9.2 said the binary-distribution criterion "cannot be constructed today,
 because there is exactly one implementation per target". That conclusion rested
@@ -929,7 +929,7 @@ object, a consumer can be linked against it dynamically, and the pairing can
 then be changed without recompiling the consumer. The criterion is constructible
 now, and §11.7 states it.
 
-⭐ The failure was the one this document names in §2 — a conclusion drawn from
+The failure was the one this document names in §2 — a conclusion drawn from
 the shape of what exists rather than from what the tools can express. It was
 reached without reading mcpp, which is one command away.
 
@@ -1002,7 +1002,7 @@ honest answer rather than a memory-parameters interface.
 | **Windows** | **64 KiB** (`VirtualAlloc`) | **4 KiB** |
 | a machine with no memory management unit | none | none |
 
-⚠️ **A design derived from Linux reports one number and is wrong on Windows.**
+**A design derived from Linux reports one number and is wrong on Windows.**
 This is the smallest complete demonstration of R1 in the whole document.
 
 **The design.** One operation, one number, defined so that it is always safe:
@@ -1021,21 +1021,21 @@ This is the smallest complete demonstration of R1 in the whole document.
 kal_uintptr kal_memory_granularity(void);
 ```
 
-- ⭐ **One number and no explanation of when it applies.** Windows answers
+- **One number and no explanation of when it applies.** Windows answers
   64 KiB; Linux answers its page size; a bare machine answers 1. A caller that
   rounds to it is correct everywhere, and there is no second number to get
   wrong.
-- ⭐ **The name is not "page".** "Page" is an operating system's word for a
+- **The name is not "page".** "Page" is an operating system's word for a
   mechanism openkal does not have. The value is a granularity, and that is what
   it is called (R1).
-- ⭐ **No protection granularity is reported**, because openkal has no operation
+- **No protection granularity is reported**, because openkal has no operation
   upon a mapping's protection — the divergence table already records `mprotect`
   as absent. Reporting a number no operation of this interface can act upon
   would be reporting a fact about the machine (R5).
-- ⭐ **Cheap for the implementer.** A constant is a legal answer, and 1 is a
+- **Cheap for the implementer.** A constant is a legal answer, and 1 is a
   legal answer. Nothing has to be discovered, cached or invalidated.
 
-⚠️ **The honest cost, stated rather than hidden.** On Windows a C library above
+**The honest cost, stated rather than hidden.** On Windows a C library above
 this reports `_SC_PAGESIZE` as 64 KiB, which is coarser than the machine's page.
 A program that uses it to *align* is correct. A program that uses it to *size a
 buffer* allocates sixteen times what it needed. openkal chooses coarse-and-always-correct over exact-and-sometimes-wrong, and the divergence table says so.
@@ -1050,7 +1050,7 @@ callers will pick wrong.
 
 | bound | where | what a caller sees today | verdict |
 | --- | --- | --- | --- |
-| **maximum name length** | openkal-linux `terminated`'s `char buf[4096]`; `g_cwd[4096]` | `kal_err_invalid` — **indistinguishable from a malformed name**, and openkal says nothing about a bound at all | ⚠️ an openkal-level gap: an operation, or a documented refusal value distinct from "invalid" |
+| **maximum name length** | openkal-linux `terminated`'s `char buf[4096]`; `g_cwd[4096]` | `kal_err_invalid` — **indistinguishable from a malformed name**, and openkal says nothing about a bound at all | an openkal-level gap: an operation, or a documented refusal value distinct from "invalid" |
 | started programs | openkal-musl, 64 | `EAGAIN` on the next spawn, which the caller cannot attribute | implementation-level; state it, or release entries for programs that have ended |
 | execution contexts | openkal-musl, `OKM_CONTEXTS 512` | `kal_abort` with a message naming the cause | acceptable — it fails loudly and says why; state it anyway |
 | descriptors, open descriptions | openkal-musl, 1024 / 512 | stated in the README | already right |
@@ -1076,7 +1076,7 @@ the derivation from openkal's own situation:
    implementation and be told what it received** — otherwise it reads its own
    uninitialised memory, which is §1.1 with the roles exchanged.
 
-Three requirements, three mechanisms, and ⭐ **they must not be conflated —
+Three requirements, three mechanisms, and **they must not be conflated —
 which is what §4.1 and §4.2 did**:
 
 | requirement | mechanism | answers |
@@ -1100,12 +1100,12 @@ int kal_fs_info(struct kal_dir base, const char* name, kal_uintptr len,
                 kal_u64 wanted, struct kal_node_info* out);
 ```
 
-⚠️ **The implementer's side must stay one line.** An implementation that always
+**The implementer's side must stay one line.** An implementation that always
 has everything writes a constant into `present` and ignores `wanted`. If it does
 not stay one line, the shape is wrong. This is the "good for the implementer"
 half of the intent made into a test.
 
-⭐ And `size` becomes `kal_u64` rather than `kal_uintptr` here rather than as a
+And `size` becomes `kal_u64` rather than `kal_uintptr` here rather than as a
 separate item: a file's length is not a property of the caller's word size, and
 `kal_fs_seek` already agrees.
 
@@ -1138,14 +1138,14 @@ R1 applied to §3, §4 and §9.
 | `want`/`got` enquiry | named after one system; justified by three properties of openkal | **keep**, re-derived in 11.4 |
 | identity as `volume`/`node` | Unix | **replaced** — 11.5 |
 | one page size | Linux (Windows has two) | **replaced** — 11.2 |
-| version floor as an **ELF note** (§9.5) | ⚠️ **ELF is one object format**; openkal targets Mach-O and PE and intends a trap | **replaced** — the floor must be an *operation* the consumer performs before it uses anything, because every boundary has operations and only one has notes |
+| version floor as an **ELF note** (§9.5) | **ELF is one object format**; openkal targets Mach-O and PE and intends a trap | **replaced** — the floor must be an *operation* the consumer performs before it uses anything, because every boundary has operations and only one has notes |
 | `stat` follows / `lstat` does not | POSIX vocabulary, but the two questions are genuinely distinct | **keep**, renamed: the flag says *resolve* or *do not resolve*, not *stat* or *lstat* |
 | `kal_fs_link_{create,read}` | a format's concept, not a kernel's; clause 11 item 7 already reasons this way | **keep** |
 | `kal_fs_restrict` | POSIX mode thinking | already withdrawn — §4.7 |
 | `kal_io_result` → out-parameters | justified as "a trap returns one word", which is a kernel's fact | **keep on a different ground**: openkal decides which boundaries it intends to be expressible across, and that decision is its own |
 | props become operations | openkal's own inconsistency, not anyone's shape | **keep** — R2 |
 
-⭐ Four of nine wore someone else's shape, and three of those were found only by
+Four of nine wore someone else's shape, and three of those were found only by
 applying R1 deliberately. That is the argument for R1 being written down rather
 than assumed.
 
@@ -1157,18 +1157,18 @@ Because mcpp builds shared libraries:
 2. build one probe program against openkal, linked dynamically, **once**;
 3. run that one binary against two shared objects:
    - openkal-linux itself;
-   - ⭐ **a thin interposer over it** that answers a *different* granularity,
+   - **a thin interposer over it** that answers a *different* granularity,
      fills a *different* `present` word, declines one optional interface, and
      reports an *older* version floor;
 4. assert the binary behaves as specified against both — including refusing to
    run against the older floor.
 
-⭐ **The interposer is the second implementation §9.2 claimed did not exist, and
+**The interposer is the second implementation §9.2 claimed did not exist, and
 it is one file.** It is also the only way to exercise the paths that have no
 other producer: negotiation, an absent optional interface at run time, a version
 floor that is too low, and a `present` word with a bit clear.
 
-⚠️ It must be a *separate artifact*, not a build feature of openkal-linux. A
+It must be a *separate artifact*, not a build feature of openkal-linux. A
 feature is chosen at dependency resolution and compiled in, which is exactly the
 arrangement this test exists to escape.
 
@@ -1198,7 +1198,7 @@ later, it is not in this list.**
 - how a two-word result crosses (§3.4);
 - how absence is reported where there is no linker (§3.5, §9.3).
 
-⭐ **The mechanism that lets these wait is a profile.** Rather than redesigning
+**The mechanism that lets these wait is a profile.** Rather than redesigning
 `openkal.task` before the boundary is known, the specification names the set of
 interfaces a **distributable** artifact may use, and that set initially excludes
 the ones whose shapes are not boundary-safe. Static linking keeps all of them
@@ -1236,7 +1236,7 @@ boundary. This section does both, and adds the finding that makes the second
 tractable: **all fifteen can be made to cross every boundary, and only five
 distinct causes stand in the way.**
 
-### 12.1 ⚠️ `standard` is falsified by this ecosystem's own C library
+### 12.1 `standard` is falsified by this ecosystem's own C library
 
 Clause 3 defines the middle tier as:
 
@@ -1267,7 +1267,7 @@ There is **no enforcement difference today** between `standard` and `optional` �
 clause 6.1 treats them identically — so the third tier carried only an advisory
 claim, and §12.1 shows the claim is false.
 
-⭐ The honest classification is already in the table, in the column next to it:
+The honest classification is already in the table, in the column next to it:
 an interface exists where **its resource** exists. Storage, a second image, a
 scheduler, a network, an address space that can be copied, entropy, an
 interactive stream, a bound upon a wait. The tier column was a second, worse
@@ -1289,7 +1289,7 @@ place where a convention among consumers belongs.
 ⇒ The specification names **no environment sets**. `core` stops being a "set"
 and is what it already is: a requirement upon implementations.
 
-⚠️ One name stays, and it is not about environments — the **boundary marking**
+One name stays, and it is not about environments — the **boundary marking**
 of §12.4. A boundary is a property of a declaration's shape, so a new
 environment cannot falsify it.
 
@@ -1330,7 +1330,7 @@ this document proposes.
 | `openkal.space` | an address space, a context in one | optional | ✓ | ✗ | a property word; **the entry is worded as a call** | ✓ (12.6) |
 | `openkal.timeout` | a bound upon a wait | optional | ✓ | ✗ | a granularity is an exported object; 3 operations return a two-word result | ✓ |
 
-⭐ **Fifteen interfaces, thirteen currently blocked at X, and five causes.**
+**Fifteen interfaces, thirteen currently blocked at X, and five causes.**
 
 | # | cause | how many | where |
 | 1 | an exported data object | **10** | nine `*_props`, plus `kal_timeout_granularity_ns` |
@@ -1343,7 +1343,7 @@ Causes 1 and 2 are already on this document's change list (R2, §3.2). Cause 3 i
 §3.4. Causes 4 and 5 were listed as *undecided* in §8 and §9.4; §12.6 and §12.7
 resolve both, and neither requires a signature to change.
 
-⚠️ **L is a different and quieter problem.** Every interface operates correctly
+**L is a different and quieter problem.** Every interface operates correctly
 at L today. **None of them can evolve at L**, because no structure carries its
 size and every property is a value the consumer's copy fixes at load. So the
 honest marking for L today is not fifteen ticks — it is *"operates, cannot
@@ -1375,7 +1375,7 @@ stack argument keeps the status it already has — honoured by an implementation
 that allocates stacks and ignored by one that does not, with the caller unable to
 observe which.
 
-⚠️ One consequence to write down: an implementation's own trampoline may still
+One consequence to write down: an implementation's own trampoline may still
 return (openkal-linux's does, into `clone`). The rule binds the **consumer's**
 entry, which must not rely on returning to anything.
 
@@ -1394,14 +1394,14 @@ present and always fails **because the caller cannot tell**; a property the
 caller reads first is exactly what tells it. It is the same argument that
 legalises the link operations of §11.4, applied to a different partiality.
 
-⚠️ And 6.5's own worry survives and is answered by §11.7: the interposer can
+And 6.5's own worry survives and is answered by §11.7: the interposer can
 answer that bit both ways, which is the **only** way the unavailable path gets
 exercised at all. Today it is a path nothing has verified because nothing can
 produce it.
 
 ### 12.8 The rule this leaves behind
 
-> ⭐ **An interface is X-capable when: it exports no object; no operation returns
+> **An interface is X-capable when: it exports no object; no operation returns
 > a pointer into the implementation; no result is wider than one machine word;
 > every structure that crosses carries its own size; an entry is an address at
 > which a context begins rather than a function that is called; and its absence
@@ -1421,7 +1421,7 @@ designed against this rule before it is specified rather than after.
 The instruction is that this is not a sequence of pull requests but **one
 change, agreed first and landed together**. Two things follow.
 
-### 13.1 ⚠️⚠️ One decision is not one publication
+### 13.1 One decision is not one publication
 
 The graph forbids it:
 
@@ -1439,7 +1439,7 @@ nothing floats up. So the landing is *one decision, one reviewed change set,
 and a topologically ordered publication* in which each step is green before the
 next begins.
 
-⚠️ The recorded failure mode is precisely here. A version was published and the
+The recorded failure mode is precisely here. A version was published and the
 index's `latest` moved before the consumers had been repinned; every clean
 environment went red while every development machine stayed green — **because
 each repository's CI substitutes the working tree and therefore never resolves
@@ -1449,7 +1449,7 @@ the published form.**
 
 1. **Every repository's change is written and reviewed before any is published.**
    One branch per repository, all open simultaneously, cross-referenced.
-2. ⭐ **A step that resolves the *published* packages must exist and must be the
+2. **A step that resolves the *published* packages must exist and must be the
    gate.** Not a job that substitutes working trees. Otherwise the landing is
    verified against a graph no user has.
 
@@ -1473,7 +1473,7 @@ Fourteen decisions. Each is a yes/no; none is an implementation detail.
 | 13 | small ABI corrections: delete `kal_fs_open_file`; typed handles at `kal_fs_stream` and `kal_spawn_streams`; `kal_endpoint.addr_len` to `kal_u32`; clause 7.2 gains the forged-handle sentence; a name-length bound | 4.3, 4.4, 9.8, 9.9, 11.3 |
 | 14 | the interposer and the shared-library ABI test ship **in this change set** | 11.7 |
 
-⚠️ **14 is the one most likely to be dropped and the one that must not be.** An
+**14 is the one most likely to be dropped and the one that must not be.** An
 ABI break that lands without an artifact that can be run against two
 implementations is a break verified only in the form it is replacing.
 
@@ -1482,7 +1482,7 @@ implementations is a break verified only in the form it is replacing.
 - **The C library defects of §1** — `rt_sigprocmask`, `do_fstatat`, `getpgid`,
   `rt_sigaction`, the started-program table, the `membarrier` case. None touches
   the interface, all are verified, and one is a crash a consumer is hitting
-  today. ⚠️ **These should not wait for the landing**, and holding them back to
+  today. **These should not wait for the landing**, and holding them back to
   make the landing "one thing" would keep a crash in a released package for the
   sake of tidiness.
 - **The negotiation mechanism** (§9.3, clause 3.2 versus 6.2). Decision 2 marks
@@ -1499,9 +1499,9 @@ implementations is a break verified only in the form it is replacing.
 | --- | --- | --- |
 | **openkal** | decisions 1–13; `SPEC.md` clauses 3, 3.2, 3.3, 5.3, 6.2, 6.5, 7.2, 8, 11; `SURFACE.txt`; every header | yes |
 | **openkal-linux** | adopt; supply identity and links; claim properties per resource; state which operations resolve a link; `kal_memory_granularity`; build as a shared object for decision 14 | — |
-| **openkal-macos** | adopt; identity from `st_dev`/`st_ino`; links; ⚠️ the row where the fork composition already diverges, so the row where decision 8 is tested | — |
-| **openkal-windows** | adopt; identity from `FILE_ID_INFO`; links with the two divergences recorded; ⚠️ the row that reports a **64 KiB** granularity and so the row that proves decision 5 | — |
-| **openkal-opensbi** | adopt the reports it must answer with constants; ⚠️ the row that must stay static and negotiation-free | — |
+| **openkal-macos** | adopt; identity from `st_dev`/`st_ino`; links; the row where the fork composition already diverges, so the row where decision 8 is tested | — |
+| **openkal-windows** | adopt; identity from `FILE_ID_INFO`; links with the two divergences recorded; the row that reports a **64 KiB** granularity and so the row that proves decision 5 | — |
+| **openkal-opensbi** | adopt the reports it must answer with constants; the row that must stay static and negotiation-free | — |
 | **openkal-uefi** | adopt likewise | — |
 | **openkal-musl** | the §1 defects **ahead of the landing**; then delete the two `4096`s; the `OKM_HAS_*` macros re-derived once the tiers change; the composed follow form; link operations | — |
 | **openkal-llvm-runtime** | repin only, unless the interposer lives here | — |
@@ -1509,11 +1509,11 @@ implementations is a break verified only in the form it is replacing.
 
 ### 13.5 The three risks that have precedent in this ecosystem
 
-1. ⚠️ **The publication order.** §13.1. It has gone wrong before, in exactly this
+1. **The publication order.** §13.1. It has gone wrong before, in exactly this
    graph.
-2. ⚠️ **The bare-metal row has no continuous integration hardware** and is the
+2. **The bare-metal row has no continuous integration hardware** and is the
    row most likely to break silently under a change that assumes a loader.
-3. ⚠️ **`OKM_HAS_*` encodes the tier that is being deleted.** openkal-musl's
+3. **`OKM_HAS_*` encodes the tier that is being deleted.** openkal-musl's
    per-target interface set was written against `standard` versus `optional`;
    after decision 1 it must be re-derived from what each implementation actually
    provides, and the target is — in its own words — an imperfect proxy for that.
@@ -1543,7 +1543,7 @@ so it cannot be mistaken for a rule the way the tier was.
 **2 — The interface table gains S / L / X marking, normative.**
 *Evidence*: §12.4. "Runtime cross-platform" gives opposite answers for L and X,
 so one column would be wrong for nine interfaces.
-⚠️ *The subsidiary decision that matters*: the marking is a statement about **the
+*The subsidiary decision that matters*: the marking is a statement about **the
 shape of the declarations**, not a requirement upon implementations. An
 implementation cannot violate it; only a declaration can. Without that sentence
 the column reads as "implementations must support traps".
@@ -1574,7 +1574,7 @@ and every read site.
 fix for §1.5 (`CASE_SENSITIVE` claimed unconditionally, `LINKS` never claimed).
 *Against*: a load becomes a call.
 *Answer*: every one of these values is read once at startup or once per resource.
-⚠️ *Subsidiary*: once `kal_fs_props` takes a `kal_dir`, a program with no
+*Subsidiary*: once `kal_fs_props` takes a `kal_dir`, a program with no
 directory in hand cannot ask. That is correct — with no resource there is no
 question — but it should be stated, not discovered.
 ⇒ **Recommend yes.**
@@ -1587,12 +1587,12 @@ question — but it should be stated, not discovered.
 openkal-musl hardcodes 4096 in two places today and is wrong on any 16 KiB or
 64 KiB machine.
 *Cost*: one operation; a constant is a legal answer; `1` is a legal answer.
-⚠️ *Subsidiary A*: one number or two? One, defined as the coarsest that is always
+*Subsidiary A*: one number or two? One, defined as the coarsest that is always
 safe. The price is that `_SC_PAGESIZE` reads 64 KiB on Windows, so a program
 sizing a buffer by it over-allocates sixteenfold, while a program aligning by it
 is correct. Two numbers move the choice to every caller and most will choose
 wrong.
-⚠️ *Subsidiary B*: adding an operation to a **core** interface obliges every
+*Subsidiary B*: adding an operation to a **core** interface obliges every
 implementation, including bare metal. This is not a violation of clause 3.2,
 which closes the set of core **interfaces**; clause 8 admits new declarations
 within one. Say so in the change, or it will read as a violation.
@@ -1604,7 +1604,7 @@ within one. Say so in the change, or it will read as a violation.
 `kal_env_arg`, `kal_env_var`, `kal_env_var_at`, `kal_fs_preopen`,
 `kal_fs_list_next` return a pointer into the implementation.
 *Evidence*: §3.2, §12.5 cause 2.
-⚠️ *Subsidiary*: add a form, or replace? With no compatibility burden, replace —
+*Subsidiary*: add a form, or replace? With no compatibility burden, replace —
 two forms of one operation is precisely what decision 13 deletes elsewhere.
 *Cost to the user*: `kal_fs_list_next` gains a buffer and a copy at the call
 site. Real, and small.
@@ -1612,11 +1612,11 @@ site. Real, and small.
 
 ---
 
-**7 — ⚠️ JUDGEMENT. Seven operations gain a one-word result form.**
+**7 — JUDGEMENT. Seven operations gain a one-word result form.**
 `kal_stream_read`/`write`, `kal_datagram_send_to`/`recv_from`,
 `kal_timeout_read`/`write`/`recv_from` return `struct kal_io_result`, two words.
 *Evidence*: §3.4, §12.5 cause 3.
-⚠️ **This one is fine at L and only fails at X**, and it is the change that costs
+**This one is fine at L and only fails at X**, and it is the change that costs
 the *user* most: `auto r = kal_stream_write(...); if (r.e)` becomes an
 out-parameter at every call site.
 *An alternative was considered and rejected on evidence*: merge the two words
@@ -1648,7 +1648,7 @@ anything more natural than the linked one.
 
 ---
 
-**9 — ⚠️ JUDGEMENT. Clause 6.5 becomes a property position on `openkal.exec`.**
+**9 — JUDGEMENT. Clause 6.5 becomes a property position on `openkal.exec`.**
 *Evidence*: §12.7, §9.4. Under distribution the producer decides for every
 environment, so a consumer cannot resolve availability at dependency resolution.
 *Against, and it is a strong objection*: 6.5's own reason is *"a path no artifact
@@ -1670,7 +1670,7 @@ gains an opaque identity and a 64-bit size.**
 word the caller writes (do not compute what nobody asked for).
 *Buys*: §1.4's silent `fs::equivalent(a,b) == true` for two different files; the
 per-resource property of §1.5; evolution at L for the whole interface.
-⚠️ *Subsidiary*: is `wanted` worth it? An implementation that always has
+*Subsidiary*: is `wanted` worth it? An implementation that always has
 everything ignores it — one line — so the implementer's cost is zero, and it is
 what lets an implementation skip computing an identity nobody asked for.
 *Test to keep*: **if the cheap implementation is not one line, the shape is
@@ -1683,7 +1683,7 @@ for the most.
 **11 — Split in two. 11a: link resolution stated in `fs.h`. 11b: link
 create/read enter `openkal.fs`.**
 *Evidence*: §1.3, §4.6.
-⭐ **11a is the one that matters and it does not depend on 11b.** Measured: with
+**11a is the one that matters and it does not depend on 11b.** Measured: with
 resolution correct, six of seven `std::filesystem` answers agree with the host
 and `fs::copy(recursive)` succeeds on a tree containing a link — with **no link
 operation at all**. Clause 11 item 7 already states the rule; it is in neither
@@ -1693,11 +1693,11 @@ header, which is why two call sites in one file chose opposite directions.
 
 ---
 
-**12 — ⚠️ JUDGEMENT. The version floor is an operation, not an object-format
+**12 — JUDGEMENT. The version floor is an operation, not an object-format
 note.**
 *Evidence*: §11.6, §9.5. An ELF note is one object format's shape; openkal
 targets Mach-O and PE and intends a trap.
-⚠️ *The judgement*: this and the undecided negotiation mechanism (§9.3) are two
+*The judgement*: this and the undecided negotiation mechanism (§9.3) are two
 halves of one question — both are "ask something before using anything". Decided
 separately they will produce two entry points.
 ⇒ **Recommend deciding the shape now and the mechanism later**: one operation,
@@ -1727,7 +1727,7 @@ is the open part.
 
 ---
 
-**14 — ⚠️ The interposer and the shared-library ABI test ship in this change set.**
+**14 — The interposer and the shared-library ABI test ship in this change set.**
 *Evidence*: §11.7, and §11.0 — the earlier claim that this could not be built
 was wrong, because mcpp supports `kind = "shared"`.
 *What it is*: one shared object over openkal-linux that answers a different
@@ -1737,7 +1737,7 @@ reports an older floor. One probe binary, built once, run against both.
 *What it is the only way to test*: negotiation, an absent optional interface at
 run time, a floor that is too low, a `present` bit that is clear, and decision
 9's unavailable-executable-memory path.
-⚠️ *It must be a separate artifact, not a feature of openkal-linux.* A feature is
+*It must be a separate artifact, not a feature of openkal-linux.* A feature is
 chosen at dependency resolution and compiled in, which is the arrangement this
 test exists to escape.
 ⇒ **Recommend yes, and treat it as non-negotiable.** An ABI break that lands
@@ -1780,7 +1780,7 @@ This is not a new mechanism — clause 6.5 already describes the second, and
 two as one thing**. The deleted `standard` tier was an attempt to describe both
 with a single word, and it described neither.
 
-⚠️ Consequence for decision 9: `openkal.exec` is then resolved **both** ways —
+Consequence for decision 9: `openkal.exec` is then resolved **both** ways —
 by a feature when the artifact is produced, and by a property position when the
 artifact is distributed. That is not a contradiction; it is the same question
 answered at the earliest time each form of distribution allows.
@@ -1812,12 +1812,12 @@ one without the connection having been stated:
 
 ⇒ The rule to state once, so that a sixth is not introduced:
 
-> ⭐ **One idea has one spelling. A report is an operation; a bit-set is
+> **One idea has one spelling. A report is an operation; a bit-set is
 > `kal_<interface>_props`; a magnitude has a name of its own; a handle carries
 > its type; a transfer reports one signed word; a name is passed as a pointer
 > and a length and returned by copying into the caller's buffer.**
 
-⚠️ And the amendment surfaces a sixth that decision 10 would otherwise
+And the amendment surfaces a sixth that decision 10 would otherwise
 *introduce*: after 10, `kal_node_info` carries its own size and no other
 structure does. The rule that keeps this consistent without taxing every
 structure:
@@ -1827,7 +1827,7 @@ structure:
 > states its own — the set of address lengths may grow while the structure stays
 > fixed, because the length is a value rather than a layout.
 
-**D. ⭐⭐ Decision 7 is answered by a form that is simpler for both sides, and
+**D. Decision 7 is answered by a form that is simpler for both sides, and
 this document's own recommendation was the worse one.**
 
 The question put in review was whether the goal could be reached while making
@@ -1865,18 +1865,18 @@ fewer spelling (amendment C), and:
 | the implementer returns | a two-field structure | one value |
 | crossing at X | impossible | one word |
 
-⚠️ **Three things this rests on, each checked rather than assumed:**
+**Three things this rests on, each checked rather than assumed:**
 
 1. *The count is bounded by the caller's buffer*, which cannot exceed half the
    address space, so a signed machine word is always sufficient.
 2. *The error set is closed* (clause 5.2, values 1–13), so a negated error can
-   never be mistaken for a count. ⭐ The closed set is what makes the collapse
+   never be mistaken for a count. The closed set is what makes the collapse
    safe; an open-ended error space would not permit it.
 3. *Nothing loses information a caller uses.* The case "transferred some bytes
    and then failed" reports the bytes, and the condition arrives on the next
    call — which is what all five sites above already do, deliberately.
 
-⚠️ The earlier rejection of this shape in §13.6 was wrong. It reasoned from the
+The earlier rejection of this shape in §13.6 was wrong. It reasoned from the
 header's sentence — "on failure, n reports how many bytes were transferred" —
 without reading what any caller does with it. **The declaration was consulted and
 the call sites were not**, which is the same error §2 names.
@@ -1943,7 +1943,7 @@ x86_64 values on both architectures:
 - `struct kstat` — the asm-generic layout orders `mode, nlink, uid, gid, rdev,
   pad, size, blksize, pad, blocks`, and this file had the x86_64 order.
 
-⭐ **A HEAD~1 control proved they were not introduced by this change.** Both
+**A HEAD~1 control proved they were not introduced by this change.** Both
 were present before it, so the aarch64 leg had never worked, and nothing said
 so: no job ran aarch64, and the x86_64 leg cannot observe either constant.
 `static_assert` on the offsets now states the layout rather than assuming it.
@@ -1960,7 +1960,7 @@ branches — an older implementation, a coarser granularity, an absent interface
 no executable memory, no node identity — that nothing here could previously
 produce.
 
-### 15.3 ⚠️⚠️ Eight jobs that could only be green when the change was already published
+### 15.3 Eight jobs that could only be green when the change was already published
 
 Every repository substitutes working trees in continuous integration so that a
 change spanning them is reviewed as a whole. Measured while landing this: **eight
@@ -1968,12 +1968,12 @@ jobs across four repositories called `mcpp build` at a point where the manifest
 still named `openkal` by version**, and failed with `E_NOT_FOUND: package
 'compat.openkal@0.9.0' not found`.
 
-⭐ The mechanism is not a missing substitution. `run-conformance.sh` substitutes
+The mechanism is not a missing substitution. `run-conformance.sh` substitutes
 the manifest and **restores it on exit** — correctly, since a script that rewrote
 a checked-in file and walked away would leave the tree holding a path. Every step
 after it is back to naming a version.
 
-⭐⭐ **THE UNIT IS THE STEP, NOT THE JOB, AND NOT THE REPOSITORY.** The first
+**THE UNIT IS THE STEP, NOT THE JOB, AND NOT THE REPOSITORY.** The first
 pass at this asked "does this job substitute?", found three repositories, and
 passed a fourth that does substitute — and then gives it back. The second pass
 asked the question of each step and found the rest. Each of the four
@@ -1990,7 +1990,7 @@ a check that cannot run at the only time it would have something to say.
 refused, not ignored`. Decision 3 added `kal_fs_link_create`; openkal-musl
 answers `symlinkat` with it; the refusal stopped arriving and the test failed.
 
-⭐ **That is the good case, and it is why the assertion was written that way
+**That is the good case, and it is why the assertion was written that way
 round.** Had it tolerated both answers, the arrival of the operation would have
 been invisible in the only place in this ecosystem where a C++ standard library
 exercises it.
@@ -2003,7 +2003,7 @@ openkal does not express and **asserts that the dispatcher does not handle it**,
 so the day that changes the step says so instead of passing while measuring
 nothing.
 
-### 15.5 ⭐⭐ The defect three layers up, whose every ingredient was correct
+### 15.5 The defect three layers up, whose every ingredient was correct
 
 Adding links exposed one more, and it is the most instructive thing this change
 produced.
@@ -2019,7 +2019,7 @@ form that declines to — deliberately, since a program that opens a link to rea
 its bytes is asking what `kal_fs_link_read` answers. So `open(O_NOFOLLOW)`
 resolved, and for a link whose target is absent it answered `ENOENT`.
 
-⚠️ **That is a different answer to a different question.** `O_NOFOLLOW` does not
+**That is a different answer to a different question.** `O_NOFOLLOW` does not
 ask to open the link and does not ask to open its target; it asks *whether the
 name is a link*, and POSIX says `ELOOP` when it is. libc++'s `remove_all`
 descends by opening each entry `O_DIRECTORY|O_NOFOLLOW`: on `ELOOP` or `ENOTDIR`
@@ -2027,7 +2027,7 @@ it unlinks the entry, on `ENOENT` it concludes the entry has already gone. So it
 unlinked nothing and then reported the directory it had just declined to empty
 as not empty.
 
-⭐ **THE ENQUIRY THAT ANSWERS IT IS THE ONE THIS DESIGN ADDED.** `KAL_FS_NO_RESOLVE`
+**THE ENQUIRY THAT ANSWERS IT IS THE ONE THIS DESIGN ADDED.** `KAL_FS_NO_RESOLVE`
 lets the port ask about the name itself, on a path taken only when the caller
 passed the flag. The design decision and the defect it repairs were found three
 weeks and three layers apart, and the second is the evidence for the first.
@@ -2049,7 +2049,7 @@ and is compiled by nothing that would notice it had moved:
 4. Version pins: `openkal-musl` pinned `openkal-windows` at 0.3.0 against a
    package at 0.4.0, and two READMEs asked a reader for `openkal = "0.5.1"`.
 
-⭐ The tool written for (4) had the defect it exists to catch. A manifest with no
+The tool written for (4) had the defect it exists to catch. A manifest with no
 version pin makes `grep` exit 1; under `pipefail` that ended the loop, so the
 survey stopped at the first such file and reported **"ok" having examined eight
 of eleven pins**. It now carries a denominator — and a floor that denominator
@@ -2057,7 +2057,7 @@ cannot supply, since a denominator drawn from the same enumeration cannot report
 that the enumeration is empty: the package's own root manifest must have been
 reached.
 
-### 15.7 ⭐⭐ The same name for two quantities, one layer apart
+### 15.7 The same name for two quantities, one layer apart
 
 The last defect this change produced is the clearest instance of what §11 argues
 about, and it was introduced BY the correction §11 recommends.
@@ -2067,7 +2067,7 @@ learn the machine's quantum at run time rather than have it fixed at build time.
 openkal-musl adopted it and assigned it to `libc.page_size`, replacing the
 constant 4096.
 
-⚠️ **They are not the same quantity.** openkal's granularity is the coarsest
+**They are not the same quantity.** openkal's granularity is the coarsest
 quantum a caller must respect, and an implementation for a machine with no
 memory management unit answers **one** — correctly: there is no page, and
 nothing needs rounding. openkal-opensbi answers one.
@@ -2077,14 +2077,14 @@ nothing needs rounding. openkal-opensbi answers one.
 assumes is a power of two no smaller than its own quantum. Given one, the
 allocator asked the environment for one-byte extents.
 
-⭐ **AND THE SYMPTOM WAS THREE CORRECT LINES FOLLOWED BY SILENCE.** The
+**AND THE SYMPTOM WAS THREE CORRECT LINES FOLLOWED BY SILENCE.** The
 same-source example printed `sorted`, `caught` and `unwound` — containers,
 exceptions, and unwinding a destructor all held — and stopped at the fourth
 line, which is the first to format a string and so the first to need an
 allocation large enough to grow the heap. Over openkal-linux, whose answer is
 4096, nothing was wrong.
 
-⚠️ **THE ASSERTION THAT SHOULD HAVE CAUGHT IT PASSED, AND WAS NOT WRONG.** The
+**THE ASSERTION THAT SHOULD HAVE CAUGHT IT PASSED, AND WAS NOT WRONG.** The
 probe said "the page size is a positive power of two obtained from the
 environment". One is positive. One is a power of two. The criterion described
 the shape of the number and not what the number is for. It now states what the
@@ -2097,7 +2097,7 @@ obliged to know them.** openkal is right to answer one. musl is wrong to believe
 it. The remedy is not in either interface but at the seam, where the answer is
 taken as a floor to respect rather than as the value.
 
-### 15.8 ⚠️⚠️ Two defects the aarch64 leg surfaced that are not about aarch64
+### 15.8 Two defects the aarch64 leg surfaced that are not about aarch64
 
 The goal named x86_64 and aarch64, and running the second found two more. Both
 are recorded here for the same reason: **the leg that surfaces a defect is not
@@ -2125,7 +2125,7 @@ do not hold the vectors are recovered from `environ` by walking back over
 `argv`'s terminator to the slot holding the count — which must equal the number
 of entries actually found, or nothing is recorded.
 
-⭐ `environ` is a **weak** reference, and the independence check states that as a
+`environ` is a **weak** reference, and the independence check states that as a
 rule rather than as an exception: this one name is permitted only when its type
 letter is weak. It is admissible where `puts` is not because the check exists to
 stop a CALL into the program's runtime re-entering this implementation, and a
@@ -2141,14 +2141,14 @@ stayed green, because it read `src/win32.h` alone and matched one declaration
 macro, while `src/win.h` declares the object manager's entries in the plain
 `__declspec(dllimport)` form.
 
-⭐ **IT REPORTED A NUMBER, AND THE NUMBER WAS OF THE NAMES IT KNEW ABOUT.**
+**IT REPORTED A NUMBER, AND THE NUMBER WAS OF THE NAMES IT KNEW ABOUT.**
 Nothing said the set was partial — which is the failure mode a denominator is
 supposed to prevent and does not, when the denominator is drawn from the same
 partial enumeration. It now globs the headers and matches both forms: 58
 declared across four headers rather than 49 across one, and four names were
 outside it. Only one was referenced, which is why only one broke a link.
 
-### 15.9 ⚠️ The specification must be merged LAST, not first
+### 15.9 The specification must be merged LAST, not first
 
 openkal's continuous integration checks, for every implementation it runs the
 conformance suite against, that the implementation is written against the same
@@ -2163,7 +2163,7 @@ that everything below it resolves — put openkal's own `main` run in flight
 **twelve seconds before** the implementations' merges landed. The gate fired,
 correctly, and the run had to be repeated.
 
-⭐ The order is the reverse of the publish order. **Publishing** must go
+The order is the reverse of the publish order. **Publishing** must go
 specification-first, because a package cannot name a version that does not
 exist. **Merging** must go specification-last, because the specification's own
 integration reads every implementation's `main` and requires them to have
@@ -2188,7 +2188,7 @@ Nine packages, 2026-08-28, in the order the dependency graph requires.
 | `openkal-musl` | 0.7.0 | 1001976 | `e66bf5a2fac456a1` |
 | `openkal-llvm-runtime` | 0.4.0 | 15614767 | `e1bb5b5e9174781b` |
 
-⭐ **Every tarball was downloaded from both hosts and compared byte for byte
+**Every tarball was downloaded from both hosts and compared byte for byte
 against the file the checksum was taken from**, rather than trusted to either
 service's listing — `gh release view` has listed an asset whose blob was missing
 and whose download was 404, and GitCode's `HEAD` returns a redirect stub whose
@@ -2213,7 +2213,7 @@ self-description all had to be implemented. Its granularity answers **1** for
 the same reason openkal-opensbi's does, and its comment now records §15.7 so the
 next C library above it does not repeat that mistake.
 
-⚠️ **AND NOTHING HAD EVER CALLED THAT IMPLEMENTATION.** The feature compiled
+**AND NOTHING HAD EVER CALLED THAT IMPLEMENTATION.** The feature compiled
 `src/kal/**`, the linker took all fourteen names into the test binary, `nm`
 showed them, and the suite was green — which proves it compiles and links and
 says nothing about what it answers. A wrong result in any of the three changes
@@ -2225,14 +2225,14 @@ produces, and the workflow greps for that rather than for the exit status.
 
 **`std-freestanding-alloc-kal` 0.1.1 → 0.1.2.** A repin: `kal_alloc` and
 `kal_free` are unchanged, and nothing 0.9 altered is reachable from
-`operator new`. ⭐ Writing it exposed something the dependency does not do — the
+`operator new`. Writing it exposed something the dependency does not do — the
 package declares those two ITSELF rather than including openkal's header, so the
 manifest catches a *version* mismatch and not a *declaration* one. Had either
 signature moved, it would compile, link, and produce a silently wrong calling
 convention at the one seam where it matters. The two are now compiled together
 in a translation unit that ships nowhere.
 
-⚠️ And the first spelling of that check had the defect it exists to catch: it
+And the first spelling of that check had the defect it exists to catch: it
 globbed the package store for an openkal include directory and took the first,
 which on this machine is 0.5.2 — four minors behind the pin — and reported
 agreement with a specification the package does not depend upon. The version now
@@ -2247,7 +2247,7 @@ omission.
 
 ## 17. Verified against the published packages
 
-⚠️ **NO CONTINUOUS INTEGRATION IN THIS ECOSYSTEM RESOLVES A PUBLISHED PACKAGE.**
+**NO CONTINUOUS INTEGRATION IN THIS ECOSYSTEM RESOLVES A PUBLISHED PACKAGE.**
 Every workflow in all eight repositories substitutes working trees — deliberately,
 since the repositories are changed together — so the index entries, the tarball
 layout, the checksums, the wrap directory and the dependency graph a consumer
@@ -2267,7 +2267,7 @@ both `xlings` and `mcpp`:
     Downloading mcpplibs.openkal-kit v0.2.0
     Downloading mcpplibs.openkal-linux v0.7.0
 
-⭐ **The first program names `openkal-kit` AND an implementation**, which is the
+**The first program names `openkal-kit` AND an implementation**, which is the
 graph that failed after the previous release: a consumer reaches openkal twice,
 once from each, and if either reaches it by path the build refuses. Nothing in
 any workflow reproduces that shape, because every workflow makes both routes
@@ -2285,11 +2285,11 @@ two enquiries, the signal mask the report was filed about, a page the allocator
 can use, `O_NOFOLLOW` reporting `ELOOP`, and a tree holding three kinds of link
 being removed.
 
-⭐ **BOTH ARCHITECTURES, THROUGH THE PUBLISHED PACKAGES.** The aarch64 leg is the
+**BOTH ARCHITECTURES, THROUGH THE PUBLISHED PACKAGES.** The aarch64 leg is the
 one that had never worked: two constants in `openkal-linux/src/sys.h` were the
 x86_64 values on both machines, and no job ran that architecture to notice.
 
-### 16.2 ⭐⭐ Two openkals in one graph, and the build tool kept them apart by the wrong name
+### 16.2 Two openkals in one graph, and the build tool kept them apart by the wrong name
 
 Measured while moving the two consumers, and worth recording because it is a
 property of what openkal *is* rather than of this release.
@@ -2302,7 +2302,7 @@ allocator) resolved **two versions of openkal into one graph** — and built:
     Mangled openkal.abort v0.5.2 ↔ v0.8.0
         → openkal.abort__v0_8_0__mcpp (cross-major fallback)
 
-⚠️ **THE MODULE NAMES WERE MANGLED APART AND THE C NAMES WERE NOT.** That
+**THE MODULE NAMES WERE MANGLED APART AND THE C NAMES WERE NOT.** That
 fallback is reasonable for an ordinary C++ library, where the module name *is*
 the interface. openkal's contract is a C application binary interface — clause
 10 says so — and a C symbol namespace is flat: `kal_alloc` is `kal_alloc` in
@@ -2315,13 +2315,13 @@ between those versions — and between 0.8.0 and 0.9.0 several did — the call
 would have been made under one convention and answered under another, with no
 diagnostic anywhere.
 
-⭐ **THE SPECIFICATION ALREADY CONTAINS THE REASONING AND DOES NOT CONTAIN THE
+**THE SPECIFICATION ALREADY CONTAINS THE REASONING AND DOES NOT CONTAIN THE
 RULE.** Clause 4.2 rejects "a second package carrying the C form" because "one
 contract in two packages can be resolved at two versions, and the property a
 contract has is that there is one of it". The case here is one package at two
 versions, which the same sentence covers and which the clause does not say.
 
-⚠️⚠️ **AND PUBLISHING THE ALLOCATOR ALONE WOULD HAVE MADE IT WORSE.** The
+**AND PUBLISHING THE ALLOCATOR ALONE WOULD HAVE MADE IT WORSE.** The
 allocator is reached through a CARET range — `std-freestanding` names
 `std-freestanding-alloc-kal = "^0.1.0"` — so 0.1.2 is picked up by every
 consumer the moment it exists, with no repin anywhere. Measured in the sandbox
@@ -2337,7 +2337,7 @@ board:
 
 The distance grew from `0.5.2 ↔ 0.8.0` to `0.5.2 ↔ 0.9.0` the instant the
 allocator was published, because the range carried it and the board did not
-move. ⭐ **That is the argument for having done the two together rather than in
+move. **That is the argument for having done the two together rather than in
 sequence**, and it is the reading that the version audit missed: the audit
 looked for range pins on *openkal* and found none, while the range that mattered
 was on a package that reaches openkal.
