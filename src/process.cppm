@@ -59,7 +59,7 @@ inline constexpr props bound_lifetime{KAL_PROCESS_PROP_BOUND_LIFETIME};
 inline constexpr props job           {KAL_PROCESS_PROP_JOB};
 inline constexpr props stop_requested{KAL_PROCESS_PROP_STOP_REQUESTED};
 
-// ⚠️ WHAT A CALLER ASKS FOR, WHICH IS A DIFFERENT WORD FROM WHAT AN
+// WHAT A CALLER ASKS FOR, WHICH IS A DIFFERENT WORD FROM WHAT AN
 // IMPLEMENTATION CAN DO. `props' above answers the second; these set the first.
 // A module consumer sees neither unless both are named here --- the C spellings
 // are macros, and a macro is invisible across a module boundary.

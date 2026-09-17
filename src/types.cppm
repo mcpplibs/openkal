@@ -40,6 +40,7 @@ export using ::kal_err_exists;
 export using ::kal_err_not_empty;
 export using ::kal_err_is_directory;
 export using ::kal_err_not_directory;
+export using ::kal_err_not_program;
 
 // Where a connection or a message goes.
 export using ::kal_endpoint;

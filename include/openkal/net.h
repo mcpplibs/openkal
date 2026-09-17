@@ -58,7 +58,19 @@ int kal_net_accept (struct kal_net_listener l,        struct kal_net_conn* out);
 
 /* A connection is read and written through openkal.stream. The stream remains
  * valid while the connection is open and is not separately released; the
- * connection owns it. The wording is `openkal.fs's, because the arrangement is. */
+ * connection owns it. The wording is `openkal.fs's, because the arrangement is.
+ *
+ * A CONNECTION HAS TWO DIRECTIONS, AND THEY ARE INDEPENDENT. Version 0.13. A
+ * transfer waiting in one direction shall not delay a transfer in the other,
+ * and shall not delay kal_net_shutdown. Clause 6.6 leaves the order of
+ * concurrent operations upon one handle unspecified; that permission concerns
+ * operations competing for one direction and does not extend to a read that
+ * waits for the peer holding back a write the peer is waiting for. An
+ * implementation that serialised the two would leave every full-duplex protocol
+ * waiting for ever, and a caller could compose around it only by polling with a
+ * bound, which substitutes latency for the property. Measured: openkal-windows
+ * created its sockets for synchronous transfer, and a context blocked in a read
+ * held back another context's write on the same connection. */
 struct kal_stream kal_net_stream(struct kal_net_conn c);
 
 /* Reports the endpoint of the peer, and the endpoint this end was given.

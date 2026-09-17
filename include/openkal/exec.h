@@ -64,7 +64,7 @@ void kal_exec_free(void* p, kal_uintptr size);
 /* Whether memory this program may execute is available to THIS ARTIFACT in THIS
  * environment.
  *
- * ⚠️⚠️ CLAUSE 6.5 SETTLED THIS AT DEPENDENCY RESOLUTION, AND THAT ANSWER DOES
+ * CLAUSE 6.5 SETTLED THIS AT DEPENDENCY RESOLUTION, AND THAT ANSWER DOES
  * NOT SURVIVE AN ARTIFACT THAT IS DISTRIBUTED. One system grants such memory
  * only to a program carrying a signed declaration, applied after the link by
  * whoever produces the artifact --- so when the artifact is built for its own
@@ -78,7 +78,7 @@ void kal_exec_free(void* p, kal_uintptr size);
  * always failing is a defect BECAUSE THE CALLER CANNOT TELL, and a position the
  * caller reads first is exactly what tells it.
  *
- * ⚠️ 6.5's own objection stands and is answered elsewhere: a path few artifacts
+ * 6.5's own objection stands and is answered elsewhere: a path few artifacts
  * take is a path little verified. The conformance arrangement answers this
  * position both ways, which is the only way the unavailable path is exercised
  * at all. */

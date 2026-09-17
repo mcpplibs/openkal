@@ -5,7 +5,7 @@
 // source is fetched from the specification repository rather than copied into
 // each implementation, so the programs cannot diverge.
 //
-// ⚠️⚠️ NAMING NO SYSTEM CALL IS NOT THE SAME AS NAMING NO COMPILER.
+// NAMING NO SYSTEM CALL IS NOT THE SAME AS NAMING NO COMPILER.
 //
 // This file used `__atomic_load_n`, `__ATOMIC_RELAXED` and `__UINT32_TYPE__`,
 // which are GCC and Clang spellings. MSVC has none of them, so the program

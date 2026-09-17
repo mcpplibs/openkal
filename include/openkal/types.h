@@ -117,7 +117,10 @@ enum kal_error {
                                   * is not                                  */
     kal_err_is_directory  = 12,  /* the name refers to a directory and the
                                   * operation applies to a file             */
-    kal_err_not_directory = 13   /* the reverse of the preceding condition   */
+    kal_err_not_directory = 13,  /* the reverse of the preceding condition   */
+    kal_err_not_program   = 14   /* the name exists and may be started, and
+                                  * is not in a form this environment can
+                                  * start. Version 0.13                     */
 };
 
 /* HOW AN OPERATION REPORTS ITS RESULT --- one rule, stated once.

@@ -1,24 +1,24 @@
 /* openkal --- what an implementation says about itself before it is used.
  *
- * ⚠️ THIS IS NOT AN INTERFACE. It provides no resource, and clause 3.2 closes
+ * THIS IS NOT AN INTERFACE. It provides no resource, and clause 3.2 closes
  * the set of core interfaces rather than the set of things every implementation
  * must export. What is here is the specification's own self-description: two
  * operations every conforming implementation exports, belonging to none of the
  * interfaces, so that a consumer can ask before it calls.
  *
- * ⭐ WHY IT CANNOT BE A NOTE IN THE ARTIFACT. The earlier answer to version skew
+ * WHY IT CANNOT BE A NOTE IN THE ARTIFACT. The earlier answer to version skew
  * was a record placed in the object file. Object files are of three kinds here
  * --- ELF, Mach-O and PE --- and a boundary crossed by a trap has no object file
  * at all. An operation is the one form every boundary already has.
  *
- * ⭐ WHY IT ANSWERS TWO QUESTIONS AND NOT ONE. A consumer that is linked learns
+ * WHY IT ANSWERS TWO QUESTIONS AND NOT ONE. A consumer that is linked learns
  * an interface's absence from the linker (clause 6.1). A consumer that is bound
  * at load or crosses a boundary has no linker to learn it from, and asking each
  * interface in turn requires calling into it, which is the thing that must not
  * happen first. One word of interface positions answers it for all of them
  * before anything else is called.
  *
- * ⚠️ AND NEITHER ANSWER IS A CAPABILITY. `kal_interfaces' says which interfaces
+ * AND NEITHER ANSWER IS A CAPABILITY. `kal_interfaces' says which interfaces
  * exist, not how they behave; how an implementation behaves within an interface
  * it provides is a property word, which is clause 6.2's own division and is not
  * restated here.

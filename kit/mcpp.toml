@@ -21,7 +21,7 @@ repo        = "https://github.com/mcpplibs/openkal"
 # composition again or took a whole C library. This package is where the
 # composition is written once.
 #
-# ⭐ THE CONTRACT FORM IS WHAT MAKES IT UNMISTAKABLE.
+# THE CONTRACT FORM IS WHAT MAKES IT UNMISTAKABLE.
 #
 # Clause 10 states that openkal's contract is a C application binary interface.
 # This package deliberately is not one: it is C++ modules in `namespace kal::kit`
@@ -33,7 +33,7 @@ repo        = "https://github.com/mcpplibs/openkal"
 # package as an implementation that has added names: the rule it enforces is
 # about the C surface, and this package has none.
 #
-# ⚠️ THE MEASUREMENT MATTERS BECAUSE THE ARGUMENT IS STRUCTURAL. A claim that
+# THE MEASUREMENT MATTERS BECAUSE THE ARGUMENT IS STRUCTURAL. A claim that
 # rests on how a compiler mangles names is worth checking against what the
 # compiler actually emitted, and the first form of this comment named a mangling
 # (`_ZN3kal3kit…`) these objects do not contain.
@@ -50,7 +50,7 @@ repo        = "https://github.com/mcpplibs/openkal"
 kind = "lib"
 
 [dependencies]
-# ⚠️⚠️ BY VERSION, NOT BY PATH, AND THE DIFFERENCE IS NOT COSMETIC.
+# BY VERSION, NOT BY PATH, AND THE DIFFERENCE IS NOT COSMETIC.
 #
 # This line read `{ path = ".." }`, which is true inside this repository and
 # inside the tarball this package is published from --- and which made the
@@ -69,7 +69,7 @@ kind = "lib"
 # because they all substitute working trees by design.
 openkal = "0.10.0"
 
-# ⚠️ NO `include_dirs` HERE EITHER. It named `../include`, which reaches out of
+# NO `include_dirs` HERE EITHER. It named `../include`, which reaches out of
 # this package into whatever happens to sit above it. With the specification
 # named by version that directory is the tarball's own copy while the headers
 # actually compiled against come from the resolved dependency --- two header

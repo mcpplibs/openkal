@@ -220,7 +220,7 @@ void run() {
                                     | kal::task::thread_local_storage).bits;
         observe(kind::abi, (kal_task_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
-        // ⭐ ZERO IS `CANNOT SAY' AND IS DISTINCT FROM ONE, which is the whole
+        // ZERO IS `CANNOT SAY' AND IS DISTINCT FROM ONE, which is the whole
         // reason this enquiry exists: before it, a C library above answered 1
         // with no error and a program sizing a pool of workers got one worker.
         // An implementation that will not say must say so, and not say "one".

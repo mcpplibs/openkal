@@ -24,7 +24,7 @@
 import okc.suite;
 import okc.child;
 
-// ⚠️ C LINKAGE, BECAUSE ON A MACHINE WITH NO OPERATING SYSTEM `main` IS AN
+// C LINKAGE, BECAUSE ON A MACHINE WITH NO OPERATING SYSTEM `main` IS AN
 // ORDINARY FUNCTION.
 //
 // A hosted implementation makes `main` the reserved entry point, and a startup

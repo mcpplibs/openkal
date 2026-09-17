@@ -61,14 +61,14 @@ fi
 status=0
 while read -r name; do
     [ -n "$name" ] || continue
-    # ⚠️⚠️ A HERE-STRING AND NOT A PIPE, AND THE DIFFERENCE IS A FALSE RED.
+    # A HERE-STRING AND NOT A PIPE, AND THE DIFFERENCE IS A FALSE RED.
     #
     # `grep -q' exits at the FIRST match, which closes the pipe under a `printf'
     # that may still be writing; the printf then dies of SIGPIPE, and `pipefail'
     # at the top of this file makes the whole pipeline report failure. The `!'
     # inverts that into "not in the specification" --- for a name that IS in it.
     #
-    # ⚠️ It depends on whether the list fits in the pipe buffer before grep
+    # It depends on whether the list fits in the pipe buffer before grep
     # exits, so it fires occasionally and passes on a re-run, which is the worst
     # shape a check can have: openkal-macos reported `kal_stdin' missing on one
     # run and clean on the next with no change between them. The name is the

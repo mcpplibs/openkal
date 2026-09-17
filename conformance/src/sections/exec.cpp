@@ -54,7 +54,7 @@ void run() {
             (kal_exec_props() & ~(kal::exec::republish | kal::exec::available).bits) == 0,
             "no position the specification has not assigned is reported");
 
-    // ⭐ WHETHER THE INTERFACE CAN BE EXERCISED BY THIS ARTIFACT IS READ BEFORE
+    // WHETHER THE INTERFACE CAN BE EXERCISED BY THIS ARTIFACT IS READ BEFORE
     // IT IS EXERCISED, AND BOTH ANSWERS ARE OBSERVED.
     //
     // Clause 6.5 settles availability at dependency resolution and says it is
@@ -97,14 +97,14 @@ void run() {
     // specification does not place this upon an implementation, because the
     // program is the party that knows which bytes it wrote.
     //
-    // ⚠️ THE BUILTIN IS NOT UNIVERSAL, AND THIS SUITE IS BUILT BY THREE
+    // THE BUILTIN IS NOT UNIVERSAL, AND THIS SUITE IS BUILT BY THREE
     // COMPILERS. Measured on the MSVC row of openkal-windows, the first run in
     // which this section was selected at all:
     //
     //     exec.cpp(78): error C3861: '__builtin___clear_cache': identifier not
     //     found
     //
-    // ⭐ The guard is on the COMPILER and not on the architecture, because what
+    // The guard is on the COMPILER and not on the architecture, because what
     // varies is which compiler spells the operation this way. Where it is
     // absent, the architectures that compiler targets here keep the two paths
     // coherent in hardware and there is nothing to do.
@@ -113,7 +113,7 @@ void run() {
                             static_cast<char*>(p) + kReturns42Size);
 #endif
 
-    // ⚠️ A BYTE COPY RATHER THAN `__builtin_memcpy', FOR THE SAME REASON AND
+    // A BYTE COPY RATHER THAN `__builtin_memcpy', FOR THE SAME REASON AND
     // FOUND IN THE SAME RUN. The suite reaches no C library --- it is written to
     // run against an implementation that may be the only supplier of one --- and
     // a builtin is not a C library, but it is not a language feature either.

@@ -1,7 +1,7 @@
-// ⭐⭐ THAT `openkal.macros' CAN BE IMPORTED AND ITS NAMES USED --- which is a
+// THAT `openkal.macros' CAN BE IMPORTED AND ITS NAMES USED --- which is a
 // different claim from the one CI already makes about it.
 //
-// ⚠️⚠️ THE MODULE WAS ADDED TO STOP A DEFECT CLASS AND HAD THE SAME DEFECT. A
+// THE MODULE WAS ADDED TO STOP A DEFECT CLASS AND HAD THE SAME DEFECT. A
 // macro does not cross a module boundary, so every KAL_ macro is regenerated
 // here under a `_M' spelling, and continuous integration regenerates the file
 // and diffs it. That step asserts the file is UP TO DATE. It does not assert

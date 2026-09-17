@@ -10,7 +10,7 @@ namespace okc::version {
 void run() {
     heading("openkal --- what the implementation says about itself");
 
-    // ⚠️ NOT CONDITIONAL ON A FEATURE, AND THAT IS THE POINT. These two are not
+    // NOT CONDITIONAL ON A FEATURE, AND THAT IS THE POINT. These two are not
     // an interface: they provide no resource, and clause 3.2's closure is of the
     // set of core INTERFACES. Every conforming implementation exports them,
     // including one of a machine with no operating system, so this section is
@@ -38,7 +38,7 @@ void run() {
     observe(kind::behaviour, kal::provides(core),
             "the core interfaces are reported as present");
 
-    // ⭐ THE WORD AND THE LINKER AGREE. This is the observation the operation
+    // THE WORD AND THE LINKER AGREE. This is the observation the operation
     // exists for: a consumer that is linked learns an interface's absence from
     // the linker, and one bound at load has only this word --- so the two must
     // say the same thing, and an implementation whose word disagreed with what

@@ -33,7 +33,7 @@ void run() {
         }
     }
 
-    // ⚠️ TWO FILLS DIFFER, AND THE CHANCE OF A FALSE REPORT IS STATED RATHER
+    // TWO FILLS DIFFER, AND THE CHANCE OF A FALSE REPORT IS STATED RATHER
     // THAN LEFT FOR A READER TO WONDER ABOUT.
     //
     // A source that returned a constant would satisfy every check above. Two

@@ -4,7 +4,7 @@
 #
 #   check-types.sh <compiler> [include-dir]
 #
-# ⭐⭐ WHAT THIS CHECKS, AND WHY IT IS NOT THE SAME AS check-surface.sh.
+# WHAT THIS CHECKS, AND WHY IT IS NOT THE SAME AS check-surface.sh.
 #
 # `check-surface.sh` asks which NAMES an implementation exports. This asks what
 # those names are DECLARED WITH. They are different freedoms: an implementation
@@ -24,7 +24,7 @@
 # x86_64 Linux and 4 on x86_64 Windows, and the two would be one signature with
 # two meanings.
 #
-# ⚠️ MEASURED, AND IT WENT THE OTHER WAY ROUND. 2026-08-23, cross-compiling for
+# MEASURED, AND IT WENT THE OTHER WAY ROUND. 2026-08-23, cross-compiling for
 # `arm64-apple-macos`:
 #
 #     okm_syscall.c:439: incompatible pointer types passing 'uint64_t *'
@@ -37,7 +37,7 @@
 # library is the one layer that must know the target ABI, because it rebuilds
 # POSIX and POSIX itself names `long`.
 #
-# ⚠️ AND WHY THIS ASKS THE COMPILER RATHER THAN grep. A text search over the
+# AND WHY THIS ASKS THE COMPILER RATHER THAN grep. A text search over the
 # headers can be defeated by a macro, cannot see through an include, and — the
 # failure mode that matters — reports success when it matches nothing, which is
 # also what it does when the files moved. `-ast-print` prints what the compiler
@@ -51,7 +51,7 @@ inc="${2:-include}"
 
 [ -d "$inc/openkal" ] || { echo "no $inc/openkal directory" >&2; exit 2; }
 
-# ⚠️ A DIRECTORY AND A NAMED FILE, NOT `mktemp -t …c`.
+# A DIRECTORY AND A NAMED FILE, NOT `mktemp -t …c`.
 #
 # `mktemp -t PREFIX` means different things on the two systems this runs on. GNU
 # coreutils treats the argument as a template and honours a suffix after the
@@ -59,7 +59,7 @@ inc="${2:-include}"
 # `/tmp/x.c.1a2b3c4d`, and the translation unit loses the extension that says
 # what language it is in.
 #
-# ⚠️ AND CLANG DOES NOT FAIL ON THAT. A file with an unrecognised extension is
+# AND CLANG DOES NOT FAIL ON THAT. A file with an unrecognised extension is
 # taken as linker input, `-fsyntax-only` leaves nothing to do, and the compiler
 # exits ZERO having printed nothing. Measured 2026-08-22 on macos-14: the check
 # read an empty AST, and the only reason it did not report conformance is the
@@ -73,7 +73,7 @@ for h in "$inc"/openkal/*.h; do
     printf '#include <openkal/%s>\n' "$(basename "$h")"
 done > "$tu"
 
-# ⚠️ THE COMPILER'S OWN WORDS ARE KEPT AND SHOWN. An earlier version sent them
+# THE COMPILER'S OWN WORDS ARE KEPT AND SHOWN. An earlier version sent them
 # to /dev/null, and the one failure this script has had so far — the `mktemp`
 # difference above — then arrived as "the headers were not parsed" with nothing
 # to say why. A check that can fail should be able to say what it saw.
@@ -83,13 +83,13 @@ if ! "$cc" -fsyntax-only -I "$inc" -Xclang -ast-print "$tu" > "$out" 2> "$dir/er
     exit 2
 fi
 
-# ⚠️ THE POSITIVE CONTROL, BEFORE THE CHECK AND NOT AFTER IT.
+# THE POSITIVE CONTROL, BEFORE THE CHECK AND NOT AFTER IT.
 #
 # The check below succeeds when it finds nothing, and an empty AST also finds
 # nothing. Every previous false green in this ecosystem had this shape, so the
 # script proves it read something before it is allowed to report success.
 #
-# ⭐ It has already earned its place. The `mktemp` difference above made this
+# It has already earned its place. The `mktemp` difference above made this
 # script parse nothing on macOS and exit zero, finding no forbidden type — which
 # is indistinguishable from conformance except by this test.
 decls="$(grep -c 'kal_' "$out" || true)"
@@ -110,7 +110,7 @@ forbidden='\b(long|short|unsigned|signed|float|double|wchar_t|_Bool|'\
 'u?int(8|16|32|64)_t|u?int_(least|fast)(8|16|32|64)_t|'\
 'time_t|off_t|mode_t|pid_t|dev_t|ino_t|clock_t|va_list|FILE)\b'
 
-# ⚠️ `typedef` LINES ARE EXCLUDED, AND THAT IS THE POINT RATHER THAN AN
+# `typedef` LINES ARE EXCLUDED, AND THAT IS THE POINT RATHER THAN AN
 # EXCEPTION. `types.h` is where a naked type is allowed to appear, because that
 # is the one place whose job is to name one — and it names the COMPILER's
 # (`__UINTPTR_TYPE__`), which `-ast-print` renders as the underlying type.

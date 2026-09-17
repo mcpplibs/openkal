@@ -47,6 +47,7 @@ export using ::kal_fs_info;
 export using ::kal_fs_file_info;
 export using ::kal_fs_set_modified;
 export using ::kal_fs_set_modified_at;
+export using ::kal_fs_set_executable_at;
 export using ::kal_fs_lock;
 export using ::kal_fs_unlock;
 export using ::kal_fs_capacity;
@@ -66,7 +67,7 @@ static_assert(sizeof(kal_file) == sizeof(kal_uintptr), "clause 7.2");
 // different times must agree on where each field is, and nothing else reports
 // a disagreement.
 //
-// ⚠️ EVERY OFFSET IS THE SAME ON A THIRTY-TWO AND A SIXTY-FOUR BIT TARGET, AND
+// EVERY OFFSET IS THE SAME ON A THIRTY-TWO AND A SIXTY-FOUR BIT TARGET, AND
 // THAT IS A PROPERTY THAT HAD TO BE DESIGNED FOR RATHER THAN OBSERVED.
 //
 // Version 0.8 held the size in a `kal_uintptr` and relied on the compiler's
@@ -79,7 +80,7 @@ static_assert(sizeof(kal_file) == sizeof(kal_uintptr), "clause 7.2");
 //
 // So the fields are fixed widths, and the two words of positions are `kal_u32`.
 // Forty-eight bytes on both widths, by construction rather than by arithmetic
-// that happens to agree.
+// that happens to agree; fifty-six from version 0.13, for the same reason.
 static_assert(__builtin_offsetof(kal_node_info, self_size)   ==  0);
 static_assert(__builtin_offsetof(kal_node_info, present)     ==  4);
 static_assert(__builtin_offsetof(kal_node_info, size)        ==  8);
@@ -87,7 +88,13 @@ static_assert(__builtin_offsetof(kal_node_info, modified_ns) == 16);
 static_assert(__builtin_offsetof(kal_node_info, identity)    == 24);
 static_assert(__builtin_offsetof(kal_node_info, kind)        == 40);
 static_assert(__builtin_offsetof(kal_node_info, writable)    == 44);
-static_assert(sizeof(kal_node_info) == 48);
+// Version 0.13 appends a field, which clause 4.2 permits for this structure
+// alone. The offsets above are unchanged; the size is the size of the structure
+// a consumer built against this revision holds, and `self_size' is how an
+// implementation learns which size a caller holds.
+static_assert(__builtin_offsetof(kal_node_info, executable)  == 48);
+static_assert(__builtin_offsetof(kal_node_info, reserved)    == 52);
+static_assert(sizeof(kal_node_info) == 56);
 
 export namespace kal::fs {
 
@@ -105,6 +112,7 @@ inline constexpr props atomic_rename {KAL_FS_PROP_ATOMIC_RENAME};
 inline constexpr props make_links    {KAL_FS_PROP_MAKE_LINKS};
 inline constexpr props locks         {KAL_FS_PROP_LOCKS};
 inline constexpr props capacity      {KAL_FS_PROP_CAPACITY};
+inline constexpr props executable    {KAL_FS_PROP_EXECUTABLE};
 
 enum : int { seek_set = KAL_SEEK_SET, seek_current = KAL_SEEK_CURRENT, seek_end = KAL_SEEK_END };
 
@@ -127,7 +135,7 @@ inline constexpr open_flags append   {KAL_OPEN_APPEND};
 // one: an intent and a capability word are different things, and a word that
 // serves as both can be passed to the wrong operation.
 //
-// ⚠️⚠️ AND IT IS HERE BECAUSE A `#define' DOES NOT CROSS A MODULE BOUNDARY.
+// AND IT IS HERE BECAUSE A `#define' DOES NOT CROSS A MODULE BOUNDARY.
 // The header's macros are invisible to a consumer that writes `import
 // openkal.fs', so a position added to the C header and not to this file is a
 // position half the consumers cannot name. The specification's own conformance
@@ -180,6 +188,7 @@ inline constexpr kal_u32 size     = KAL_INFO_SIZE;
 inline constexpr kal_u32 modified = KAL_INFO_MODIFIED;
 inline constexpr kal_u32 writable = KAL_INFO_WRITABLE;
 inline constexpr kal_u32 identity = KAL_INFO_IDENTITY;
+inline constexpr kal_u32 executable = KAL_INFO_EXECUTABLE;
 inline constexpr kal_u32 all      = KAL_INFO_ALL;
 }
 

@@ -7,7 +7,7 @@
  * therefore work a C library performs against a directory the environment
  * supplied, once, rather than work each program performs.
  *
- * ⭐ WHAT A NAME REFERS TO, AND WHAT A NAME FINALLY REFERS TO, ARE TWO
+ * WHAT A NAME REFERS TO, AND WHAT A NAME FINALLY REFERS TO, ARE TWO
  * QUESTIONS. A filesystem may hold a node whose content is another name.
  * `kal_fs_info' answers the second by default and the first when asked; the
  * operations that OPEN answer the second always. Clause 11 item 7 stated this
@@ -36,7 +36,7 @@ enum kal_node_kind {
 
 /* What is known about a node.
  *
- * ⭐⭐ THREE MECHANISMS, BECAUSE THERE ARE THREE QUESTIONS, AND CONFLATING THEM
+ * THREE MECHANISMS, BECAUSE THERE ARE THREE QUESTIONS, AND CONFLATING THEM
  * WAS THE DEFECT THIS REPLACES.
  *
  *   `self_size'  the caller sets it to `sizeof(struct kal_node_info)' as the
@@ -56,7 +56,7 @@ enum kal_node_kind {
  *                IT I NEED, so an implementation need not compute an identity
  *                for a caller that asked for a size.
  *
- * ⚠️ AN IMPLEMENTATION THAT ALWAYS HAS EVERYTHING IGNORES `wanted' AND WRITES A
+ * AN IMPLEMENTATION THAT ALWAYS HAS EVERYTHING IGNORES `wanted' AND WRITES A
  * CONSTANT INTO `present'. That is one line, and if it is not one line the shape
  * is wrong. */
 struct kal_node_info {
@@ -67,16 +67,21 @@ struct kal_node_info {
     kal_u64 identity[2];  /* see KAL_INFO_IDENTITY                            */
     int     kind;
     int     writable;
+    int     executable;   /* version 0.13; see KAL_INFO_EXECUTABLE           */
+    int     reserved;     /* zero; keeps the size a multiple of eight on
+                           * every target, including one that aligns a
+                           * sixty-four bit field to four bytes             */
 };
 
-/* ⚠️ EVERY FIELD IS A FIXED WIDTH, AND `self_size' AND `present' ARE `kal_u32'
+/* EVERY FIELD IS A FIXED WIDTH, AND `self_size' AND `present' ARE `kal_u32'
  * FOR THE REASON `kal_endpoint.addr_len' IS. Clause 5.3 freezes this layout, so
  * a machine word here would freeze a difference between a thirty-two and a
  * sixty-four bit target that nothing in the structure needs: the size of a
  * structure is not a pointer, and thirty-two positions is more than this
- * enquiry will assign. The layout is consequently forty-eight bytes on both
- * widths, and a consumer and an implementation built for different widths of
- * the same target agree on where each field is. A word of positions that is
+ * enquiry will assign. The layout is consequently fifty-six bytes on both
+ * widths (forty-eight before version 0.13 appended `executable'), and a
+ * consumer and an implementation built for different widths of the same target
+ * agree on where each field is. A word of positions that is
  * only ever RETURNED --- every `kal_<interface>_props' --- keeps the machine
  * word, because a register has no layout to freeze. */
 
@@ -87,9 +92,31 @@ struct kal_node_info {
 #define KAL_INFO_MODIFIED ((kal_u32)1u << 2)
 #define KAL_INFO_WRITABLE ((kal_u32)1u << 3)
 
+/* Whether the node is recorded as one that may be started as a program.
+ * Version 0.13.
+ *
+ * THIS IS A PROPERTY OF THE NODE AND NOT A PERMISSION. A permission presupposes
+ * a principal, and clause 11 item 6 declines to define one. What is recorded
+ * here presupposes none: a volume that stores the property stores it once for
+ * the node, and an environment on which it is stored as three bits (one per
+ * class of caller) reports it as set when any of the three is set.
+ *
+ * The field is filled only for a node of kind `kal_node_file', and only upon a
+ * volume for which the implementation claims KAL_FS_PROP_EXECUTABLE. Elsewhere
+ * the position is left clear in `present'. An implementation shall not report
+ * the property as set where the volume does not record it: an environment that
+ * decides what may be started from a name or from the content rather than from
+ * a recorded property has no answer to give here, and a constant answer would
+ * be a simulation (clause 3.1).
+ *
+ * The field follows `writable', which clause 4.2 permits because this is the
+ * one structure that grows. A caller whose `self_size' does not reach it is not
+ * written to beyond that size, and does not receive the position in `present'. */
+#define KAL_INFO_EXECUTABLE ((kal_u32)1u << 5)
+
 /* The identity of the node, as two words.
  *
- * ⭐ OPAQUE, AND COMPARABLE, AND NOTHING ELSE. Two nodes are the same node when
+ * OPAQUE, AND COMPARABLE, AND NOTHING ELSE. Two nodes are the same node when
  * both words are equal. The words are not interpretable, not ordered, and are
  * not required to survive a restart. An implementation whose environment has an
  * inode, a file index or an object identifier uses it; one that cannot
@@ -103,7 +130,8 @@ struct kal_node_info {
 #define KAL_INFO_IDENTITY ((kal_u32)1u << 4)
 
 #define KAL_INFO_ALL (KAL_INFO_KIND | KAL_INFO_SIZE | KAL_INFO_MODIFIED \
-                    | KAL_INFO_WRITABLE | KAL_INFO_IDENTITY)
+                    | KAL_INFO_WRITABLE | KAL_INFO_IDENTITY \
+                    | KAL_INFO_EXECUTABLE)
 
 /* Positions in the flags word of kal_fs_info. */
 #define KAL_FS_NO_RESOLVE ((kal_uintptr)1u << 0)  /* the name itself, not what
@@ -111,7 +139,7 @@ struct kal_node_info {
 
 /* Positions in the result of kal_fs_props.
  *
- * ⚠️ AN ENQUIRY TAKING A DIRECTORY, NOT A WORD PER IMPLEMENTATION. Every
+ * AN ENQUIRY TAKING A DIRECTORY, NOT A WORD PER IMPLEMENTATION. Every
  * position below is a property of the FORMAT a resource is on and not of the
  * environment: one machine mounts a case-sensitive volume beside a
  * case-insensitive one, a volume with links beside one without, and a rename
@@ -131,6 +159,11 @@ struct kal_node_info {
                                                             * answered here. 0.10 */
 #define KAL_FS_PROP_CAPACITY       ((kal_uintptr)1u << 6)  /* kal_fs_capacity is
                                                             * answered here. 0.10 */
+#define KAL_FS_PROP_EXECUTABLE     ((kal_uintptr)1u << 7)  /* the volume records
+                                                            * whether a node may
+                                                            * be started, and
+                                                            * kal_fs_set_executable_at
+                                                            * is answered here. 0.13 */
 
 /* Positions in the flags word of kal_fs_open. */
 #define KAL_OPEN_READ      ((kal_uintptr)1u << 0)
@@ -159,7 +192,7 @@ extern "C" {
  * names are the environment's; this specification requires only that they be
  * distinct.
  *
- * ⭐ THE NAME IS COPIED, AND `name_len' REPORTS THE LENGTH IT HAS. An operation
+ * THE NAME IS COPIED, AND `name_len' REPORTS THE LENGTH IT HAS. An operation
  * that produces a RESOURCE returns `int' and writes the resource; the length of
  * a name it also produces goes in an out-parameter, because the return is
  * already spoken for. Where an operation's whole result is a length, the length
@@ -183,7 +216,7 @@ kal_uintptr kal_fs_props(struct kal_dir);
  * than five more operations, every environment can express it, and it does not
  * introduce a way to ascend. Clause 7.12.
  *
- * ⭐ OPENING RESOLVES. Where a component of the name, or the name itself, is a
+ * OPENING RESOLVES. Where a component of the name, or the name itself, is a
  * node whose content is another name, these operations act upon what it finally
  * refers to. A caller that wants the node itself asks `kal_fs_info' with
  * KAL_FS_NO_RESOLVE and `kal_fs_link_read'; there is no form of opening that
@@ -200,7 +233,7 @@ int kal_fs_open_dir(struct kal_dir base, const char* name, kal_uintptr len,
  * second writer exists. Clause 3.1 classifies each of those as a simulation, so
  * the specification states the intent instead.
  *
- * ⭐⭐ AND THE WORD DOES NOT CARRY A PERMISSION, WHICH IS STATED HERE BECAUSE
+ * AND THE WORD DOES NOT CARRY A PERMISSION, WHICH IS STATED HERE BECAUSE
  * HERE IS WHERE IT IS LOOKED FOR. A caller creating a file and meaning "only I
  * may read this" finds no flag for it, and clause 11 entry 6 gives the reason: a
  * permission presupposes an identity, and the environments this specification
@@ -211,7 +244,7 @@ int kal_fs_open_dir(struct kal_dir base, const char* name, kal_uintptr len,
  * STARTED the program, through the preopens it supplies and withholds; a
  * location the program does not trust, which is encryption.
  *
- * ⚠️ Read as a gap this reads as one. It is a position, and the position is
+ * Read as a gap this reads as one. It is a position, and the position is
  * WASI's: `fs_rights_base' there attaches to a handle and not to a file, and the
  * analogue here is the word above. */
 int kal_fs_open(struct kal_dir base, const char* name, kal_uintptr len,
@@ -219,7 +252,7 @@ int kal_fs_open(struct kal_dir base, const char* name, kal_uintptr len,
 
 /* The greatest length, in bytes, of a name this implementation accepts.
  *
- * ⚠️ A BOUND A CALLER CANNOT LEARN PRODUCES A FAILURE THE CALLER CANNOT
+ * A BOUND A CALLER CANNOT LEARN PRODUCES A FAILURE THE CALLER CANNOT
  * ATTRIBUTE. Measured: an implementation held names in a fixed buffer and
  * refused a longer one as `kal_err_invalid', which is the same answer it gives
  * for a name that ascends --- so a program meeting the bound was told that its
@@ -255,7 +288,7 @@ int kal_fs_truncate(struct kal_file, kal_u64 size);
  * failing: a caller that asks what a name refers to has been answered when told
  * that it refers to nothing. Clause 7.7.
  *
- * ⭐ RESOLVES BY DEFAULT. Without KAL_FS_NO_RESOLVE this answers about what the
+ * RESOLVES BY DEFAULT. Without KAL_FS_NO_RESOLVE this answers about what the
  * name finally refers to, so it agrees with what `kal_fs_open' would act upon;
  * with it, about the node the name is. A name that finally refers to nothing is
  * `kal_node_absent' in the first form and `kal_node_link' in the second, and
@@ -307,7 +340,7 @@ int kal_fs_set_modified(struct kal_file, kal_u64 modified_ns);
 
 /* Sets the time a NAME's node reports. Version 0.10.
  *
- * ⚠️⚠️ A SECOND DECLARATION BECAUSE THE FIRST CANNOT REACH A DIRECTORY, AND THE
+ * A SECOND DECLARATION BECAUSE THE FIRST CANNOT REACH A DIRECTORY, AND THE
  * GAP WAS FOUND BY A CONSUMER RATHER THAN HERE.
  *
  * The operation above is stated on an open FILE, for a reason that remains
@@ -316,7 +349,7 @@ int kal_fs_set_modified(struct kal_file, kal_u64 modified_ns);
  * this interface had no route at all to a directory's time, while `kal_fs_info'
  * reports one perfectly well.
  *
- * ⭐ MEASURED THREE LAYERS UP. A consumer takes a lock by making a directory and
+ * MEASURED THREE LAYERS UP. A consumer takes a lock by making a directory and
  * refreshes the lock by stamping it. Reading the stamp worked; writing it could
  * not be expressed, and openkal-musl reached it by opening the directory for
  * READING and setting the time on that --- which Linux and macOS perform and
@@ -332,9 +365,36 @@ int kal_fs_set_modified(struct kal_file, kal_u64 modified_ns);
 int kal_fs_set_modified_at(struct kal_dir base, const char* name, kal_uintptr len,
                            kal_u64 modified_ns);
 
+/* Records whether a NAME's node may be started as a program. Version 0.13.
+ *
+ * THE INVERSE OF AN ENQUIRY, ADMITTED BY CLAUSE 7.11. `kal_fs_info' reports
+ * KAL_INFO_EXECUTABLE, and a property the environment records rather than
+ * derives is incomplete without a way to set it. The measurement that admitted
+ * it: a program that unpacks another program, or assembles a tree containing
+ * one, had no way to leave the result startable, and a C library above answered
+ * `chmod' by refusing. An archive extracted above this interface lost the
+ * property without an error.
+ *
+ * It is not a permission operation, for the reason given at KAL_INFO_EXECUTABLE.
+ * A non-zero `executable' makes the node startable by every class of caller that
+ * may read it; zero makes it startable by none. An environment that stores the
+ * property per class performs exactly that, and nothing else about the node
+ * changes. A caller that requires a distinction between classes of caller is
+ * asking for a permission, which this interface does not express.
+ *
+ * The name is resolved, as opening resolves. A name that refers to a directory
+ * is reported as kal_err_is_directory, because on the environments that store
+ * the property for a directory it means something else.
+ *
+ * An implementation that does not claim KAL_FS_PROP_EXECUTABLE for the volume
+ * reports kal_err_not_supported and changes nothing. An implementation that
+ * claims the position shall be able to perform this. */
+int kal_fs_set_executable_at(struct kal_dir base, const char* name, kal_uintptr len,
+                             int executable);
+
 /* Excluding other holders from a range of a file. Version 0.10.
  *
- * ⚠️⚠️ ADDED BECAUSE ITS ABSENCE WAS SILENTLY UNSAFE ONE LAYER UP, AND THE
+ * ADDED BECAUSE ITS ABSENCE WAS SILENTLY UNSAFE ONE LAYER UP, AND THE
  * ADMISSIBILITY ARGUMENT IS THE ONE THE LINK OPERATIONS BELOW ALREADY MAKE.
  *
  * A C library above this interface answers `fcntl(F_SETLK)'. With nothing here
@@ -343,13 +403,13 @@ int kal_fs_set_modified_at(struct kal_dir base, const char* name, kal_uintptr le
  * the host, and it is the shape this specification exists to exclude --- an
  * answer that is not true, given to a caller with no way to check it.
  *
- * ⭐ AND IT IS NOT THE `chmod' CASE, WHICH IS WHY IT IS HERE AND THAT IS NOT.
+ * AND IT IS NOT THE `chmod' CASE, WHICH IS WHY IT IS HERE AND THAT IS NOT.
  * A permission operation was declined because a FAT volume, a UEFI system
  * partition and a Windows access-control list do not share a model. Every
  * environment this specification targets locks a byte range and spells it
  * almost identically. What was missing was a word, not a capability.
  *
- * ⚠️ Whether a VOLUME can is a property of the format rather than of the
+ * Whether a VOLUME can is a property of the format rather than of the
  * environment, exactly as it is for links --- a network volume may not, and a
  * read-only medium need not. So it is an operation of this interface answered by
  * `kal_fs_props' and not an interface of its own, which is what clause 6.2
@@ -363,7 +423,7 @@ int kal_fs_set_modified_at(struct kal_dir base, const char* name, kal_uintptr le
  * be", which is the whole-file convention every environment beneath spells the
  * same way.
  *
- * ⭐⭐ A LOCK IS HELD BY THE FILE AND ENDS WITH IT, AND THAT IS REQUIRED RATHER
+ * A LOCK IS HELD BY THE FILE AND ENDS WITH IT, AND THAT IS REQUIRED RATHER
  * THAN OBSERVED. It is released by `kal_fs_close_file' and by the end of the
  * program that holds it, however that program ends.
  *
@@ -373,7 +433,7 @@ int kal_fs_set_modified_at(struct kal_dir base, const char* name, kal_uintptr le
  * program that ends abnormally while holding one locks itself out of its own
  * file for ever. Release upon death is what only the environment can supply.
  *
- * ⚠️ AND IT IS THE FILE AND NOT THE PROGRAM, WHICH IS NARROWER THAN ONE
+ * AND IT IS THE FILE AND NOT THE PROGRAM, WHICH IS NARROWER THAN ONE
  * ENVIRONMENT'S OLDEST FORM OF THIS. That form releases every lock a program
  * holds upon a node as soon as the program closes ANY descriptor for it, so a
  * library that opened the same file twice destroyed its own lock. An
@@ -406,7 +466,7 @@ int kal_fs_capacity(struct kal_dir, kal_u64* total, kal_u64* available);
 
 /* Nodes whose content is another name.
  *
- * ⚠️ THESE ARE OPERATIONS OF THIS INTERFACE AND NOT AN INTERFACE OF THEIR OWN,
+ * THESE ARE OPERATIONS OF THIS INTERFACE AND NOT AN INTERFACE OF THEIR OWN,
  * AND CLAUSE 6.2 IS WHY. Whether a volume has such nodes is a property of the
  * format rather than of the environment: one implementation succeeds on one
  * volume and fails on another. A property that varies between the RESOURCES of

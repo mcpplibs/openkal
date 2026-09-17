@@ -42,7 +42,7 @@ void run() {
                 "the first argument is reported with its own length");
     }
 
-    // ⭐ THE LENGTH IS THE VALUE'S AND NOT THE BUFFER'S, WHICH IS WHAT LETS A
+    // THE LENGTH IS THE VALUE'S AND NOT THE BUFFER'S, WHICH IS WHAT LETS A
     // CALLER SIZE FIRST AND WHAT MAKES TRUNCATION IMPOSSIBLE TO MISS.
     {
         const kal_intptr full  = kal_env_arg(0, buf, room);
@@ -128,7 +128,7 @@ void run() {
         observe(kind::abi, consistent,
                 "a counted string contains no terminator within its own length");
 
-        // ⚠️ THE OPERATION WRITES NO MORE THAN THE CAPACITY IT WAS GIVEN. An
+        // THE OPERATION WRITES NO MORE THAN THE CAPACITY IT WAS GIVEN. An
         // implementation that copied the whole value regardless would corrupt
         // the caller past a buffer the caller sized correctly, which is the
         // defect this shape exists to make impossible.

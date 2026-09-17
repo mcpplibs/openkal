@@ -35,7 +35,7 @@ void run() {
 #else
     // The quantum this environment allocates and protects memory in.
     //
-    // ⭐ AN OPERATION AND NOT A CONSTANT. A C library above this reports it as
+    // AN OPERATION AND NOT A CONSTANT. A C library above this reports it as
     // its own page size, and one that fixed it when it was built is wrong on
     // every machine whose quantum differs from the one it was built for --- which
     // is what a distributed binary meets.
@@ -46,7 +46,7 @@ void run() {
         observe(kind::behaviour, (g & (g - 1)) == 0,
                 "the granularity is a power of two");
 
-        // ⚠️ THE VALUE IS THE ONE THE INTERFACE'S OWN OPERATIONS ACCEPT, which
+        // THE VALUE IS THE ONE THE INTERFACE'S OWN OPERATIONS ACCEPT, which
         // is the whole of what it promises: an address and a length that are
         // multiples of it are acceptable. An implementation reporting a
         // quantum its allocator then refused would be reporting a fact about

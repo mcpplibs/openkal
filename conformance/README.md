@@ -150,7 +150,7 @@ trying rather than by reading:
 | the hand-over from the image's first instruction to `main` | the implementation's own startup, selected with `OPENKAL_CONFORMANCE_IMPL_FEATURES=standalone`, because every implementation here puts it behind a feature rather than in its default build |
 | an entry symbol | this suite: `src/main.cpp` declares `main` as `extern "C"`, because `-ffreestanding` makes `main` an ordinary function and the startup object refers to it by name |
 
-⚠️ **One observation is not made there, and the suite says so rather than
+**One observation is not made there, and the suite says so rather than
 skipping it.** The requirement that `kal_exit` run no static destructor is
 observed in a copy the suite starts, which needs `openkal.process`; where that
 interface is absent, `okc.abort` reports it as not observed. The static object
@@ -172,7 +172,7 @@ report conformance.
 
 It asks a compiler what it parsed rather than searching the text, so a type
 reached through a macro or an include is seen and typedef names are read as
-written. ⚠️ And it proves it parsed something before it is allowed to report
+written. And it proves it parsed something before it is allowed to report
 success: a check that succeeds by finding nothing succeeds identically when it
 has read nothing.
 

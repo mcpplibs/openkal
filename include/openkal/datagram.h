@@ -45,6 +45,10 @@ int kal_datagram_local(struct kal_datagram d, struct kal_endpoint* out);
 
 /* Sends one message.
  *
+ * Sending and receiving are independent in the sense `net.h' states for a
+ * connection (version 0.13): a context waiting in kal_datagram_recv_from shall
+ * not delay a send upon the same socket from another context.
+ *
  * A message is sent whole or not at all; a partial send is not a result this
  * interface produces. The count reported on success is therefore always the
  * length that was given, and is reported so that the result type is the one

@@ -77,7 +77,7 @@ jobs:
 
       - name: Install mcpp
         run: |
-          # ⚠️ A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
+          # A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
           # WITHOUT SAYING SO.
           #
           # The index is published as an artifact behind a pointer, and that
@@ -98,7 +98,7 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+            if # THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
           # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
           # from whatever the index has; the step below replaces it with the
           # build under review, and the pin is what an ordinary run tests.
@@ -116,13 +116,13 @@ jobs:
           done
           mcpp --version
           mcpp self config --mirror GLOBAL
-          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          # CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
           #
           # Empty in the ordinary run, so this job keeps testing the RELEASED
           # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
           # repository variable — and the same job runs against that source.
           #
-          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
           # releases went out green and only then turned this ecosystem red: the
           # engine's own CI cannot see a defect that appears only in a real
           # dependency graph, and this repository could not see the engine until
@@ -135,7 +135,7 @@ jobs:
             [ -d "$src" ] || git clone --quiet --depth 1 \
               --branch "$MCPP_SOURCE_REF" \
               https://github.com/mcpp-community/mcpp.git "$src"
-            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
             # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
             # compiles mcpp, and that pin does not move when mcpp is released —
             # so a build inside the checkout obeys it and tries to install a
@@ -148,7 +148,7 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
-            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
             # macOS runners too: on Windows the artefact is `mcpp.exe`, and
             # `-perm -u+x` is not a question that filesystem answers the way this
             # expects. Measured: `Finished release [optimized] in 173.44s`
@@ -162,7 +162,7 @@ jobs:
                     \( -name mcpp -o -name mcpp.exe \) | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
-            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # Reported, because a PATH entry that does not win looks exactly
             # like one that does until something built with the wrong engine.
             echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
           fi
@@ -183,7 +183,7 @@ jobs:
 
       # The C++ form. The modules are the artefact a C++ consumer imports, and
       # building them is what proves the compiler accepts them.
-      # ⚠️ A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
+      # A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
       #
       # Every row of every job here is hosted, and every hosted target this
       # specification serves is 64-bit. That is a structural blind spot rather
@@ -200,7 +200,7 @@ jobs:
       #
       # Compile-only: there is no 32-bit implementation to run against, and the
       # claim under test is about layout rather than behaviour.
-      # ⚠️ A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
+      # A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
       #
       # Every other row here is hosted, and every hosted target this
       # specification serves is 64-bit. That is a structural blind spot: the C
@@ -214,13 +214,13 @@ jobs:
       # at eight. It surfaced in a CONSUMER (`mcpplibs/riscv-virt-rt`'s rv32
       # leg), the only place the 32-bit layout existed at all.
       #
-      # ⚠️ THROUGH `mcpp`, NOT THROUGH A BORROWED clang. The first version of
+      # THROUGH `mcpp`, NOT THROUGH A BORROWED clang. The first version of
       # this step globbed the LLVM payload for `clang++` — which is absent on
       # the gcc and msvc rows, and is named `clang++.exe` on Windows, so the
       # command expanded to nothing and the step died with `: command not
       # found` on four rows. mcpp resolves the toolchain for a target itself;
       # asking it is the only spelling that holds on every row.
-      # ⚠️ A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
+      # A 32-BIT TARGET, AND NOTHING ELSE IN THIS REPOSITORY IS ONE.
       #
       # Every other row here is hosted, and every hosted target this
       # specification serves is 64-bit. That is a structural blind spot: the C
@@ -234,7 +234,7 @@ jobs:
       # at eight. It surfaced in a CONSUMER (`mcpplibs/riscv-virt-rt`'s rv32
       # leg), the only place the 32-bit layout existed at all.
       #
-      # ⚠️ THE PROBE LIVES INSIDE THE CHECKOUT AND USES A RELATIVE PATH. Two
+      # THE PROBE LIVES INSIDE THE CHECKOUT AND USES A RELATIVE PATH. Two
       # earlier spellings failed for reasons that had nothing to do with the
       # ABI: globbing the LLVM payload for `clang++` died with `: command not
       # found` on the rows whose toolchain is gcc or msvc, and interpolating
@@ -273,9 +273,12 @@ jobs:
           static_assert(__builtin_offsetof(kal_node_info, identity)    == 24);
           static_assert(__builtin_offsetof(kal_node_info, kind)        == 40);
           static_assert(__builtin_offsetof(kal_node_info, writable)    == 44);
+          // Appended in 0.13, past the end of what existed.
+          static_assert(__builtin_offsetof(kal_node_info, executable)  == 48);
+          static_assert(__builtin_offsetof(kal_node_info, reserved)    == 52);
           // The same at both pointer widths, which is the property this
           // 32-bit row exists to observe: no field of it is pointer-sized.
-          static_assert(sizeof(kal_node_info) == 48);
+          static_assert(sizeof(kal_node_info) == 56);
           static_assert(sizeof(kal_dir)  == sizeof(kal_uintptr));
           static_assert(sizeof(kal_file) == sizeof(kal_uintptr));
           // A transfer is one signed word, and a signed word is a pointer's
@@ -292,7 +295,7 @@ jobs:
           done
           rm -rf .abi-probe
 
-      # ⚠️⚠️ EVERY MACRO HAS A MODULE SPELLING, AND THIS IS CHECKED RATHER THAN
+      # EVERY MACRO HAS A MODULE SPELLING, AND THIS IS CHECKED RATHER THAN
       # REMEMBERED --- because twice it was not. `KAL_LOCK_*' in 0.10 and
       # `KAL_SPAWN_*' in 0.11 were each added to a header, used from a module
       # consumer, and failed to compile there, because a macro does not cross a
@@ -325,7 +328,7 @@ jobs:
           CC=cc bash tools/check-declarations.sh
           command -v clang >/dev/null && CC=clang bash tools/check-declarations.sh || true
 
-      # ⭐⭐ AND NO DECLARATION NAMES A BACKEND TYPE.
+      # AND NO DECLARATION NAMES A BACKEND TYPE.
       #
       # The job above asserts the declarations COMPILE. This asserts what they
       # are written WITH, which is a different freedom and the one that decides
@@ -333,10 +336,10 @@ jobs:
       # `sizeof(long)` is 8 on x86_64 Linux and 4 on x86_64 Windows; a `long` in
       # an interface would be one signature with two meanings.
       #
-      # ⚠️ It runs on every row of this matrix rather than once, because a type
+      # It runs on every row of this matrix rather than once, because a type
       # is a claim about a TARGET and this matrix is where the targets are.
       #
-      # ⚠️ Needs a clang-family driver (`-Xclang -ast-print`); rows whose
+      # Needs a clang-family driver (`-Xclang -ast-print`); rows whose
       # toolchain has no such spelling are covered by the other rows, and the
       # step says so rather than passing silently.
       - name: No declaration names a backend type
@@ -349,7 +352,7 @@ jobs:
           fi
           bash tools/check-types.sh "$cc" include
 
-      # ⚠️ AND THE CHECK DETECTS WHAT IT EXISTS TO DETECT.
+      # AND THE CHECK DETECTS WHAT IT EXISTS TO DETECT.
       #
       # A check that succeeds by finding nothing succeeds identically when it
       # reads nothing, and every false green in this ecosystem has had that
@@ -391,7 +394,7 @@ jobs:
 
       - name: Install mcpp
         run: |
-          # ⚠️ A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
+          # A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
           # WITHOUT SAYING SO.
           #
           # The index is published as an artifact behind a pointer, and that
@@ -412,7 +415,7 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+            if # THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
           # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
           # from whatever the index has; the step below replaces it with the
           # build under review, and the pin is what an ordinary run tests.
@@ -429,13 +432,13 @@ jobs:
             sleep 60
           done
           mcpp self config --mirror GLOBAL
-          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          # CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
           #
           # Empty in the ordinary run, so this job keeps testing the RELEASED
           # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
           # repository variable — and the same job runs against that source.
           #
-          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
           # releases went out green and only then turned this ecosystem red: the
           # engine's own CI cannot see a defect that appears only in a real
           # dependency graph, and this repository could not see the engine until
@@ -448,7 +451,7 @@ jobs:
             [ -d "$src" ] || git clone --quiet --depth 1 \
               --branch "$MCPP_SOURCE_REF" \
               https://github.com/mcpp-community/mcpp.git "$src"
-            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
             # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
             # compiles mcpp, and that pin does not move when mcpp is released —
             # so a build inside the checkout obeys it and tries to install a
@@ -461,7 +464,7 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
-            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
             # macOS runners too: on Windows the artefact is `mcpp.exe`, and
             # `-perm -u+x` is not a question that filesystem answers the way this
             # expects. Measured: `Finished release [optimized] in 173.44s`
@@ -475,7 +478,7 @@ jobs:
                     \( -name mcpp -o -name mcpp.exe \) | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
-            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # Reported, because a PATH entry that does not win looks exactly
             # like one that does until something built with the wrong engine.
             echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
           fi
@@ -639,7 +642,7 @@ jobs:
 
       - name: Install mcpp
         run: |
-          # ⚠️ A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
+          # A LOOP, BECAUSE ONE `xlings update` CAN RETURN A STALE INDEX
           # WITHOUT SAYING SO.
           #
           # The index is published as an artifact behind a pointer, and that
@@ -660,7 +663,7 @@ jobs:
           # of the two situations it is.
           for attempt in 1 2 3 4 5 6; do
             xlings update > /dev/null 2>&1 || true
-            if # ⚠️ THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
+            if # THE PIN MAY NAME THE RELEASE THIS RUN IS VALIDATING, which does
           # not exist yet — that is the whole point of MCPP_SOURCE_REF. Bootstrap
           # from whatever the index has; the step below replaces it with the
           # build under review, and the pin is what an ordinary run tests.
@@ -677,13 +680,13 @@ jobs:
             sleep 60
           done
           mcpp self config --mirror GLOBAL
-          # ⭐⭐ CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
+          # CROSS-VALIDATION: BUILD THE mcpp UNDER REVIEW AND USE THAT ONE.
           #
           # Empty in the ordinary run, so this job keeps testing the RELEASED
           # mcpp the pin above names. Set it — `workflow_dispatch` input, or the
           # repository variable — and the same job runs against that source.
           #
-          # ⚠️ THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
+          # THIS EXISTS BECAUSE THE ORDER USED TO BE WRONG. Several mcpp
           # releases went out green and only then turned this ecosystem red: the
           # engine's own CI cannot see a defect that appears only in a real
           # dependency graph, and this repository could not see the engine until
@@ -696,7 +699,7 @@ jobs:
             [ -d "$src" ] || git clone --quiet --depth 1 \
               --branch "$MCPP_SOURCE_REF" \
               https://github.com/mcpp-community/mcpp.git "$src"
-            # ⚠️ THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
+            # THE CLONE'S OWN WORKSPACE PIN MUST NOT DECIDE WHICH mcpp
             # BUILDS IT. `.xlings.json` at mcpp's root pins the mcpp that
             # compiles mcpp, and that pin does not move when mcpp is released —
             # so a build inside the checkout obeys it and tries to install a
@@ -709,7 +712,7 @@ jobs:
             # above, which is exactly what removing the file leaves.
             rm -f "$src/.xlings.json"
             ( cd "$src" && mcpp build --release )
-            # ⚠️ BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
+            # BOTH SPELLINGS, AND NO `-perm`. The matrix reaches Windows and
             # macOS runners too: on Windows the artefact is `mcpp.exe`, and
             # `-perm -u+x` is not a question that filesystem answers the way this
             # expects. Measured: `Finished release [optimized] in 173.44s`
@@ -723,7 +726,7 @@ jobs:
                     \( -name mcpp -o -name mcpp.exe \) | head -1)
             [ -n "$built" ] || { echo "::error::mcpp did not build from $MCPP_SOURCE_REF"; exit 1; }
             echo "$(cd "$(dirname "$built")" && pwd)" >> "$GITHUB_PATH"
-            # ⚠️ Reported, because a PATH entry that does not win looks exactly
+            # Reported, because a PATH entry that does not win looks exactly
             # like one that does until something built with the wrong engine.
             echo "under review: $("$built" --version)  (from $MCPP_SOURCE_REF)"
           fi
@@ -768,7 +771,7 @@ jobs:
       # C++ modules in `namespace kal::kit` and exports no name beginning with
       # `kal_`; a C++ name is mangled to `_ZN3kal3kit…`, so an implementation
       # that linked the kit still passes `check-surface.sh --complete`.
-      # ⭐⭐ A PUBLISHED PACKAGE MAY NOT REACH ANOTHER BY PATH.
+      # A PUBLISHED PACKAGE MAY NOT REACH ANOTHER BY PATH.
       #
       # kit/mcpp.toml is published as openkal-kit, out of this repository's own
       # tarball. While it read `openkal = { path = ".." }` that was true here and
@@ -778,7 +781,7 @@ jobs:
       # the other --- and the build refused, correctly, because two routes to one
       # package are two copies of it.
       #
-      # ⚠️ NO CONTINUOUS INTEGRATION HERE COULD HAVE CAUGHT IT. Every workflow in
+      # NO CONTINUOUS INTEGRATION HERE COULD HAVE CAUGHT IT. Every workflow in
       # this ecosystem substitutes working trees, so both routes become paths and
       # agree. The defect appears only where an implementation names the
       # specification by VERSION, which is the published shape and exactly what
@@ -806,7 +809,7 @@ jobs:
         run: |
           bash tools/run-kit-tests.sh '${{ matrix.implementation }}' .impl
 
-      # ⭐⭐ THE EXAMPLE A CONSUMER READS, BUILT AND RUN.
+      # THE EXAMPLE A CONSUMER READS, BUILT AND RUN.
       #
       # examples/portable is the program the specification points at as the one
       # every implementation must satisfy, and NOTHING BUILT IT. Its README
@@ -815,7 +818,7 @@ jobs:
       # measured across all six implementation repositories, the word `portable`
       # appeared in none of their workflows. A promise with nothing executing it.
       #
-      # ⚠️ AND THE DRIFT THAT FOLLOWS FROM THAT IS VISIBLE IN ITS OWN MANIFEST:
+      # AND THE DRIFT THAT FOLLOWS FROM THAT IS VISIBLE IN ITS OWN MANIFEST:
       # it named `openkal = "0.5.0"` --- three specification versions behind ---
       # while claiming to demonstrate the current contract to a reader who would
       # copy it. Nothing could have noticed.
@@ -825,12 +828,12 @@ jobs:
       # under review, so the working trees stand in, exactly as
       # tools/run-conformance.sh does for the suite.
       #
-      # ⚠️ RELATIVE PATHS, NOT `pwd`. This job runs on Windows too, where MSYS
+      # RELATIVE PATHS, NOT `pwd`. This job runs on Windows too, where MSYS
       # reports `/d/a/...`, which the build tool does not resolve. Relative
       # paths also cannot put a local directory into a file that might be
       # committed.
       #
-      # ⚠️ NO `standalone` FEATURE HERE. That feature makes the implementation
+      # NO `standalone` FEATURE HERE. That feature makes the implementation
       # supply `_start`, which collides with the C library's crt1.o on a hosted
       # toolchain --- measured: "multiple definition of `_start`". The
       # conformance runner defaults to no features for the same reason.
@@ -844,7 +847,7 @@ jobs:
           grep -q 'path = "../../.impl"' mcpp.toml \
             || { echo "::error::the implementation was not substituted"; exit 1; }
 
-          # ⚠️ THE IMPLEMENTATION REACHES THE SPECIFICATION TOO, AND BY ITS OWN
+          # THE IMPLEMENTATION REACHES THE SPECIFICATION TOO, AND BY ITS OWN
           # FORM. Substituting only this manifest leaves two routes to one
           # package and the build refuses, correctly:
           #
@@ -860,7 +863,7 @@ jobs:
 
           mcpp run 2>&1 | tee portable.log
 
-          # ⭐ THE COUNT IS THE CRITERION, AND SO IS THE DENOMINATOR. A program
+          # THE COUNT IS THE CRITERION, AND SO IS THE DENOMINATOR. A program
           # that failed to start would print none of these lines, and a check
           # for the absence of failures would hold over an empty log.
           lines=$(grep -c '^openkal: ' portable.log)

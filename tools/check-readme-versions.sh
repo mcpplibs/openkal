@@ -3,7 +3,7 @@
 #
 #   check-readme-versions.sh [<package-directory>]
 #
-# ⚠️⚠️ A README THAT NAMES A VERSION DRIFTS SILENTLY, AND THIS ONE HAD.
+# A README THAT NAMES A VERSION DRIFTS SILENTLY, AND THIS ONE HAD.
 #
 # Every README in this ecosystem opens by showing what a program writes in its
 # manifest. Those lines are the first thing a reader copies and the last thing
@@ -13,7 +13,7 @@
 # got a version whose declarations do not match the documentation around them,
 # and nothing said so.
 #
-# ⭐ THE POINT IS NOT THE STALENESS, IT IS THAT IT WAS INVISIBLE. Everything else
+# THE POINT IS NOT THE STALENESS, IT IS THAT IT WAS INVISIBLE. Everything else
 # in these packages is checked by something: the surface against SURFACE.txt, the
 # declarations against both forms, the behaviour against the conformance suite.
 # The one thing a reader actually types was checked by nobody.
@@ -22,13 +22,13 @@
 # must agree with that package's own manifest where the package is one of this
 # ecosystem's. A version of anything else is not this check's business.
 #
-# ⚠️⚠️ AND IT IS NOT ONLY READMES. This checked READMEs alone until 2026-08-28,
+# AND IT IS NOT ONLY READMES. This checked READMEs alone until 2026-08-28,
 # when a change spanning eight repositories was reviewed and `openkal-musl`'s
 # own manifest was found pinning `openkal-windows = "0.3.0"` against a package
 # that had moved to 0.4.0. The README beside it was correct, because the README
 # was the thing being checked.
 #
-# ⭐ A MANIFEST PIN IS THE SAME CLASS OF FACT AS A README LINE --- a version of
+# A MANIFEST PIN IS THE SAME CLASS OF FACT AS A README LINE --- a version of
 # a sibling written down here and true somewhere else --- so it is checked by
 # the same rule. Example manifests are included: an example is a README a reader
 # can build.
@@ -43,7 +43,7 @@ readme="$here/README.md"
 # copies from, and every manifest in this tree that names a sibling. `target'
 # is excluded because a build directory holds copies of manifests this tree
 # does not own.
-# ⚠️ `-L', BECAUSE `$here' MAY BE A SYMBOLIC LINK. `find' does not descend into
+# `-L', BECAUSE `$here' MAY BE A SYMBOLIC LINK. `find' does not descend into
 # one unless told to, and when this was run against a tree reached by link it
 # examined the README and NOTHING ELSE --- reporting "1 files" and passing.
 sources() {
@@ -63,7 +63,7 @@ version_of() {   # version_of <package> --- from the package's own manifest
     done
 }
 
-# ⭐ A DENOMINATOR. The count of pins alone cannot distinguish a tree with few
+# A DENOMINATOR. The count of pins alone cannot distinguish a tree with few
 # pins from a survey that stopped early, which is the defect recorded below.
 seen="$(mktemp)"
 trap 'rm -f "$seen"' EXIT
@@ -98,7 +98,7 @@ done < <(
         [ -f "$file" ] || continue
         # A pin in either form: `pkg = "1.2.3"' and `pkg = { version = "1.2.3" ...'.
         #
-        # ⚠️⚠️ `|| true' IS LOAD-BEARING AND ITS ABSENCE TRUNCATED THIS SURVEY
+        # `|| true' IS LOAD-BEARING AND ITS ABSENCE TRUNCATED THIS SURVEY
         # WITHOUT SAYING SO. A manifest whose dependencies are all path form ---
         # `examples/substitution/app/mcpp.toml' is one --- matches nothing, so
         # grep exits 1; under `set -e' with `pipefail' that ended the LOOP, and
@@ -123,7 +123,7 @@ if [ "$files" != "$want" ]; then
     exit 1
 fi
 
-# ⭐⭐ A DENOMINATOR DRAWN FROM THE SAME ENUMERATION CANNOT REPORT THAT THE
+# A DENOMINATOR DRAWN FROM THE SAME ENUMERATION CANNOT REPORT THAT THE
 # ENUMERATION IS EMPTY. The count above compares the survey against `sources',
 # so an enumeration that found nothing agrees with a survey that examined
 # nothing and the check passes. This is the floor that does not come from it:

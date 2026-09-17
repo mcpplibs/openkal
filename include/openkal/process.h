@@ -29,7 +29,7 @@ struct kal_process { kal_uintptr h; };
  * of a file it opened for the purpose is in the same position and had nothing to
  * read.
  *
- * ⚠️ ZERO IS RESERVED HERE AND IS NOT RESERVED IN `openkal.stream', WHICH IS A
+ * ZERO IS RESERVED HERE AND IS NOT RESERVED IN `openkal.stream', WHICH IS A
  * COLLISION AND IS RECORDED RATHER THAN REPAIRED.
  *
  * `kal_stream' has no distinguished value: an implementation whose streams are
@@ -82,7 +82,7 @@ struct kal_preopen {
 /* kal_process_stop_requested answers a word rather than null. Version 0.11. */
 #define KAL_PROCESS_PROP_STOP_REQUESTED ((kal_uintptr)1u << 7)
 
-/* ⚠️⚠️ HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
+/* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
  *
  * Until 0.11 there were three declarations --- `kal_process_spawn',
@@ -91,11 +91,11 @@ struct kal_preopen {
  * exactly one reason: clause 8 forbids adding an argument to a declaration that
  * exists, so each new modifier had to arrive as a new name.
  *
- * ⭐ THE 0.10 COMMENT ON `..._bound' PREDICTED WHERE THAT ENDS, IN TERMS:
+ * THE 0.10 COMMENT ON `..._bound' PREDICTED WHERE THAT ENDS, IN TERMS:
  * "Declaring every combination is how an interface acquires four spawns and then
  * eight, so the combination is declared when something needs it and not before."
  *
- * ⚠️ Something needed it, and the evidence was a single function signature in a
+ * Something needed it, and the evidence was a single function signature in a
  * consumer --- `run_shell_stream(argv, cwd, …, timeout_ms)', whose child calls
  * `setpgid(0, 0)' and `chdir(cwd)' on ADJACENT LINES. Two more modifiers, wanted
  * together. Four orthogonal modifiers is sixteen declarations, each of which must
@@ -114,13 +114,13 @@ struct kal_spawn {
     /* What `path' is resolved against. NAMING the program, and nothing else. */
     struct kal_dir base;
 
-    /* ⭐ THE DIRECTORY THE PROGRAM RUNS IN, AND IT IS REQUIRED.
+    /* THE DIRECTORY THE PROGRAM RUNS IN, AND IT IS REQUIRED.
      *
      * openkal deliberately has no ambient working directory --- "wherever I happen
      * to be" is not something this interface can name --- so there is no default
      * that would be true, and a caller that does not care passes `base'.
      *
-     * ⚠️ NAMING A PROGRAM AND NAMING WHERE IT RUNS ARE TWO DIRECTORIES. Before
+     * NAMING A PROGRAM AND NAMING WHERE IT RUNS ARE TWO DIRECTORIES. Before
      * 0.11 there was one, and a C library above could not answer
      * `posix_spawn_file_actions_addchdir_np' at all: `chdir' moved what the
      * LIBRARY resolved names against and the started program still ran where its
@@ -133,14 +133,14 @@ struct kal_spawn {
      * applied to stating, once, at the moment of starting, where a program runs. */
     struct kal_dir work;
 
-    /* ⭐⭐ THE UNIT THIS PROGRAM BELONGS TO, AND IT IS THE ONE FIELD HERE THAT IS
+    /* THE UNIT THIS PROGRAM BELONGS TO, AND IT IS THE ONE FIELD HERE THAT IS
      * WRITTEN AS WELL AS READ.
      *
      *   null            this program belongs to no unit of the caller's making
      *   *job == 0       a new unit is formed, and its identity is written here
      *   *job != 0       this program joins the unit that word names
      *
-     * ⚠️ IN AND OUT BECAUSE NEITHER KIND OF SYSTEM CAN DO IT THE OTHER WAY. This
+     * IN AND OUT BECAUSE NEITHER KIND OF SYSTEM CAN DO IT THE OTHER WAY. This
      * system creates the unit first and puts members into it; that one has the
      * unit created BY its first member --- a process group's identity is a
      * process's --- so there is nothing to create beforehand. An operation that
@@ -153,14 +153,14 @@ struct kal_spawn {
      * KAL_PROCESS_PROP_JOB reports kal_err_not_supported for a non-null `job'
      * rather than starting a program outside the unit that was asked for.
      *
-     * ⚠️ ENTERING A UNIT HAS A COST ON SOME SYSTEMS AND THAT IS WHY IT IS PER
+     * ENTERING A UNIT HAS A COST ON SOME SYSTEMS AND THAT IS WHY IT IS PER
      * START. Where the unit is a process group, entering a new one LEAVES THE
      * TERMINAL'S FOREGROUND GROUP, so a program with an interface whose child
      * then reads the terminal stops on SIGTTIN. A caller that has given the
      * started program pipes for all three streams wants a unit; an interactive
      * caller must never be given one silently.
      *
-     * ⚠️ AND THE TWO KINDS OF UNIT ARE NOT EQUALLY STRONG. A job is named by a
+     * AND THE TWO KINDS OF UNIT ARE NOT EQUALLY STRONG. A job is named by a
      * handle that is never reused; a process group is named by a process
      * identifier, which is reused once the leader has ended and the numbers have
      * wrapped. Terminating a unit whose leader is long gone can therefore reach a
@@ -168,14 +168,14 @@ struct kal_spawn {
      * program that calls `killpg' lives with it --- and it is recorded rather than
      * hidden behind an interface that reads as though it were not so.
      *
-     * ⭐⭐ AND THIS IS WHERE A UNIT IS ESTABLISHED --- AT THE START, BY WHOEVER
+     * AND THIS IS WHERE A UNIT IS ESTABLISHED --- AT THE START, BY WHOEVER
      * STARTS. A caller names the unit here and the implementation performs the
      * placement, so the unit and the program that can name it are on the same
      * side of the boundary. `kal_process_job_enter' is the other half and is not
      * a way around this: it places THE CALLER, for the sake of the spawns the
      * caller goes on to perform.
      *
-     * ⚠️ IT FOLLOWS THAT A COPY'S UNIT CANNOT BE NAMED BY THE ORIGINAL, and a C
+     * IT FOLLOWS THAT A COPY'S UNIT CANNOT BE NAMED BY THE ORIGINAL, and a C
      * library composing job control meets this rather than reading it. Duplicate
      * the image, have the copy form a unit, then signal that unit from the
      * original: the copy's handle is the copy's --- clause 6.7 builds it from an
@@ -197,7 +197,7 @@ struct kal_spawn {
 /* The started program does not outlive its caller: when the calling image ends,
  * however it ends, the started program ends too.
  *
- * ⚠️ ADDED IN 0.10 BECAUSE A CALLER WAS TOLD A FALSEHOOD. Clause 7.1 declines to
+ * ADDED IN 0.10 BECAUSE A CALLER WAS TOLD A FALSEHOOD. Clause 7.1 declines to
  * replace a running image, so a C library asked for `execve' composes it --- and
  * the composition leaves THREE images where a system with the operation has two:
  * the caller, a copy that waits, and the program. A signal reaches the middle
@@ -225,10 +225,22 @@ extern "C" {
  * An implementation reports kal_err_not_supported, and starts nothing, when the
  * request names something it cannot do: a flag whose position it does not claim
  * in `kal_process_props', or a non-empty `grants' without
- * KAL_PROCESS_PROP_GRANT_DIR. ⚠️ STARTING THE PROGRAM WITHOUT THE THING ASKED FOR
+ * KAL_PROCESS_PROP_GRANT_DIR. STARTING THE PROGRAM WITHOUT THE THING ASKED FOR
  * IS NOT AN OPTION --- a caller that asked for a bound lifetime and got a program
  * without one has been given a program that outlives it, which is the failure the
- * flag exists to remove. */
+ * flag exists to remove.
+ *
+ * A START THAT DID NOT HAPPEN IS REPORTED, AND IS REPORTED BY ITS REASON. An
+ * implementation shall not report kal_ok, and shall not yield a process, for a
+ * program that was not started; a caller that receives a handle for a start
+ * that failed can discover the failure only as an exit status, which cannot be
+ * told apart from a program that ran and returned that status. The reason is
+ * the one the environment gave: a name that is not there is kal_err_not_found,
+ * one that may not be started is kal_err_permission, a directory is
+ * kal_err_is_directory, and a name that is there and may be started but is not
+ * in a form this environment can start is kal_err_not_program (version 0.13).
+ * The last is distinct from kal_err_io because no device reported a failure,
+ * and a C library above maps it back to the condition its callers act upon. */
 int kal_process_spawn(const struct kal_spawn* how,
                       const char*  path,  kal_uintptr path_len,
                       const char** argv,  const kal_uintptr* argv_lens, kal_uintptr argc,
@@ -256,7 +268,7 @@ int kal_process_wait(struct kal_process, int* status, int* terminated);
 
 /* Requests the termination of ONE started program, whatever unit it is in.
  *
- * ⭐ ITS MEANING DOES NOT DEPEND ON HOW THAT PROGRAM WAS STARTED, and 0.11 is
+ * ITS MEANING DOES NOT DEPEND ON HOW THAT PROGRAM WAS STARTED, and 0.11 is
  * where that became true. The shape this replaced was a flag on the spawn, after
  * which this operation reached one program or a whole tree according to a
  * property of the handle that no caller could see. An operation whose meaning
@@ -265,11 +277,11 @@ int kal_process_wait(struct kal_process, int* status, int* terminated);
 int kal_process_terminate(struct kal_process);
 void kal_process_close(struct kal_process);
 
-/* ⭐⭐ A WORD THIS PROGRAM'S ENVIRONMENT SETS WHEN SOMEBODY HAS ASKED IT TO END.
+/* A WORD THIS PROGRAM'S ENVIRONMENT SETS WHEN SOMEBODY HAS ASKED IT TO END.
  * Zero until then, non-zero afterwards, and never cleared. Null where an
  * implementation does not claim KAL_PROCESS_PROP_STOP_REQUESTED.
  *
- * ⚠️ THIS IS NOT A SIGNAL INTERFACE, AND THE DIFFERENCE IS WHY IT CAN EXIST AT
+ * THIS IS NOT A SIGNAL INTERFACE, AND THE DIFFERENCE IS WHY IT CAN EXIST AT
  * ALL. Signals are one environment's mechanism: a numbered set, a disposition per
  * program, a handler that interrupts whatever was running. This system has them;
  * that one has console control events, which arrive on a NEW EXECUTION CONTEXT
@@ -277,7 +289,7 @@ void kal_process_close(struct kal_process);
  * specification targets have no processes to signal. An interface shaped like
  * signals would be the borrowed shape clause 7.1 names.
  *
- * ⭐ WHAT WAS ACTUALLY MISSING WAS ONE SENTENCE, and it is the only one of the
+ * WHAT WAS ACTUALLY MISSING WAS ONE SENTENCE, and it is the only one of the
  * uses of signals that this interface could not already express:
  *
  *     terminating a program            kal_process_terminate
@@ -296,17 +308,17 @@ void kal_process_close(struct kal_process);
  * specification already has, and which `openkal.timeout' already bounds. No new
  * concept, and none of the re-entrancy rules a handler forces on every caller.
  *
- * ⚠️ IT IS A NOTICE AND NOT A VETO. The program is told; whether it ends is its
+ * IT IS A NOTICE AND NOT A VETO. The program is told; whether it ends is its
  * own affair, and it may still be ended afterwards by something it cannot
  * observe --- which is true on every system this targets and is why the word says
  * "requested" rather than "will happen".
  *
- * ⚠️ IT DOES NOT SAY WHO ASKED, OR HOW. One word, because a program that is
+ * IT DOES NOT SAY WHO ASKED, OR HOW. One word, because a program that is
  * asked to end does the same thing whoever asked. An implementation that can
  * distinguish causes may add an enquiry later; this one does not need altering
  * for that.
  *
- * ⚠️ AND IT SAYS NOTHING ABOUT AN END THAT CANNOT BE OBSERVED. Where a program is
+ * AND IT SAYS NOTHING ABOUT AN END THAT CANNOT BE OBSERVED. Where a program is
  * ended outright --- the un-declinable signal here, the abrupt termination there,
  * `kal_process_job_terminate' through this interface --- nothing is set, because
  * nothing anywhere gets to notice. That symmetry is the reason this is
@@ -317,7 +329,7 @@ const kal_u32* kal_process_stop_requested(void);
  * a word of zero forms a new unit and receives its identity, and a word that
  * names one joins it.
  *
- * ⭐⭐ THE CALLER AND NOT A PROGRAM IT STARTS, WHICH IS THE WHOLE DIFFERENCE, and
+ * THE CALLER AND NOT A PROGRAM IT STARTS, WHICH IS THE WHOLE DIFFERENCE, and
  * `kal_spawn.job' alone could not express it.
  *
  * A C library above this interface answers `fork'. The copy then wishes to be
@@ -328,7 +340,7 @@ const kal_u32* kal_process_stop_requested(void);
  * learns, so the original's request to end that unit names one that does not
  * exist.
  *
- * ⚠️ THIS IS NOT THE MUTABLE AMBIENT STATE openkal DECLINES ELSEWHERE. A working
+ * THIS IS NOT THE MUTABLE AMBIENT STATE openkal DECLINES ELSEWHERE. A working
  * directory that can be changed is shared between execution contexts and is
  * refused for that reason. A unit is not shared and not read back: a program
  * states once which unit it belongs to, and the only thing that can be done with
@@ -344,7 +356,7 @@ int kal_process_job_enter(struct kal_job*);
  * background leaves nothing for a caller to terminate one at a time. */
 int kal_process_job_terminate(struct kal_job);
 
-/* Releases the caller's reference to a unit. ⚠️ IT DOES NOT END THE UNIT, and an
+/* Releases the caller's reference to a unit. IT DOES NOT END THE UNIT, and an
  * implementation must take care that it does not: this system's job objects can
  * be asked to end their members when the last handle closes, and one that asked
  * for that would make this operation mean something different here from what it

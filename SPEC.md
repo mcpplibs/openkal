@@ -1,4 +1,4 @@
-# openkal Specification, version 0.12
+# openkal Specification, version 0.13
 
 ## 1. Scope
 
@@ -50,7 +50,7 @@ provides an interface in whole or not at all.
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.12 specifies the core and optional interfaces. The reserved row is not
+Version 0.13 specifies the core and optional interfaces. The reserved row is not
 specified, and its name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -74,7 +74,7 @@ every other, and how its absence reaches a consumer is one of two things:
 | the implementation does not provide it at all | clause 6.1 — the definitions are absent, and a consumer that uses one fails to link |
 | the implementation provides it only to an artifact produced in a particular way | a feature of the implementation's package, resolved at dependency resolution — clause 6.5 |
 
-⚠️ There were three tiers, and the middle one said that an implementation
+There were three tiers, and the middle one said that an implementation
 *hosting a C library* provides `openkal.env`, `openkal.time`, `openkal.fs`,
 `openkal.process` and `openkal.task`. It was false, and falsified within this
 specification's own ecosystem: an implementation for a machine with firmware and
@@ -129,7 +129,7 @@ placed outside it costs a consumer one declared dependency. The first error is
 found late and by the wrong party; the second is found at dependency resolution
 and by the party that can act on it.
 
-⚠️ **What this closes is the set of INTERFACES.** `kal_version` and
+**What this closes is the set of INTERFACES.** `kal_version` and
 `kal_interfaces` are exported by every conforming implementation and belong to
 no interface: they provide no resource, and an implementation answers both with
 constants. They are the specification's own self-description, required by clause
@@ -147,7 +147,7 @@ not scale: the sets a program can be written against are not arbitrary subsets,
 and an ecosystem that could only enumerate them could not say "this package
 needs an environment of such-and-such a kind".
 
-⚠️ **The specification names no such set, and the one it did name has been
+**The specification names no such set, and the one it did name has been
 withdrawn.** Version 0.8 named `hosted` — the core interfaces together with
 `openkal.env`, `openkal.time`, `openkal.fs`, `openkal.process` and
 `openkal.task`. The name described a class of environment, and a name that
@@ -390,6 +390,29 @@ makes an addition to it the kind of change a reader is entitled to see argued.
 | `kal_err_is_directory` | A file operation applied to a directory. |
 | `kal_err_not_directory` | A directory operation applied to a file, and a component of a name that is not a directory. |
 
+Version 0.13 adds one value.
+
+| Value | Why the set could not express it |
+| --- | --- |
+| `kal_err_not_program` | A name that exists and may be started, and is not in a form the environment can start. Every environment has the condition natively (`ENOEXEC`, `ERROR_BAD_EXE_FORMAT`). Before this value an implementation reported it as `kal_err_io`, which states that a device failed when none did; a C library above could then not map the failure back to the condition its own callers act upon. Measured by a consumer: `posix_spawn` of such a file returned `EIO` above openkal and `ENOEXEC` on a host (issue 28). |
+
+**The criterion for adding a value.** The set is closed against implementations,
+which do not extend it; it is not closed against this specification, which adds
+to it under clause 8. A value is added only when both of the following hold, and
+the record of each addition states both:
+
+1. a caller acts differently upon the condition than upon every existing value,
+   so that folding it into an existing value leaves the caller wrong rather than
+   merely less informed; and
+2. every environment the specification targets has the condition natively, so
+   that the mapping is one arm of a table and not a classification an
+   implementation must construct (clause 7.1).
+
+A condition for which either is not established is recorded and not added. The
+failures of a network connection are such a case today: the three
+implementations report them differently, and no measurement yet establishes
+which distinctions a caller acts upon.
+
 The addition is governed by clause 8, which admits new declarations. A value
 already assigned retains its meaning, so a program compiled against version 0.4
 observes the same values for the same conditions as before.
@@ -422,6 +445,13 @@ The layout of every structure declared by this specification is frozen at
 version 0.3. The evolution rule of clause 8 admits new declarations and excludes
 changes to existing ones; a structure layout is not protected by that rule
 unless it is separately declared immutable, and it is so declared here.
+
+One structure is excepted, and the exception is stated in clause 4.2:
+`kal_node_info` carries `self_size`, and fields may be appended to it. An
+appended field does not move a field that exists, and an implementation writes
+no more of the structure than the caller's `self_size` states. Version 0.13
+appends `executable` and a reserved field that keeps the size a multiple of
+eight on every target.
 
 ### 5.4 The interface names its own types and no others
 
@@ -617,7 +647,7 @@ how the artifact is produced is not reported at run time.** Reporting it at run
 time would make every caller carry a path that most artifacts never take — and
 a path no artifact takes is a path nothing has verified.
 
-⚠️ **The rule holds where the artifact is produced for its own environment, and
+**The rule holds where the artifact is produced for its own environment, and
 inverts where it is not.** An artifact that is distributed is produced once, by
 a party that decided for every environment it will meet, possibly long before
 and for a different system; the consumer resolves nothing. So availability
@@ -641,6 +671,14 @@ An implementation shall permit concurrent operations upon distinct handles.
 Concurrent operations upon one handle shall not damage the implementation's own
 state. The order in which they take effect, and whether the bytes of one
 transfer may be separated by those of another, are unspecified.
+
+That permission concerns operations competing for one direction of a resource.
+A resource with two independent directions is not a resource with one:
+`openkal.net` states that a transfer waiting in one direction of a connection
+shall not delay a transfer in the other or a half-closure, and `openkal.datagram`
+states the same of sending and receiving (version 0.13). Without that statement
+an implementation that serialised every operation upon a socket conformed, and a
+full-duplex protocol above it waited for ever.
 
 Atomicity below a threshold, which some systems guarantee for some resources, is
 not required. It is not universally implementable, and requiring it would oblige
@@ -926,7 +964,7 @@ the specification package shall verify the third.
    same type on one target and different types on another, which is the whole
    subject of clause 5.4.
 
-   ⚠️ A check that reports conformance by finding nothing reports it identically
+   A check that reports conformance by finding nothing reports it identically
    when it has read nothing. The procedure therefore establishes that the
    declarations were parsed before it is permitted to report success, and the
    specification package demonstrates that the check fails when an excluded type
@@ -986,7 +1024,7 @@ The following are recorded so that they are not mistaken for oversights.
    permission presupposes an identity, and the environments this specification
    targets do not agree that one exists.
 
-   ⭐ **And what a program should write instead, which was not recorded and is
+   **And what a program should write instead, which was not recorded and is
    now.** A program that means "only I may read this" is stating it in a
    vocabulary this environment does not have. It has three answers, and none of
    them is a mode:
@@ -998,14 +1036,24 @@ The following are recorded so that they are not mistaken for oversights.
      others do not have;
    - against a location the program does not trust, it encrypts the contents.
 
-   ⚠️ The measurement that settles the alternative: a mode word is not stored by
+   The measurement that settles the alternative: a mode word is not stored by
    several filesystems a hosted implementation will meet, and on such a volume
    `chmod` **reports success and changes nothing**, which is the outcome this
    specification exists to refuse. `kal_node_info.writable` — one boolean — is
    not a simplification of a mode word; it is the intersection of what those
    formats store.
 
-7. **Creation and reading of links.** ⚠️ **Settled in 0.9.** `kal_fs_link_create`
+   **Whether a node may be started is not a permission, and version 0.13 defines
+   it.** `KAL_INFO_EXECUTABLE` and `kal_fs_set_executable_at` record one property
+   of a node, and the property presupposes no principal: a volume that stores it
+   stores it once for the node. It satisfies the criteria this entry applies to a
+   mode word, which the mode word fails. It is answered per volume by
+   `kal_fs_props`, so a volume that does not store it is asked before it is
+   written to, and an operation upon one refuses rather than reporting success
+   and changing nothing. What remains undefined is every distinction between
+   classes of caller, which is the part that presupposes an identity.
+
+7. **Creation and reading of links.** **Settled in 0.9.** `kal_fs_link_create`
    and `kal_fs_link_read` are operations of `openkal.fs`, and they are operations
    of it rather than an interface of their own for exactly the reason this entry
    used to give: whether a volume has such nodes is a property of the format and
@@ -1034,7 +1082,7 @@ The following are recorded so that they are not mistaken for oversights.
    defined by this version. It is the question `openkal.space` reaches first and
    is not peculiar to it.
 
-   ⭐ **What this costs, named in 0.12 because an implementation paid it.** A
+   **What this costs, named in 0.12 because an implementation paid it.** A
    unit is established by whoever starts a program, at the moment of starting it:
    `kal_spawn.job` is where a caller says which unit a started program belongs
    to, and the implementation performs the placement. It follows that a program
@@ -1045,7 +1093,7 @@ The following are recorded so that they are not mistaken for oversights.
    unit of its own, then signal that unit from the original — has no closure
    here, and this is the reason rather than an omission.
 
-   ⚠️ **The failure this produces is not a refusal, which is why it is recorded.**
+   **The failure this produces is not a refusal, which is why it is recorded.**
    An implementation that meets the dead end is invited to reach for the nearest
    unit it *can* name, which is its own; openkal-musl 0.12.0 did exactly that,
    and every negative identifier that matched no child named the caller's own
@@ -1054,30 +1102,30 @@ The following are recorded so that they are not mistaken for oversights.
    that does work is the one this entry began with: start the program with
    `kal_spawn.job`, where the unit and the caller that knows its name are on the
    same side of the boundary.
-10. **Exclusion upon a range of a file.** ⚠️ **Settled in 0.10.** `kal_fs_lock`
+10. **Exclusion upon a range of a file.** **Settled in 0.10.** `kal_fs_lock`
     and `kal_fs_unlock` are operations of `openkal.fs`, admitted on exactly the
     grounds entry 7 records for links: whether a *volume* can exclude is a
     property of the format rather than of the environment, so `kal_fs_props`
     answers it and a caller asks before it calls.
 
-    ⭐ **And this one is the opposite of entry 6, which is why the two are next
+    **And this one is the opposite of entry 6, which is why the two are next
     to each other.** Permission was declined because the environments do not
     agree that an identity exists. Every environment this specification targets
     locks a byte range, and spells it almost identically. What was missing was a
     word, not a capability.
 
-    ⚠️ **What its absence cost, and it was not a refusal.** A C library above
+    **What its absence cost, and it was not a refusal.** A C library above
     this interface answers `fcntl(F_SETLK)`. With nothing here to answer it
     with, one returned success and took no lock — **two programs held one
     exclusive lock and neither could find out**. Measured against a host. This
     entry exists so that "a specification with no operation for X" is not
     mistaken for "consumers of it will simply not do X".
 
-    ⭐ **Release upon the holder's end is required rather than observed**, and
+    **Release upon the holder's end is required rather than observed**, and
     that requirement is the whole reason the operation cannot be composed above
     the line: a caller can build exclusion out of `KAL_OPEN_EXCLUSIVE` and a
     name, and nothing then releases that name when its holder dies.
-11. **A started program that does not outlive its caller.** ⚠️ **Settled in
+11. **A started program that does not outlive its caller.** **Settled in
     0.10** as `kal_process_spawn_bound`, **and respelled in 0.11** as
     `KAL_SPAWN_BOUND_LIFETIME` — see entry 14.
 
@@ -1087,20 +1135,20 @@ The following are recorded so that they are not mistaken for oversights.
     where a system with the operation has two: the caller, a copy that waits,
     and the program.
 
-    ⚠️ **A signal reaches the middle one.** `kal_process_terminate` upon the
+    **A signal reaches the middle one.** `kal_process_terminate` upon the
     identifier the caller holds terminates the waiter; measured with a host as
     control, the caller is told the program died on the signal it sent while the
     program runs to completion, unsupervised. The termination operation was not
     at fault — it was asked to terminate one started program and did. What was
     missing was a way to *say* the thing `execve` means.
-12. **How many contexts run at once.** ⚠️ **Settled in 0.10.**
+12. **How many contexts run at once.** **Settled in 0.10.**
     `kal_task_parallelism`. `KAL_TASK_PROP_PARALLEL` says *whether* and not *how
     many*, and a C library above had nowhere else to look: `hardware_concurrency`
     answered 1 with no error, so a program sizing a pool of workers got one
-    worker and no way to know. ⭐ Zero means "cannot say" and is distinct from
+    worker and no way to know. Zero means "cannot say" and is distinct from
     one, because an environment with one processor and an environment that will
     not answer call for different behaviour.
-13. **The time of a name, and the size of a volume.** ⚠️ **Settled in 0.10.**
+13. **The time of a name, and the size of a volume.** **Settled in 0.10.**
     `kal_fs_set_modified_at` and `kal_fs_capacity`. The first exists because
     `kal_fs_set_modified` is stated on an open *file* while a directory is
     opened as a `kal_dir` — so this interface had no route to a directory's time
@@ -1113,18 +1161,18 @@ The following are recorded so that they are not mistaken for oversights.
     interface rather than in `openkal.space`: how much room a volume has is a
     property of the *names* a caller can already reach, not of the memory a
     program runs in. A C library above answers `statvfs`, and with nothing here
-    to answer it with it reported a fixed number — ⚠️ **which is worse than
+    to answer it with it reported a fixed number — **which is worse than
     refusing, because a program that checks for room before writing was told
     there was room.**
 
-    ⭐ It answers bytes and not blocks, and that is the whole of the design
+    It answers bytes and not blocks, and that is the whole of the design
     decision. Every environment this specification targets states a block count
     and a block size, in units of its own choosing, and every one of them
     differs; a caller wanting bytes multiplies two numbers whose meaning it must
     first look up. Bytes are what the caller is deciding about, so bytes are
     what this returns and the multiplication happens once, in the
     implementation, where the units are known.
-14. **Starting a program was becoming a family, and 0.11 stopped it.** ⚠️ **This
+14. **Starting a program was becoming a family, and 0.11 stopped it.** **This
     is the first entry that records a REMOVAL**, and it is recorded here for the
     same reason the additions are: so that the next reader meets the reasoning in
     the specification rather than in a diff.
@@ -1135,7 +1183,7 @@ The following are recorded so that they are not mistaken for oversights.
     spelled apart for exactly one reason: clause 8 forbids adding an argument to
     a declaration that exists, so each modifier had to arrive as a new name.
 
-    ⭐ **The 0.10 text on `..._bound` predicted where that ends, in terms**:
+    **The 0.10 text on `..._bound` predicted where that ends, in terms**:
     "Declaring every combination is how an interface acquires four spawns and
     then eight." Two more modifiers then arrived together — the directory a
     program runs in, and terminating what a started program itself started — and
@@ -1153,20 +1201,20 @@ The following are recorded so that they are not mistaken for oversights.
     different arity, different types — which is the loud failure and not the
     quiet one.
 
-    ⚠️ **What this costs, stated rather than glossed.** `struct kal_spawn` is
+    **What this costs, stated rather than glossed.** `struct kal_spawn` is
     frozen by clause 5.3, so a future modifier that carries a *parameter* rather
     than a flag cannot be added to it and will need its own declaration after
     all. This entry does not claim to have solved that; it claims that one
     general form plus a flag word is a better place to meet the problem than
     sixteen names, and that the modifiers wanted so far are all flags.
 
-    ⚠️ **And clause 8 was set aside to do it**, deliberately and once. Clause 8
+    **And clause 8 was set aside to do it**, deliberately and once. Clause 8
     exists to protect written code, and 0.11 is the last version at which there
     is none to protect. An equivalent change after this specification has
     consumers is not permitted by clause 8 and this entry is not a precedent for
     one.
 15. **`KAL_SPAWN_OWN_JOB` has a shape borrowed from one environment, and clause
-    7.1 is what says so.** ⚠️ **Open, and recorded before it is settled** — because
+    7.1 is what says so.** **Open, and recorded before it is settled** — because
     the flag ships in 0.11 with one implementation refusing it, and a reader is
     owed the reason.
 
@@ -1176,13 +1224,13 @@ The following are recorded so that they are not mistaken for oversights.
     equal to its own, so `getpgid(pid) == pid` **recovers the association from
     the kernel**.
 
-    ⚠️ **openkal-windows cannot recover it.** It can form the unit — a job object
+    **openkal-windows cannot recover it.** It can form the unit — a job object
     is exactly this — but there is no call there that answers "which job is this
     process in" with a handle, and `kal_process` is one word already holding the
     process. Satisfying the flag would require a registry keyed by process
     handle.
 
-    ⭐ **Clause 7.1 states the consequence mechanically**: an implementation that
+    **Clause 7.1 states the consequence mechanically**: an implementation that
     must maintain a translation table, a registry, or a name resolver in order to
     satisfy this specification indicates that the specification has taken a shape
     borrowed from one environment, **and the shape is at fault rather than the
@@ -1192,8 +1240,43 @@ The following are recorded so that they are not mistaken for oversights.
 
     ⇒ **The natural shape makes the unit a resource the caller holds**, created
     before its members and terminated as a unit, so that nothing has to be
-    recovered on either kind of system. ⚠️ It is not settled here because the two
+    recovered on either kind of system. It is not settled here because the two
     kinds of system create such a unit differently — Windows makes it externally
     and assigns members, while a process group is made by a member from inside —
     and a shape that is natural to one and not the other is the same defect
     again, spelled the other way round.
+16. **A node that may be started, and a start that could not happen.** Settled
+    in 0.13. Two consumers of openkal-musl met the same gap from its two sides.
+    A packaging tool that unpacks a program could not leave the result startable,
+    and a C library could not report why a start failed: `ENOEXEC` arrived above
+    the interface as `kal_err_io`. The first is answered by
+    `KAL_INFO_EXECUTABLE`, `KAL_FS_PROP_EXECUTABLE` and
+    `kal_fs_set_executable_at` (entry 6 states why this is not a permission); the
+    second by `kal_err_not_program` (clause 5.2 states the criterion it meets).
+
+    The same examination found that one implementation reported `kal_ok` and a
+    handle for a start that did not happen, including for a name that does not
+    exist. `kal_process_spawn` now states that a start that did not happen is
+    reported, and the conformance suite observes it with a name that does not
+    exist, which requires no file to be created.
+17. **Two directions of one resource.** Settled in 0.13; see clause 6.6. The
+    conformance suite observes it with two contexts and a bound, so that an
+    implementation that serialises the directions is reported rather than left
+    waiting.
+18. **A stream at an arbitrary position of a started program.** Considered in
+    0.13 and not defined. A started program receives three streams, and a
+    descriptor at any other position is not conveyed. A position is the shape of
+    one environment's descriptor table (clause 7.1): another environment conveys
+    handles to a started program as a list of values and has no positions, and a
+    started program would still need to be told where to look. Were the need
+    measured, the shape consistent with this specification is the one
+    `kal_preopen` has, a named grant rather than a numbered position. No
+    consumer is silently wrong today: openkal-musl refuses the placement it
+    cannot express.
+19. **A stream handle of zero.** Recorded at `kal_spawn_streams` in 0.12 and not
+    changed in 0.13. Zero denotes inheritance there and is a valid stream on an
+    implementation whose streams are descriptors. The specification permits an
+    implementation to remove the ambiguity by never answering a stream enquiry
+    with zero and does not require it; a caller that cannot tolerate the
+    ambiguity reports the request as unsupported, which is what openkal-musl
+    does.

@@ -75,7 +75,7 @@ extern "C" {
  * withholding nothing: a caller cannot observe which of the two occurred, and
  * has no decision resting upon it.
  *
- * ⭐ `entry' IS AN ADDRESS AT WHICH A CONTEXT BEGINS, NOT A FUNCTION THAT IS
+ * `entry' IS AN ADDRESS AT WHICH A CONTEXT BEGINS, NOT A FUNCTION THAT IS
  * CALLED. NO RETURN ADDRESS EXISTS: the started context stands at the top of a
  * stack with nothing beneath it, and returning from `entry' ends the context
  * with a status saying that it returned rather than choosing one. This was

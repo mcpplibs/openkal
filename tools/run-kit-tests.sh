@@ -56,7 +56,7 @@ sed -i.bak -E "s|^${package} = \{ version = \"[^\"]*\"(.*)$|${package} = { path 
     "$kit/mcpp.toml"
 rm -f "$kit/mcpp.toml.bak"
 
-# ⚠️ AND THE KIT REACHES THE SPECIFICATION BY VERSION TOO, WHICH IT DID NOT USED
+# AND THE KIT REACHES THE SPECIFICATION BY VERSION TOO, WHICH IT DID NOT USED
 # TO. While that line read `path = ".."` it already named this working tree and
 # needed no substitution. It now names a published version --- because a path
 # there made the package unusable alongside any implementation --- so without
@@ -66,7 +66,7 @@ rm -f "$kit/mcpp.toml.bak"
 sed -i.bak -E "s|^openkal = .*$|openkal = { path = \"$here_native\" }|" "$kit/mcpp.toml"
 rm -f "$kit/mcpp.toml.bak"
 
-# ⚠️ ASSERTED RATHER THAN ASSUMED. A substitution that matched nothing leaves the
+# ASSERTED RATHER THAN ASSUMED. A substitution that matched nothing leaves the
 # manifest naming a version, the resolver fetches a published implementation, and
 # the run reports on that one while appearing to report on this branch.
 grep -q "path = \"$impl_native\"" "$kit/mcpp.toml" \

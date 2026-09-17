@@ -1,4 +1,4 @@
-# The C surface of openkal 0.11, one name per line.
+# The C surface of openkal 0.13, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -70,6 +70,7 @@ kal_fs_props
 kal_fs_remove
 kal_fs_rename
 kal_fs_seek
+kal_fs_set_executable_at
 kal_fs_set_modified
 kal_fs_set_modified_at
 kal_fs_stream

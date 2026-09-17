@@ -50,16 +50,16 @@ than a function, so a module reported as *n−1 / n* is complete.
 
 | interface | linux | macos | windows | opensbi | uefi |
 | --- | :-: | :-: | :-: | :-: | :-: |
-| abort, memory, stream | ✅ | ✅ | ✅ | ✅ | ✅ |
-| env, time | ✅ | ✅ | ✅ | ✅ | — |
-| fs, process, task, random, terminal | ✅ | ✅ | ✅ | — | — |
-| **net** | ✅ | **—** | **—** | — | — |
-| **datagram** | ✅ | **—** | **—** | — | — |
-| **timeout** | ✅ | **—** | **—** | — | — |
-| **exec** | ✅ | **—** | **—** | — | — |
-| **space** | ✅ | **—** | **—** | — | — |
+| abort, memory, stream | yes | | yes | | yes |
+| env, time | yes | | yes | | — |
+| fs, process, task, random, terminal | yes | | yes | — | — |
+| **net** | yes | **—** | **—** | — | — |
+| **datagram** | yes | **—** | **—** | — | — |
+| **timeout** | yes | **—** | **—** | — | — |
+| **exec** | yes | **—** | **—** | — | — |
+| **space** | yes | **—** | **—** | — | — |
 
-⭐ **THE FIVE INTERFACES 0.8 ADDED EXIST ONLY ON LINUX.** macos and windows
+**THE FIVE INTERFACES 0.8 ADDED EXIST ONLY ON LINUX.** macos and windows
 decline them in whole, which clause 3 permits and clause 6.1 makes honest — a
 program that uses one fails at the link, naming the operation. But it means any
 capability built upon them is a Linux capability until those two move.
@@ -71,9 +71,9 @@ name:
 
 | surface | routed | note |
 | --- | :-: | --- |
-| `pipe`, `pipe2` | ✅ | `kal_process_channel`, weak reference tested before call |
-| `copy_file_range` | ✅ | |
-| `execve`, `wait4`, `readlink`, `getdents64`, `dup`, `dup3`, `kill` | ✅ | |
+| `pipe`, `pipe2` | yes | `kal_process_channel`, weak reference tested before call |
+| `copy_file_range` | yes | |
+| `execve`, `wait4`, `readlink`, `getdents64`, `dup`, `dup3`, `kill` | yes | |
 | `socket`, `bind`, `listen`, `accept`, `connect` | **0** | falls to `default:` → `-ENOSYS` |
 | `clone`, `fork` | **0** | `musl/src/thread/clone.c` excluded |
 | `chmod`, `fchmod`, `fchmodat` | **0** | |
@@ -118,7 +118,7 @@ That is fork's semantics. The atom exists, and openkal-linux implements it. What
 does not exist is the *route*: `musl/src/thread/clone.c` is excluded and no
 `SYS_clone` case is present.
 
-⚠️ The distinction that survives is narrower and still matters. `fork()` returns
+The distinction that survives is narrower and still matters. `fork()` returns
 twice at the call site; `kal_space_start` begins the copy at an entry function.
 Section 4.2 addresses what follows from that.
 
@@ -164,7 +164,7 @@ reports' items into them:
 | `shutdown` | `kal_net_shutdown` |
 | UDP, whole surface | `kal_datagram_open/send_to/recv_from/local/close` |
 
-⚠️ **BSD SEPARATES `socket()` FROM `connect()`/`bind()`; openkal DOES NOT.**
+**BSD SEPARATES `socket()` FROM `connect()`/`bind()`; openkal DOES NOT.**
 `kal_net_connect` produces a connection; there is no unbound socket. The port
 must therefore hold a descriptor in a *pending* state carrying domain, type and
 protocol, and perform the atom at `connect`, or at `listen` after `bind` has
@@ -201,7 +201,7 @@ Two candidate designs, and the choice should be made deliberately:
    consistently; everything that spawns a subprocess goes through 4.1. Cost:
    programs that call `fork()` directly do not run.
 
-⭐ Option 2 is the smaller step and covers the reported workload. Option 1 is
+Option 2 is the smaller step and covers the reported workload. Option 1 is
 the complete one. They are not exclusive — 2 can ship first and 1 later, and
 neither changes the specification.
 
@@ -221,7 +221,7 @@ So `chmod(path, 0600)` cannot be honoured. Three answers, in decreasing honesty:
    processes it does not.
 3. Ask the specification for a permission atom (see 4.4).
 
-⚠️ Option 2 is the one that silently lies, and it is also the one that makes the
+Option 2 is the one that silently lies, and it is also the one that makes the
 most tests pass. It should not be chosen without saying so in the port's own
 source.
 
@@ -232,7 +232,7 @@ it has is an acknowledgement that links exist: `kal_node_link` as a node kind
 and `KAL_FS_PROP_LINKS` as a property word. An implementation can therefore
 *report* a link it encounters and cannot *make* one.
 
-⭐ That asymmetry is itself a finding. A property word declaring support for a
+That asymmetry is itself a finding. A property word declaring support for a
 thing the interface offers no operation upon is a promise with no way to keep
 it — the shape this ecosystem has recorded before as a specification's silence
 being invisible from inside the specification.
@@ -289,7 +289,7 @@ which preserves the compiler-rt case and releases the name to consumers.
 New descriptor kinds beside the existing `OKM_STREAM / OKM_CHANNEL / OKM_FILE /
 OKM_DIR`: a pending socket, a connection, a listener, a datagram endpoint.
 
-⚠️ **EVERY NEW ROUTE MUST TAKE A WEAK REFERENCE AND TEST IT BEFORE CALLING**,
+**EVERY NEW ROUTE MUST TAKE A WEAK REFERENCE AND TEST IT BEFORE CALLING**,
 as `kal_process_channel` already does (`if (!kal_process_channel) return
 -ENOSYS;`). `openkal.net` is optional; a strong reference would turn "this
 backend declines the interface" into "this program does not link", making an
@@ -307,9 +307,9 @@ They implement ten of fifteen interfaces. The five they decline are the five
 | datagram | as above | as above |
 | timeout | `poll` with a deadline; `SO_RCVTIMEO` | `WSAPoll`, overlapped I/O |
 | exec | `mmap(MAP_JIT)` + `pthread_jit_write_protect_np` | `VirtualAlloc` + `FlushInstructionCache` |
-| space | ⚠️ macOS: `fork` exists but is unsafe after threads; Windows: no equivalent | see below |
+| space | macOS: `fork` exists but is unsafe after threads; Windows: no equivalent | see below |
 
-⭐ **`openkal.space` ON WINDOWS IS THE ONE THAT MAY HAVE TO STAY DECLINED**, and
+**`openkal.space` ON WINDOWS IS THE ONE THAT MAY HAVE TO STAY DECLINED**, and
 declining it is a legitimate outcome rather than a failure: clause 3 says in
 whole or not at all, and clause 6.1 makes the absence a link error naming
 `kal_space_start`. The design should not invent a fake.
@@ -340,7 +340,7 @@ when 4.3 and 4.4 are answered; `<random>` is already answered. No change is
 needed in this repository for section 4.1 — the C++ layer reaches sockets
 through the C library, not directly.
 
-⚠️ One item does belong here: the bare-metal row excludes
+One item does belong here: the bare-metal row excludes
 `libcxx/src/filesystem/*.cpp` while the hosted rows build it. If the hosted
 rows are to report a *complete* `std::filesystem`, the exclusions and the
 `__config_site` switches must be read against each other once more, in the way
@@ -372,7 +372,7 @@ the port is the honest answer, and clause 6.3 is where the reasoning belongs.
 5. **0.9 symlink atoms, if accepted** — last, because it moves the specification
    and therefore every backend.
 
-⚠️ Steps 2 and 3 are independent and can proceed in parallel. Step 3 is the
+Steps 2 and 3 are independent and can proceed in parallel. Step 3 is the
 larger effort and the one that decides whether this ecosystem's story is "POSIX
 programs run on Linux" or "POSIX programs run".
 
@@ -391,7 +391,7 @@ Each step is judged by a reading, not by a green run:
 | declines | a program using a declined interface fails at the **link**, naming the operation — never at runtime, never silently |
 | every new route | with the backend's interface absent, the call returns `-ENOSYS` rather than jumping through a null pointer |
 
-⚠️ The last row is the one the report `openkal-linux#13` raised directly: a stub
+The last row is the one the report `openkal-linux#13` raised directly: a stub
 that is a null pointer produces `PC=0` with an empty backtrace, which names
 nothing. A guarded weak reference returning `-ENOSYS` is the difference between
 a program that fails and a program that cannot say why.
@@ -427,7 +427,7 @@ The four decisions of section 8, settled:
 
 ### 9.1 Five things this document got wrong
 
-⚠️ **`posix_spawn` was never missing.** §4.1 says
+**`posix_spawn` was never missing.** §4.1 says
 `musl/src/process/posix_spawn.c` is excluded and that a port implementation
 would restore `posix_spawn`, `system` and `popen`. The exclusion is real and the
 conclusion was not: `port/src/okm_spawn.c` has *replaced* that source since the
@@ -435,7 +435,7 @@ port was written, and `system` and `popen` work through it. Measured:
 `system("exit 5")` returns an exit status of 5, `popen` carries a line back.
 What was missing was a criterion, not a capability — `examples/subprocess` is it.
 
-⚠️⚠️ **`timeout_ns = 0` does not mean "do not wait".** §4.1 says `O_NONBLOCK`
+**`timeout_ns = 0` does not mean "do not wait".** §4.1 says `O_NONBLOCK`
 and a zero `poll` timeout are "expressible with `kal_timeout_*` at
 `timeout_ns = 0`". They are the *opposite*: `timeout.h` defines zero as **no
 bound**, following `kal_task_wait`. Passing a caller's zero straight through
@@ -443,12 +443,12 @@ turns the one call that must not wait into the one that never returns —
 measured, as a hang, four lines into the network probe. The smallest bound is
 `1`, which the environment rounds up to its own granularity.
 
-⚠️ **`SYS_clone` is not the only number `fork` arrives through.** musl's `_Fork`
+**`SYS_clone` is not the only number `fork` arrives through.** musl's `_Fork`
 issues `SYS_fork` where the architecture has it and `SYS_clone` where it does
 not, so a dispatcher implementing only the second is reached on aarch64 and
 riscv64 and never on x86_64.
 
-⚠️ **The macOS row's `exec` is not the clause 6.5 case.** §5.2 gives
+**The macOS row's `exec` is not the clause 6.5 case.** §5.2 gives
 `mmap(MAP_JIT)` + `pthread_jit_write_protect_np`. That pair is what a program
 needs for memory writable and executable *at the same time*, which
 `openkal.exec` does not offer: a region is writable, then published, then
@@ -456,7 +456,7 @@ executable, and never both. The implementation is the ordinary `mmap` +
 `mprotect`, and the conformance suite calls the published region, so the reading
 is settled by the system rather than by the argument.
 
-⚠️ **`SO_REUSEADDR` is not the same option on all three systems.** On Linux and
+**`SO_REUSEADDR` is not the same option on all three systems.** On Linux and
 macOS it permits a listener whose predecessor is lingering; on Windows it
 permits two listeners on one address at once. openkal-windows therefore does not
 set it, and setting it "for symmetry" would have made that implementation behave
@@ -467,7 +467,7 @@ differently while looking the same.
 Every one of these was invisible on the machine the work was done on, and each
 names a different kind of blindness.
 
-**⚠️⚠️ The symbol namespace is shared across the layer boundary.** Winsock
+**The symbol namespace is shared across the layer boundary.** Winsock
 exports the *BSD names* — `bind`, `listen`, `accept`, `connect` — and so does
 the C library above it: openkal-musl compiles musl's own `src/network/*.c`,
 which define those names and route them through the port. Naming `-lws2_32` on
@@ -476,7 +476,7 @@ ordering problem: an import library's member defines the thunk *and* the
 `__imp_` pointer together. The remedy is to resolve the library at run time, so
 that nothing of it enters the program's symbol table.
 
-**⚠️⚠️ `kal_task_current()` is not stable across a copy of the address space,
+**`kal_task_current()` is not stable across a copy of the address space,
 and nothing ever said it was.** openkal-musl keeps its per-context state in a
 table keyed on that identity. openkal-linux caches `gettid` in a thread-local,
 so the *copy of the cache* answers the parent's value and the lookup works;
@@ -485,27 +485,27 @@ the table has never seen. The second is the honest answer to the question the
 interface asks. The assumption was the port's, and the started context now
 rebinds its slot before anything reads per-context state.
 
-**⚠️ `__builtin___clear_cache` is a call, not an inline sequence.** On aarch64
+**`__builtin___clear_cache` is a call, not an inline sequence.** On aarch64
 and riscv64 it becomes `___clear_cache` / `__riscv_flush_icache` in the
 compiler's support library — a dependency a package asserting "no C runtime
 symbol" may not acquire. §9.1's fourth item was written before this was
 measured; openkal-macos added the builtin and its own independence check
 reported it within the hour.
 
-**⚠️ A bounded wait must answer with the set the interface defines for it.**
+**A bounded wait must answer with the set the interface defines for it.**
 openkal-windows returned an error belonging to the *resource* where
 `openkal.timeout` defines one for the *wait*, and the conformance suite reported
 it — the second time on one runner out of three, because Wine chooses a
 different error for the same condition. An error of the resource is the
 transfer's to report, and the transfer follows the wait.
 
-**⚠️ The conformance suite was written against two compilers of three.**
+**The conformance suite was written against two compilers of three.**
 `__builtin___clear_cache` and `__builtin_memcpy` are not MSVC's, and the first
 run in which anything selected the `exec` section is the run that found it.
 
 ### 9.2 One thing neither this document nor anything else had noticed
 
-⚠️⚠️ **No continuous integration anywhere selected the interfaces this document
+**No continuous integration anywhere selected the interfaces this document
 is about.** Every backend ran the conformance suite as `full`, which expands to
 `standard,abi,stability,cost` — and `standard` is the *hosted* set. The five
 interfaces 0.8 added are in `optional`. So every one of their sections was
@@ -529,7 +529,7 @@ openkal-macos the same; openkal-windows enumerates the six it provides, because
 | the five interfaces examined rather than skipped | every backend's conformance run |
 | the **published** packages resolved, built and run | `openkal/tools/sandbox-closure.sh`, which is the only thing in this ecosystem that resolves a published package |
 
-⚠️ The weak-reference check found two apparent failures on its first run, and
+The weak-reference check found two apparent failures on its first run, and
 both were the check's fault: a search under `target/` reaches the *dependency's*
 objects, where openkal-linux's `kal_timeout_accept` refers to its own
 `kal_net_accept` strongly — which is correct for an implementation and says
