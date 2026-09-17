@@ -79,8 +79,9 @@ struct kal_node_info {
  * sixty-four bit target that nothing in the structure needs: the size of a
  * structure is not a pointer, and thirty-two positions is more than this
  * enquiry will assign. The layout is consequently fifty-six bytes on both
- * widths (forty-eight before version 0.13 appended `executable'), and a consumer and an implementation built for different widths of
- * the same target agree on where each field is. A word of positions that is
+ * widths (forty-eight before version 0.13 appended `executable'), and a
+ * consumer and an implementation built for different widths of the same target
+ * agree on where each field is. A word of positions that is
  * only ever RETURNED --- every `kal_<interface>_props' --- keeps the machine
  * word, because a register has no layout to freeze. */
 
