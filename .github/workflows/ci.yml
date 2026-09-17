@@ -273,9 +273,12 @@ jobs:
           static_assert(__builtin_offsetof(kal_node_info, identity)    == 24);
           static_assert(__builtin_offsetof(kal_node_info, kind)        == 40);
           static_assert(__builtin_offsetof(kal_node_info, writable)    == 44);
+          // Appended in 0.13, past the end of what existed.
+          static_assert(__builtin_offsetof(kal_node_info, executable)  == 48);
+          static_assert(__builtin_offsetof(kal_node_info, reserved)    == 52);
           // The same at both pointer widths, which is the property this
           // 32-bit row exists to observe: no field of it is pointer-sized.
-          static_assert(sizeof(kal_node_info) == 48);
+          static_assert(sizeof(kal_node_info) == 56);
           static_assert(sizeof(kal_dir)  == sizeof(kal_uintptr));
           static_assert(sizeof(kal_file) == sizeof(kal_uintptr));
           // A transfer is one signed word, and a signed word is a pointer's
