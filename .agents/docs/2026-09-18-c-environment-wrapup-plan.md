@@ -342,15 +342,15 @@ Older engines silently misbuild them. Upgrade: `xlings install mcpp --force`.
 ### 阶段 B — 包 PR 转绿后的 merge + tag + 镜像
 
 **用户操作**：
-7. 合 `openkal-musl#37`，tag `0.15.0`，`gtc release` 到 GitCode `mcpp-res/openkal-musl`
-8. 合 `openkal-llvm-runtime#24`，tag `0.11.0`，`gtc release` 到 GitCode `mcpp-res/openkal-llvm-runtime`（**注意**：llvm-rt PR-CI 在 Windows host reach job 上会红——这是 §6 已记录限制，不是 c-environment 回归；用户拍板时按"c-environment 相关全绿"判定，不要求该 job 绿）
+7. 合 `openkal-musl#37`，tag `0.15.0`，`gtc release` 到 GitCode `mcpp-res/openkal-musl` —— **待用户拍板**
+8. 合 `openkal-llvm-runtime#24`，tag `0.11.0`，`gtc release` 到 GitCode `mcpp-res/openkal-llvm-runtime`（**注意**：llvm-rt PR-CI 在 Windows host reach job 上会红——这是 §6 已记录限制，不是 c-environment 回归；用户拍板时按"c-environment 相关全绿"判定，不要求该 job 绿）—— **待用户拍板**
 
 **AI 立即执行**（拿到 sha256 后）：
-9. 回填 `.agents/docs/2026-09-18-c-environment-record.md` §2 的 sha256 —— **完成**（07:48 UTC）
-10. 回退 `docs(record): add the Windows host × freestanding c-abi probe to the limits`（commit f9bb1b5）——真实修复已让 §F 关闭，限制行不再需要
-11. 跑 `2026-09-18-c-environment-verify.sh`（B1）——沙箱验证
-12. 触发 `mcpplibs/mcpp-index#439` 的 measure job 重测（B2）
-13. 回填 §4 沙箱段与 §4 兼容测量段
+9. 回填 `.agents/docs/2026-09-18-c-environment-record.md` §2 的 sha256 —— **完成**（commit `6e295f7`，07:48 UTC）
+10. 回退 `docs(record): add the Windows host × freestanding c-abi probe to the limits`（commit f9bb1b5）——真实修复已让 §F 关闭，限制行不再需要 —— **完成**（commit `7234676`，含 §F 行删除 + §6/§9 对齐）
+11. 跑 `2026-09-18-c-environment-verify.sh`（B1）——沙箱验证 —— **部分跑**（commit `cfc81db`，08:51 UTC，A 段 PASS，B/C/D/E 段 NOT-RUN，gated on 用户拍板 merge+tag+gtc release）
+12. 触发 `mcpplibs/mcpp-index#439` 的 measure job 重测（B2）—— **未做**（gated on #439 merge 后重跑 measure job）
+13. 回填 §4 沙箱段与 §4 兼容测量段 —— **沙箱段已填**（commit `cfc81db`），**兼容测量段未填**（gated on B2）
 
 ### 阶段 C — 索引落地
 
