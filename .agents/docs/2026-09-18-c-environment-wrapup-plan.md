@@ -71,7 +71,7 @@
 
 A1 / A2 / A3 / A4 / B3 / E1 均已在现有分支落地并推送；CI 状态见 §0 表。
 
-### 3.2 §F 处置：三次尝试均失败，需要 mcpp 引擎侧修复
+### 3.2 §F 处置：四条包层路径均失败，需要 mcpp 引擎侧修复
 
 §F 是 openkal-llvm-runtime#24 的 **Windows host × riscv64-none-elf** c-abi 探针失败：
 
@@ -81,54 +81,48 @@ error: the C library's [c-abi] declaration does not match what the compiler actu
          _WIN32                   declared undefined  measured defined
 ```
 
-用户明确要求"不要 workaround，要真实 CI pass"。在不动 mcpp 引擎的前提下试过三条路径，三条都失败：
+用户明确要求"不要 workaround，要真实 CI pass"。在不动 mcpp 引擎的前提下试过四条路径 | 状态 | 失败原因 | 结果 |
+| --- | --- | --- | --- |
+| **1. CI 跳过失败矩阵行** | `fcfda5c5`（已 revert `929eec56`） | workaround | 用户显式拒绝 |
+| **2. 去掉 freestanding 上的 musl 依赖** | `7e8a17c0` on `openkal-llvm-runtime`（已 revert `cc79459b`） | 破坏 libcxx 的 `<__mbstate_t.h>` 需要 `bits/alltypes.h` | 构建直接红 |
+| **3. per-target `[c-abi] presents = "none"` on musl** | `2570bdf` on `openkal-musl`（已 revert `dff3d56`） | mcpp 解析了 TOML，但引擎仍把 musl 解析为 c-abi 供者、探针仍用 package-level 声明——override 是被解析了但没生效 | `llvm-rt#24` Windows host 行仍以同一不匹配失败 |
+| **4. per-target `[c-abi] wchar = 16` on musl** | `6e92657` on `openkal-musl`（已 revert `efd35f1`） | 探针仍读 package-level 的 `wchar=32`，per-target 声明无效 | `llvm-rt#24` Windows host 行错误信息完全没变：`__SIZEOF_WCHAR_T__` 声明 32、实测 16；`_WIN32` 声明 undefined、实测 defined |
 
-1. **CI 跳过**（commit `fcfda5c5`，已 revert）：workaround，用户显式拒绝。
-2. **去掉 freestanding 上的 musl 依赖**（commit `7e8a17c0` on `openkal-llvm-runtime`，已 revert）：破坏 libcxx 的 `<__mbstate_t.h>` 需要 `bits/alltypes.h`，构建直接红。
-3. **per-target `[c-abi]` override on musl**（commit `2570bdf` on `openkal-musl`，已 push，已 revert `dff3d56`）：mcpp 2026.9.18.2 接受这一 TOML 语法（`musl#37` 5/5 PASS），但**引擎仍把 musl 解析为 c-abi 供者，探针仍用 musl 的 package-level 声明**——override 是被解析了但没生效。`llvm-rt#24` 的矩阵日志：
+四条路径验证了三件事：
 
-```
-Target riscv64-none-elf → riscv64-unknown-elf
-       compiler-runtime  compiler-rt    (openkal-llvm-runtime@0.11.0, graph)
-       kernel-abi        openkal        (openkal-opensbi@<sha>, graph)
-       c-abi             musl           (openkal-musl@0.15.0, graph)   ← 仍解析为 musl
-       c++-abi           libc++         (openkal-llvm-runtime@0.11.0, graph)
-```
+- **per-target `[c-abi]` override 在 mcpp 2026.9.18.2 是 no-op**：被解析但不影响 c-abi 层解析与探针
+- **去掉 musl 依赖破坏了 libcxx 的 `<__mbstate_t.h>`**：musl 的 `bits/alltypes.h` 仍被 freestanding libcxx 引用
+- **问题严格收窄到 Windows 主机**：macOS host × freestanding 探针通过（`openkal-llvm-runtime#24` 矩阵 4m28s PASS），Linux host × freestanding 探针通过（`musl#37` cross-link PASS）
 
-```
-error: the C library's [c-abi] declaration does not match what the compiler actually produced for 'riscv64-none-elf'.
-         __SIZEOF_WCHAR_T__ (bits) declared 32         measured 16        ← 仍用 package-level 的 32
-         _WIN32                   declared undefined  measured defined
-```
-
-**真正需要的是 mcpp 引擎侧的修复**，单靠包层修不了。两条最小路径：
+**真正需要的是 mcpp 引擎侧的修复**。两条最小路径：
 
 - **(a) mcpp 探针在 `os = "none"` 跳过**——freestanding 没有 C 环境可核对，探针无声明可校验，结构性问题消失。
 - **(b) mcpp 探针剥离 Windows 主机宏注入**——`clang -E -dM --target=riscv64-none-elf` 在 Windows 主机下会泄漏 `_WIN32`，探针应当在比对之前 `-U_WIN32 -U_WIN64 -U__MINGW32__ -U__MINGW64__` 把主机宏清掉。
 
 任一条都需要新的 mcpp 发版（2026.9.18.3，约 2-3 小时），重新抬三处 pin，重跑全部 CI。本波关闭需要等这次发版。
 
-**当前仓库分支状态**（公网可见，净效果等价于原始 pin 但保留了三条尝试—回退历史）：
+**当前仓库分支状态**（公网可见，净效果等价于原始 pin 但保留了四条尝试—回退历史）：
 
 `openkal-musl`：
 ```
+efd35f1 Revert "mcpp.toml: declare freestanding c-abi with the toolchain's actual values"
+6e92657 mcpp.toml: declare freestanding c-abi with the toolchain's actual values   ← 路径 4（已 revert）
 dff3d56 Revert "mcpp.toml: declare presents = "none" for os = "none""
-2570bdf mcpp.toml: declare presents = "none" for os = "none"               ← 路径 3（已 revert）
+2570bdf mcpp.toml: declare presents = "none" for os = "none"                       ← 路径 3（已 revert）
 5035005 ci: pin mcpp 2026.9.18.2
 d4e6980 ci: pin mcpp 2026.9.18.1
 ```
 
 `openkal-llvm-runtime`：
 ```
+69ad3a42 trigger: re-run CI to pick up openkal-musl path-4 fix
 cc79459b Revert "mcpp.toml: scope the openkal-musl dependency to hosted targets"
-7e8a17c0 mcpp.toml: scope the openkal-musl dependency to hosted targets   ← 路径 2（已 revert）
+7e8a17c0 mcpp.toml: scope the openkal-musl dependency to hosted targets           ← 路径 2（已 revert）
 929eec56 Revert "ci: skip riscv64-none-elf on the Windows host matrix row"
-fcfda5c5 ci: skip riscv64-none-elf on the Windows host matrix row          ← 路径 1（已 revert）
+fcfda5c5 ci: skip riscv64-none-elf on the Windows host matrix row                  ← 路径 1（已 revert）
 c18ed7e2 ci: pin mcpp 2026.9.18.2
 b3fa1226 ci: pin mcpp 2026.9.18.1
 ```
-
-`mcpp-index`：`openkal-c-environment` 分支 14 commits 已 ready（除 measure job 等），draft。
 
 **§F 处置决策点**（请用户拍板）：
 1. **立即发起 mcpp 2026.9.18.3 发版**（路径 a 或 b），约 2-3 小时后三处 pin 抬升、所有 CI 重跑、波次关闭
@@ -139,7 +133,7 @@ b3fa1226 ci: pin mcpp 2026.9.18.1
 
 初稿列出的三种组合中 **(c, c)**（双接受）被用户拒，理由是"不要 workaround，要真实 CI pass"。(a, a)（双修 mcpp）需要 2-3 小时发版周期，至今仍未走——这是本波关闭的真实阻塞。
 
-包层三条路径都失败：CI 跳过（workaround），去掉 musl 依赖（破坏构建），per-target `[c-abi]` override（被解析但没生效）。下一步必须走 mcpp 引擎侧修复。
+包层四条路径都失败：CI 跳过（workaround），去掉 musl 依赖（破坏构建），per-target `[c-abi] presents = "none"`（被解析但没生效），per-target `[c-abi] wchar = 16`（同样被解析但没生效）。下一步必须走 mcpp 引擎侧修复。
 
 ### 3.4 A1 / A2 的 commit 措辞（已落地，确认）
 
