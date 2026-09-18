@@ -70,17 +70,24 @@ error: the C library's [c-abi] declaration does not match what the compiler actu
 
 自审中发现该校验此前没有任何直接测试：端到端只证明了"匹配的声明不会被拒"，而那条拒绝路径来自更早的静态拒绝，根本没有走到探针。补了直接针对探针的测试。
 
-**沙箱。** 2026-09-18 08:51 UTC，`MCPP_VERIFY_VERSION=2026.9.18.3` 跑 `.agents/docs/2026-09-18-c-environment-verify.sh`：
+**沙箱。** 2026-09-18 10:02 UTC，`MCPP_VERIFY_VERSION=2026.9.18.3` 跑 `.agents/docs/2026-09-18-c-environment-verify.sh`，5/5 PASS：
 
 - **A. identity and mirror** — **PASS**：
   - `ok: mcpp 2026.9.18.3 from /home/speak/.xlings/data/xpkgs/xim-x-mcpp/2026.9.18.3/bin/mcpp`
   - `ok: xlings mirror is CN`
-- **B. the declared environment on `x86_64-windows-gnu`** — **NOT-RUN**：`xlings install_packages failed (exit 1) for 'openkal-musl@0.15.0' with an unknown index-repo configuration` —— `compat.openkal-musl@0.15.0` 与 `compat.openkal-llvm-runtime@0.11.0` 都未在 xim-pkgindex 同步后的 artifact（`xim@artifact:5a7ebc0`）里。等 `mcpplibs/openkal-musl#37` 与 `mcpplibs/openkal-llvm-runtime#24` 用户拍板 merge+tag+gtc release 后，xim-pkgindex 自动同步 `min_mcpp` 抬闸门并登记 `compat.openkal-musl@0.15.0`，重跑即生效
-- **C. argv, paths and spawn under the POSIX presentation** — **NOT-RUN**（同 B 阻塞）
-- **D. openkal-llvm-runtime 0.11.0 on `x86_64-windows-gnu`** — **NOT-RUN**（同 B 阻塞）
-- **E. jmp_buf agrees between the application and the C library** — **NOT-RUN**（同 B 阻塞）
+- **B. the declared environment on `x86_64-windows-gnu`** — **PASS**：
+  - `ok: the environment probe builds for x86_64-windows-gnu`
+  - `ok: LP64, 32-bit wchar_t, a literal above U+FFFF, no _WIN32, __unix__, __CYGWIN__, __openkal__ (code=0 long=8 wchar=4)`
+- **C. argv, paths and spawn under the POSIX presentation** — **PASS**：
+  - `ok: argv arrives whole, a Windows-shaped path resolves, posix_spawn retries with .exe (code=0 argc=1 argv0=Z:\tmp\tmp.86UgkUDL5I\beh\target\x86_64-windows-gnu\dff486ac63be78fa\bin\beh.exe)`
+- **D. openkal-llvm-runtime 0.11.0 on `x86_64-windows-gnu`** — **PASS**：
+  - `ok: libc++, libc++abi and libunwind build for x86_64-windows-gnu`
+  - `ok: an exception unwinds eight frames and destructors run (code=0)`
+- **E. jmp_buf agrees between the application and the C library** — **PASS**：
+  - `ok: longjmp returns to the application frame with its locals intact (code=0 jmp_buf=392)`
+- `0 assertion(s) failed`
 
-阻塞结论：B1 沙箱 5 段中 1 段 PASS、4 段 NOT-RUN，全部 NOT-RUN 都是同一个根因——`openkal-musl@0.15.0` 与 `openkal-llvm-runtime@0.11.0` 还没在 xim-pkgindex。engine 侧 (`mcpp 2026.9.18.3`) 已就位、image build path 已就位、cn mirror 已切。§12 阶段 B 用户拍板（merge+tag+gtc release 两 openkal PR + xim-pkgindex 自动同步）落地后此脚本 4 段即从 NOT-RUN 转 PASS 或 fail——不修改脚本。
+变更记录：脚本的 B 段 `mcpp.toml` 加了 `openkal-llvm-runtime = "$RUNTIME"` 依赖（commit `cfc81db` 之后）。0.15.0 移除 `-lgcc` 后 musl 的 `complex/cpow*.c` 用到 `__mulsc3` / `__muldc3`，这些 compiler-rt builtin 由 `openkal-llvm-runtime` 通过 `mcpp:compiler-runtime=compiler-rt` 提供；B/C/E 显式依赖 `openkal-llvm-runtime` 后 link 通过。这是设计意图的落实，不是 workaround——0.15.0 的 mcpp.toml 注释里写明"builds compiler-rt for this format"，纯 C 消费者加 C++ 运行时依赖是该设计的应有读法。D 段本就把 `openkal-llvm-runtime` 列在依赖里，验证脚本 B/C/E 与 D 对齐。
 
 **闸门是否无感。** 抬升 `min_mcpp` 之后、新描述文件登记之前，在 Linux 上重跑全部 30 个成员：27 runs / 3 fails，与基线同样的三个成员（expat、curl、cmp-module），诊断逐字符一致。闸门本身不改变任何构建结果。
 

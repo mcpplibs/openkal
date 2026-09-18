@@ -59,6 +59,7 @@ name = "cenv"
 version = "0.1.0"
 [dependencies]
 openkal-musl = "$MUSL"
+openkal-llvm-runtime = "$RUNTIME"
 [target.'cfg(os = "windows")'.dependencies]
 openkal-windows = "$WINDOWS"
 [build]
