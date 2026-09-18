@@ -22,14 +22,19 @@ builtins   = "iso"
 
 ## 2. 发布
 
-| 包 | 版本 | PR | sha256（待 xim-pkgindex 收录后由 #439 一并提供） |
+| 包 | 版本 | PR | sha256 |
 | --- | --- | --- | --- |
-| mcpp | 2026.9.18.2 | mcpp#671 | 待填 |
-| openkal-musl | 0.15.0 | openkal-musl#37 | 待发布 |
-| openkal-llvm-runtime | 0.11.0 | openkal-llvm-runtime#24 | 待发布 |
+| mcpp 2026.9.18.2（linux-x86_64） | 2026.9.18.2 | mcpp#671 | `161233baf04dc144658587c7ae3b9477ec138b1e1315068dfb78e379444dd269` |
+| mcpp 2026.9.18.2（linux-aarch64） | 2026.9.18.2 | mcpp#671 | `315206f074cb5e4fb4b6a3cc8f2f25088d252e76a702968b58e4dfe7bb9ddc8c` |
+| mcpp 2026.9.18.2（macosx-arm64） | 2026.9.18.2 | mcpp#671 | `f88da71a0b0354e47a4de6d95e334576fc93e48446b01d4356080435be6c7bec` |
+| mcpp 2026.9.18.2（windows-x86_64） | 2026.9.18.2 | mcpp#671 | `45d61428a6d5386067ebc685a970578a10056af1a896919dabb3dce993f7fa2a` |
+| openkal-musl | 0.15.0 | openkal-musl#37 | 待发布（§F 阻塞解除后打 tag + 镜像） |
+| openkal-llvm-runtime | 0.11.0 | openkal-llvm-runtime#24 | 待发布（§F 阻塞解除后打 tag + 镜像） |
 | mcpp-index（描述文件 + 闸门） | — | mcpplibs/mcpp-index#439 | 已合并前的准备阶段 |
 
-发版顺序由索引的 `min_mcpp` 闸门决定：mcpp → xim-pkgindex → 两个 openkal 包 → 索引抬闸门并登记描述文件 → 重新测量 → openkal 文档 PR → 沙箱验证 → 生态自审。mcpp 2026.9.18.1 与 2026.9.18.2 已发布；xim-pkgindex #861 已合并（注册 2026.9.18.2）。两个 openkal 仓库正在重钉 2026.9.18.2 跑 CI（musl #37 5 行进行中、llvm-runtime #24 4 绿 1 红）。
+发版顺序由 xim-pkgindex 的 `min_mcpp` 闸门决定：mcpp → xim-pkgindex → 两个 openkal 包 → 索引抬闸门并登记描述文件 → 重新测量 → openkal 文档 PR → 沙箱验证 → 生态自审。mcpp 2026.9.18.1 与 2026.9.18.2 已发布；xim-pkgindex #861 已合并（注册 2026.9.18.2）。两个 openkal 仓库 PR-CI 在 draft mcpp 2026.9.18.3（mcpp-community/mcpp PR #673）下均 **5/5 PASS**（`MCPP_SOURCE_REF` repo variable 拉 draft 分支源码）；包本身的合并/tag/镜像等 mcpp#673 用户拍板后再做。
+
+**§F** 在 draft mcpp 上验证为真实修复：`cenv_probe::verify` 加 `hostStripMacros` 参数；`prepare.cppm` 在 Windows 主机下注入 `-U_WIN32 -U_WIN64 -U__MINGW32__ -U__MINGW64__`，Windows × freestanding 再加 `-ffreestanding`；freestanding wchar 无条件发 `-fno-short-wchar`。包层四条路径均已试过且均失败：CI 跳过（workaround，用户拒）、scope musl 到 hosted（破坏 `<__mbstate_t.h>`）、per-target `[c-abi] presents = "none"`、per-target `[c-abi] wchar = 16`——前两条已被 `git revert` 清出分支历史，后两条在 musl 分支留下 revert 记录。
 
 ## 3. 与设计稿的差异
 
@@ -98,3 +103,7 @@ error: the C library's [c-abi] declaration does not match what the compiler actu
 | `native`（ISO C 形态，picolibc 移植） | 设计 | 按 review 决定推迟 |
 | macOS 的两个 xcode-27 任务红 | lld 22.1.8 与 runner 镜像 | 本轮查清并接受。修好了其中一层（xim-pkgindex#858：`clang++.cfg` 不再硬把 Command Line Tools 的 SDK 排在前，改问 `xcrun --show-sdk-path`，日志确认生效），但同日镜像由 Xcode 27 beta 6 换为 Release Candidate，其自带 SDK 的 `.tbd` 同样含 `arm64e.x1`，两个 SDK 都不可解析。上游修复 2026-09-11 才进 main：22.1.8 于 2026-06-16 切出且 `release/22.x` 此后无提交，23.1.0 与 23.1.1 均早于修复，向 `release/23.x` 的 backport（llvm-project#224185）已获批准但未合并。故这两个任务在上游发版之前不可能绿，不加 `continue-on-error`——把真实信号降级为警告，将来换成别的失败也会照样"通过" |
 | Windows 主机 × `riscv64-none-elf`（freestanding）的 c-abi 探针 | mcpp 探针 + clang-on-Windows 主机 | c-abi 探针在 Linux 与 macOS 主机下交叉到 freestanding 均通过（`musl#37` cross-link PASS、`openkal-llvm-runtime#24` macOS host row PASS），但 Windows 主机下报告两条不匹配：`__SIZEOF_WCHAR_T__` 声明 32、实测 16；`_WIN32` 声明 undefined、实测 defined。前者反映出 freestanding 工具链的 `__SIZEOF_WCHAR_T__` 默认为 16——这正是 musl 在 hosted 上的 `wchar=32` 声明不该套到 freestanding 上的根因；后者是 clang 在 Windows 主机上即便 `--target=riscv64-none-elf` 仍把 `_WIN32` 注进预处理器输出（hosted 三元组上 `--target` 替换会改写主机宏，freestanding 不改）。两个不匹配都是真实存在的结构性缺陷，一个在 `[c-abi]` 与 `os = "none"` 的关系上，一个在 mcpp 探针的 Windows 主机剥离上。包层三条修复路径都试过：CI 跳过（workaround，用户拒）；scoping musl 依赖到 hosted（破坏 libcxx 的 `<__mbstate_t.h>`）；per-target `[c-abi]` override（mcpp 解析但不影响 c-abi 层解析与探针）。需要 mcpp 引擎侧修复：路径 a（让 `os = "none"` 不跑探针）或路径 b（Windows 主机下探针前加 `-U_WIN32 -U_WIN64 -U__MINGW32__ -U__MINGW64__`）。本轮需要发 mcpp 2026.9.18.3。`openkal-llvm-runtime#24` 4/5 PASS，仅 Windows host × freestanding 一行红；`musl#37` 5/5 PASS |
+| `xcrun --show-sdk-path` 在 Apple 工具链内不被认可为 `[c-abi]` 实现 | mcpp 与 xlings | CI 上 `xcrun` 命令被 Apple 在自己的 CLI 里列为 `--sdk <path>`，二者语义不同 | 暂记于此供下轮调研；本轮未触 |
+| macOS xcode-27 runner 镜像灰度 | mcpp CI 与 xlings LLVM | 9-17 同期存在 `20260907`（Xcode 27 beta 6）与 `20260912`（Release Candidate）两个镜像，前者 SDK 正常、后者 `.tbd` 含 `arm64e.x1`，lld 22.1.8 解析失败；一次推送两个 job 落到两个镜像上一红一绿并非断言，是 9-17 11:05 与 11:05 同分钟观察。`xcrun` 答出的正是坏 SDK，所以 #665（`-isysroot`）机制上不可能修好链接——`clang++.cfg` 的 `--sysroot` 总是压过命令行的 `-isysroot`，#665 解决的是头文件搜索而非链接（详见 `mcpp#669`，已更正）。`#858`（xim-pkgindex 改问 `xcrun`）是真正的修复；#665 仍是正确改动但解决的是不同问题 | 上游 LLVM 发版前不可能绿；立 issue `mcpp#669` 并留红，不加 `continue-on-error` |
+
+| c-abi 探针与 [c-abi] 在 freestanding 上的关系（结构性） | mcpp | 上述 freestanding 缺陷与 #224185（上游 LLVM 发版）形成这一轮两条结构性线索：一条等上游，一条等本轮 mcpp 2026.9.18.3 的引擎侧修复 | 由接力 agent 在 2026.9.18.3 PR 内实施 |
