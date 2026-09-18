@@ -143,18 +143,6 @@ Four rules follow, and they bind packages rather than this specification.
    (`__unix__`, `_WIN32`); the system is stated by the target triple
    (`__linux__`, `__APPLE__`).
 
-   The C environment is declared by the C library and is not implied by the
-   target. A C library may present a POSIX environment on a system whose own is
-   not POSIX, in which case `_WIN32` is absent although the image is PE; what
-   names that combination is the object format's own identity (`__CYGWIN__`),
-   which is a fourth fact and not one of the three. Source that reads `_WIN32`
-   to mean "the target is Windows" is reading the wrong family: a package's own
-   units learn the target from the package's manifest, and everything the
-   environment states reaches every translation unit built for that target,
-   assembly included. `_WIN64` belongs to the same family and is the one a
-   search for `_WIN32` misses; where it selects a calling convention or a
-   register layout, it is answering the fourth question, not the second.
-
    `__openkal__` may gate a call to a `kal_*` operation. It shall not be used to
    select a header, to infer whether `_WIN32` is true, or to tell one target from
    another: a difference in headers is adapted to on `c-abi`, and a difference in

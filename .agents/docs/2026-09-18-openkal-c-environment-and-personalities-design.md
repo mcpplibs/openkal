@@ -137,45 +137,26 @@ builtins   = "iso"          # 编译器不得假定平台 C 库的扩展，见 3
 
 引擎保存"请求的性质 → 目标三元组与开关"的映射，这是通用知识，不含包名。
 
-呈现为 `posix` 意味着一件事，在每个目标上都一样：`__unix__` 存在，`_WIN32` 不存在。差别只在于要付出多少代价才能做到。初稿把"Linux 与 macOS 默认已满足"写成了同一件事，而探针上线后立刻证伪了一半——Apple 的 clang 不预定义 `__unix__`，只给 `__APPLE__` 与 `__MACH__`；裸机三元组同样没有。
-
 | 目标 | 请求 | 实现 |
 | --- | --- | --- |
 | Linux | posix / arch-default / 32 | 默认三元组已满足 |
-| macOS | posix / arch-default / 32 | 补 `-D__unix__`；其余默认已满足 |
-| 裸机（`*-none-elf` 等） | posix / arch-default / 32 | 同上。没有平台身份宏可言，正因如此才要由声明给出 |
-| Windows | posix / arch-default / 32 | 采用 Cygwin 式语义（LP64、PE、Win64），保留 `__CYGWIN__`，加 `-fno-short-wchar` |
+| macOS | posix / arch-default / 32 | 默认三元组已满足 |
+| Windows | posix / arch-default / 32 | 采用 Cygwin 式语义（LP64、PE、Win64），去掉 `__CYGWIN__`，加 `-fno-short-wchar` |
 | macOS | builtins = iso | 关闭 `memset_pattern16` 一类的平台惯用法 |
 | 无法满足 | | 明确拒绝并说明缺什么，不静默降级 |
 
-`__CYGWIN__` 予以定义，但理由不是初稿设想的那一条，也不是它能修好 libunwind。
-
-尖峰实验中 C++ 运行时无法构建：`llvm/libunwind/src/config.h:117` 报 `#error Unsupported target`，因为 `_LIBUNWIND_WEAK_ALIAS` 在 `__APPLE__`、`__ELF__`、AIX、wasm、`_WIN32` 之间选择，而"PE 格式但没有 `_WIN32`"不匹配任何一支。上游 libunwind 全树没有 `__CYGWIN__` 分支，所以定义它并不能消除这个 `#error`。真正的原因与 openkal-musl 的 port 层相同：openkal-llvm-runtime 已有的 Windows 补丁（`#if defined(_WIN32) && !defined(OPENKAL)`）正是以 `_WIN32` 选中 PE 代码路径、再挡掉 `windows.h`，宏一消失，它把自己的 PE 分支也一并关掉了。按 §3.4 的规则，这类单元应由包自己的清单按目标提供定义。
-
-定义 `__CYGWIN__` 的理由只剩一条，但它成立：第三方可移植代码需要一个名字来指"PE 格式加 POSIX C 环境"，而 `__CYGWIN__` 是上游唯一使用的那个名字；我们自己的包可以打补丁，别人的包不能。代价是少数库会因此走向 Cygwin 专有接口（`sys/cygwin.h`、`cygwin_conv_path`），而这些接口不在依赖图里。这是一个用数据裁决的取舍：30 个成员的测量里，若定义它带来的新失败多于它修好的数量，就改为不定义。是否定义 `__unix__` 同样由测量决定（§8）。
+`__CYGWIN__` 不予定义：它会把少数库引向 Cygwin 专有接口（`sys/cygwin.h`、`cygwin_conv_path`），而这些接口不在依赖图里。是否定义 `__unix__` 由尖峰实验的数据决定（§8）。
 
 ### 3.4 环境的作用范围，以及自身在平台环境里编译的包
 
 声明的环境作用于**目标侧的全部编译单元**：C 库自己、C++ 运行时、compiler-rt 的 builtins，以及图中所有普通包。三者必须一致，否则 `long` 宽度会在它们之间错位。
 
-"全部"包括汇编源。汇编与 C 过同一个预处理器，而且确有代码据此选择：openkal-musl 的 `okm_setjmp.S` 以宏选目标文件格式指令与寄存器保存集，上游 libunwind 在 `assembly.h` 中同样如此。尖峰实验中实测到 mcpp 的实现只作用于 C 与 C++ 编译，同一个包里 `.c` 看不到 `_WIN32` 而 `.S` 看得到——一个按 SysV 保存集写入、却按 Win64 头文件定大小的 `jmp_buf`，在记录被写越界之前不会有任何报告。这类不一致比缺少某个特性更危险，因为它没有诊断。
-
-能被告知的前提是前端认得这套说法。GAS 单元经 `-x assembler-with-cpp` 进入同一个前端，`--target=`、`-fno-short-wchar` 一类记号都被接受，因此照常广播；NASM 不认识其中任何一个，也没有 `--target=` 的概念，只能什么都不给。于是留下一条限制：以 NASM 写成、且需要知道 C 环境的汇编，只能由包自己的清单给出定义，与安装头文件之外的内部单元同法。
-
 有两类包必须例外，它们本来就编译在平台环境里：
 
-| 包 | 为什么 | 怎么确定 |
-| --- | --- | --- |
-| 提供 `mcpp:kernel-abi=openkal` 的实现（openkal-windows 等） | 它要 include 平台声明，`_WIN32` 对它必须为真 | 由引擎推断，不需声明 |
-| 声明了平台依赖的包中的平台编译单元（§5.3） | 同上 | 由包声明 `c-environment = "platform"` |
-
-第一类从声明改为推断，是尖峰实验的结果。初稿要求实现自己声明，而 openkal-windows 0.8.0 尚未声明，于是它的 `CommandLineToArgvW`、`CreateFileW` 等调用被一并套进 POSIX 呈现：`-fno-short-wchar` 给了它 32 位 `wchar_t`，而 Win32 递回来的永远是 16 位 UTF-16，一个 `wchar_t*` 循环于是把两个 UTF-16 单元读成一个码点。argv 截断、Windows 形状的路径 `stat` 失败、`posix_spawn` 不重试 `.exe`，三处回退都由此而来，且都在这一行声明补上之后消失（实测）。
-
-提供 `kernel-abi` 的包按定义就是调用平台自身接口的那道边界，它不可能想要被呈现的环境。因此由引擎推断，而不是要求它说。这样每个已发布的实现无须改动、无须重新发版即可正确；这个缺陷从"写在文档里"变成"不可表达"；新写的实现第一天就不会错。包自己的显式声明仍然优先于推断。
-
-还有一类单元既不是例外，也不能沿用旧写法：它**只需要知道目标是哪个平台**，并不 include 平台头文件。openkal-musl 的 port 层就是如此，它以 `_WIN32` 区分 argv 的取法、路径的形状、`posix_spawn` 是否重试 `.exe`，尖峰实验中这三处同时回退，正是因为宏消失而分支静默改选。规则是：这类单元由**包自己的清单**按目标提供定义（如 `cfg(windows)` 下的 `-DOKM_TARGET_WINDOWS`），不从编译器宏推断。
-
-安装出去的头文件不适用上一条，因为应用的编译命令里没有那个定义。`bits/setjmp.h` 按 `_WIN32` 决定 `jmp_buf` 的布局，一旦应用与 C 库对该宏的读法不同，两者的 `jmp_buf` 大小就会错开。安装头文件要么读由构建期写出的目标头文件，要么读三元组给出的、对应用同样成立的宏。
+| 包 | 为什么 |
+| --- | --- |
+| 提供 `mcpp:kernel-abi=openkal` 的实现（openkal-windows 等） | 它要 include 平台声明，`_WIN32` 对它必须为真 |
+| 声明了平台依赖的包中的平台编译单元（§5.3） | 同上 |
 
 因此包（或包内的某些文件）需要能够声明"我在平台环境里编译"：
 
