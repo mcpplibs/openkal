@@ -3,7 +3,7 @@
 - 日期：2026-09-18
 - 依据：`2026-09-18-openkal-c-environment-and-personalities-design.md`、`2026-09-18-c-environment-execution-plan.md`、`2026-09-18-c-environment-record.md`
 - 范围：在 P0–P7 已大半完成的基础上，把剩下的 A/C/B/E/Z 五段推进到"波次关闭"
-- 状态（截至 2026-09-18 07:55 UTC）：A1 / A2 / A3 / A4 / B3 / E1 已**在现有分支上落地并推送**；§F 已用 mcpp 引擎侧**真实修复**（PR #673 已合并至 main，commit `7788d3e6`，release `2026.9.18.3` 已发版）处置；两个 openkal 包 PR-CI 在 released `2026.9.18.3` 下：musl `35320919702` 4/4 PASS、llvm-rt `35320580063` 5/5 PASS（c-environment 相关全绿）；用户已标记"windows ci 假绿"为 kernel-abi（openkal-windows 0.8.0）pre-existing 限制，撤 `|| true` 让 Windows host cxx-example 报 7 个真实失败，按 record §6 处理；xim-pkgindex#861 / #862 已合并（mcpp → .2 / .3）；xim-pkgindex 验证 .3 artifact 已发布（run `35317558823`）
+- 状态（**2026-09-18 10:25 UTC，波次关闭**）：A1 / A2 / A3 / A4 / B3 / E1 / F1 已**在现有分支上落地并推送**；§F 用 mcpp 引擎侧**真实修复**（PR #673，commit `7788d3e6`，release `2026.9.18.3`）关闭；两个 openkal 包 PR-CI 在 released `2026.9.18.3` 下：musl `35320919702` 4/4 PASS、llvm-rt `35326004969` 5/5 PASS（**Windows host reach job 现在报真实状态**——c-environment 相关全绿，kernel-abi 缺口在 record §6 行 8）；5 PR merge + 2 gtc release（`mcpp-res/openkal-musl@0.15.0` sha256 `75803192a09a46d532300a2b49c5b7b3d12473a2247870585a655630881c4dd5`、`mcpp-res/openkal-llvm-runtime@0.11.0` sha256 `2e26674d6698aa3c9cbc648fb4b692473e39e339fb52400a153b8a35c8208bf4`）+ 2 descriptor registration（`#441`）；xim-pkgindex 已自动同步；B1 沙箱 5/5 PASS（`64e8e67`）；B2 30 成员重测：Linux 27/3 不变（与 0.13 逐字节一致）、Windows 12/18（0/30→12/30 改善；18 compat.* 包 posix 适配留给下轮）；4 repo README 升级提示已推；自审报告 `openkal/.agents/docs/2026-09-18-c-environment-self-audit.md` 完成；Z1 MEMORY closed；Z2 已落地；阶段 E 自审覆盖 8 行限制表
 
 ## 0. 真实当前状态（来自 gh pr view 与 git log，2026-09-18 07:55 UTC）
 
