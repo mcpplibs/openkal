@@ -118,9 +118,10 @@
 | `mcpplibs/mcpp-index#439` draft → ready + merge | 未做 | 用户拍板 |
 | `openkal` docs PR #36 merge | 未做 | 用户拍板 |
 | xim-pkgindex 自动同步（依赖 #439 merge 后抬 `min_mcpp`） | 未做 | 用户拍板 |
-| 沙箱验证脚本 `2026-09-18-c-environment-verify.sh` 跑通 | 未做 | 用户拍板（须两个 openkal 包先有 tag） |
+| 沙箱验证脚本 `2026-09-18-c-environment-verify.sh` 跑通 | 部分跑：A 段 PASS、B/C/D/E 段 NOT-RUN（gated on 用户拍板 merge+tag+gtc release） | 用户拍板（须两个 openkal 包先有 tag） |
 | 30 成员重测：Linux 27/3 不变、Windows 15/15 转绿 | 未做 | 须 #439 merge 后重跑 measure job |
-| record §4 沙箱段 + §4 兼容测量段"（待填）"回填 | 未做 | 须 B1 + B2 数据 |
+| record §4 沙箱段"（待填）"回填 | **已填**（commit `cfc81db`）：A 段 PASS 证据、B-E 段 NOT-RUN 与同一个根因（`openkal-musl@0.15.0` / `openkal-llvm-runtime@0.11.0` 不在 xim-pkgindex） | — |
+| record §4 兼容测量段"（待填）"回填 | 未填（须 B2 数据） | 须 B2 |
 
 ## 12. 结论
 
