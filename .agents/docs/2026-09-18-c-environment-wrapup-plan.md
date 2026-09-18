@@ -3,7 +3,7 @@
 - 日期：2026-09-18
 - 依据：`2026-09-18-openkal-c-environment-and-personalities-design.md`、`2026-09-18-c-environment-execution-plan.md`、`2026-09-18-c-environment-record.md`
 - 范围：在 P0–P7 已大半完成的基础上，把剩下的 A/C/B/E/Z 五段推进到"波次关闭"
-- 状态（截至 2026-09-18 05:24 UTC）：A1 / A2 / A3 / A4 / B3 / E1 已**在现有分支上落地并推送**；§F 已用**真实修复**（per-target `[c-abi]` override）处置；`musl#37` 5/5 PASS、`llvm-rt#24` 矩阵在跑；mcpp-index#439 `measure` 已 PASS；xim-pkgindex#861 已合并（mcpp → .2）
+- 状态（截至 2026-09-18 06:40 UTC）：A1 / A2 / A3 / A4 / B3 / E1 已**在现有分支上落地并推送**；§F 已用 mcpp 引擎侧**真实修复**（PR #673 draft）处置；两个 openkal 包 PR-CI 在 draft mcpp 下均 **5/5 PASS**；mcpp-index#439 `measure` 已 PASS（用 2026.9.18.2）；xim-pkgindex#861 已合并（mcpp → .2）；**mcpp#673 等待用户评估决定是否合入**
 
 ## 0. 真实当前状态（来自 gh pr view 与 git log，2026-09-18 04:56 UTC）
 
@@ -71,7 +71,9 @@
 
 A1 / A2 / A3 / A4 / B3 / E1 均已在现有分支落地并推送；CI 状态见 §0 表。
 
-### 3.2 §F 处置：包层四条路径失败 + mcpp 引擎侧修复（draft 状态）
+### 3.2 §F 处置：包层四条路径失败 + mcpp 引擎侧修复（draft 状态，等用户评估）
+
+mcpp#673 上游 CI 自测：19/21 PASS，2 个 FAIL 是**已知的 macOS xcode-27 `arm64e.x1` lld 解析失败**（与 0.13 波次的限制同源——runner 镜像含 lld 22.1.8 不支持的 TBD 元数据，xim-pkgindex#858 修了一层仍未能完全解决，llvm-project#224185 backport 未合并）。这两个 FAIL 与本 PR 无关。
 
 §F 是 openkal-llvm-runtime#24 的 **Windows host × riscv64-none-elf** c-abi 探针失败：
 
