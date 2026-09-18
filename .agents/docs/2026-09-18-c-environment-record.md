@@ -22,7 +22,14 @@ builtins   = "iso"
 
 ## 2. 发布
 
-（待填：各包版本、PR 号与两端 sha256。）
+| 包 | 版本 | PR | sha256（待 xim-pkgindex 收录后由 #439 一并提供） |
+| --- | --- | --- | --- |
+| mcpp | 2026.9.18.2 | mcpp#671 | 待填 |
+| openkal-musl | 0.15.0 | openkal-musl#37 | 待发布 |
+| openkal-llvm-runtime | 0.11.0 | openkal-llvm-runtime#24 | 待发布 |
+| mcpp-index（描述文件 + 闸门） | — | mcpplibs/mcpp-index#439 | 已合并前的准备阶段 |
+
+发版顺序由索引的 `min_mcpp` 闸门决定：mcpp → xim-pkgindex → 两个 openkal 包 → 索引抬闸门并登记描述文件 → 重新测量 → openkal 文档 PR → 沙箱验证 → 生态自审。mcpp 2026.9.18.1 与 2026.9.18.2 已发布；xim-pkgindex #861 已合并（注册 2026.9.18.2）。两个 openkal 仓库正在重钉 2026.9.18.2 跑 CI（musl #37 5 行进行中、llvm-runtime #24 4 绿 1 红）。
 
 ## 3. 与设计稿的差异
 
