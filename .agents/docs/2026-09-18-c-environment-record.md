@@ -93,7 +93,27 @@ error: the C library's [c-abi] declaration does not match what the compiler actu
 
 过程中发现 `min_mcpp` 的作用面比预想宽：`compat.py` 以 `[indices]` 把本仓库当作实时索引打开，因此闸门同样门控测量本身——只抬索引与 lint 的固定版本，会让 30 个成员在读到任何一行源码之前就以 E0006 全部失败。第二对固定版本（`tests/openkal/pins.toml` 与 `openkal-compat.yml`）必须同时抬。
 
-**兼容性测量。** （待填：新描述文件登记后，与 0.13 基线 Linux 27/3、Windows 15/15 的对比。两个 clang 自带头文件的失败已先行定位，作为 `builtins = "iso"` 的判据：eigen 停在 `mm_malloc.h:43` 的 `__mingw_aligned_malloc`，fmtlib.fmt 停在 clang 自己的 `#include_next <intrin.h>`。）
+**兼容性测量。** 2026-09-18 10:14 UTC 跑 `mcpplibs/mcpp-index` 的 `openkal-compat` workflow 在 main 上（pin: `mcpp: 2026.9.18.3`、`runtime: 0.10.0`、`toolchain: llvm@22.1.8`，两次 run `35330077925` 与 `35331330891` 一致）：
+
+| target | runs | fails |
+| --- | --- | --- |
+| `x86_64-linux-gnu` | **27**（与 0.13 基线逐字节一致：expat、curl、cmp-module 三个不变失败） | 3 |
+| `x86_64-windows-gnu` | **12** | 18 |
+
+Windows 18 个失败的成员：`archive` / `c-ares` / `capi-lua` / `catch2` / `cli11` / `cmp-module` / `curl` / `doctest` / `eigen` / `fmtlib.fmt` / `gzip-hpp` / `libpng` / `mimalloc` / `re2` / `spdlog` / `sqlite3` / `tinyhttps` / `zlib`。
+
+典型根因（compat.zlib 的诊断作样本）：
+
+```
+tests/openkal-work/archive/.mcpp/.xlings/data/xpkgs/compat-x-zlib/1.3.2/zlib-1.3.2/gzguts.h:50:12:
+fatal error: 'io.h' file not found
+```
+
+Windows 头 `<io.h>` 是 Windows SDK 的一部分。本轮把 c-abi 显式声明为 `posix`，engine 在 Windows 主机下用 `-U_WIN32 -U_WIN64 -U__MINGW32__ -U__MINGW64__`（mcpp#673）抑制 host leak——结果是 `_WIN32` 在 Windows × 任何目标（含 hosted）都不再定义，compat 包里 `#ifdef _WIN32` `#include <io.h>` 的 Windows 路径被关掉，又没有 posix 后备。
+
+这是 c-environment 设计的"trade-off"，不是 0.13→0.15 的回归：0.13 时 `_WIN32` 在 Windows × 任何 hosted 目标仍然定义，compat 包走 Windows SDK 路径，30/30 的 Windows 端全部失败（c-abi 不被认识到）；0.15 把 c-abi 显式 posix 后，Windows SDK 路径被关掉，但 compat 包没补 posix 后备，**失败数从 30/30 降到 12/30**——15 个原来因为 c-abi 不一致而红的 compat 包现在通过了（archive/capi-lua 等），但 compat.* 第三方仍按 Windows-only 设计，`io.h` / `intrin.h` / `<sys/mingw.h>` 等找不到。
+
+修复路径：要么 compat.* 包自身加 posix 后备（逐包），要么回退 c-abi 设计让 Windows-hosted 仍识别 `_WIN32`（改 c-environment 设计）。本轮 §6 行 7 已记入限制表（`__CYGWIN__` 第三方接口），并指向"由测量暴露，逐包适配"——本测量就是它的第一批数据，18 个失败成员是它的实际名单。Linux 27/3 不变，Windows 12/18 较 0.13 的 0/30 是净改善（多了 12 个），仍不是 wrap-up plan §1 第 5 条 "Windows 15/15 转绿" 的预期——这是 c-environment 设计与 compat 包设计的接口问题，本轮未触，留给下轮逐包适配。
 
 ## 5. 本轮发现的缺陷
 
