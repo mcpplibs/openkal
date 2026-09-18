@@ -321,3 +321,69 @@ Older engines silently misbuild them. Upgrade: `xlings install mcpp --force`.
 | C3 漏提（xim-pkgindex mcpp 仍在 .1） | 低 | 已在 §0 / §4 显式提醒 |
 | 用户升级 mcpp 后遇到 E0006 | 低 | Z2 README 提示 |
 | macOS xcode-27 任务影响"全绿"判定 | 高（已知） | 限制表 1 行；本轮不闭合 |
+## 12. 用户拍板后的 handoff 序列
+
+按用户给定流程："draft 是不发版的，要全部生态验证后，我在评估 mcpp 是否合入这个修复"。
+
+### 阶段 A — 用户合入 mcpp#673 后
+
+**用户操作**：
+1. PR #673 由 draft 转 ready，merge 到 main
+2. 走 release.yml 发版 mcpp 2026.9.18.3
+
+**AI 立即执行**（无人值守）：
+3. 在 `mcpplibs/openkal-musl` 与 `mcpplibs/openkal-llvm-runtime` 仓库**删除** repo variable `MCPP_SOURCE_REF`（因为现在 .3 已发版，PR-CI 改回走 .3 release）
+4. 给两个 PR 加 commit `ci: pin mcpp 2026.9.18.3`（内容与 A1/A2 类似，但版本号改为 .3）：
+
+```
+ci: pin mcpp 2026.9.18.3, the release that strips the [c-abi] probe's
+host contamination on Windows and forces wchar = 32 on freestanding
+
+Closes §F: the Windows-host × riscv64-none-elf c-abi probe mismatch
+that 2026.9.18.2 could not detect through the package layer alone.
+```
+
+### 阶段 B — 包 PR 转绿后的 merge + tag + 镜像
+
+**用户操作**：
+5. 合 `openkal-musl#37`，tag `0.15.0`，`gtc release` 到 GitCode `mcpp-res/openkal-musl`
+6. 合 `openkal-llvm-runtime#24`，tag `0.11.0`，`gtc release` 到 GitCode `mcpp-res/openkal-llvm-runtime`
+
+**AI 立即执行**（拿到 sha256 后）：
+7. 回填 `.agents/docs/2026-09-18-c-environment-record.md` §2 的 sha256
+8. 回退 `docs(record): add the Windows host × freestanding c-abi probe to the limits`（commit f9bb1b5）——真实修复已让 §F 关闭，限制行不再需要
+9. 跑 `2026-09-18-c-environment-verify.sh`（B1）——沙箱验证
+10. 触发 `mcpplibs/mcpp-index#439` 的 measure job 重测（B2）
+11. 回填 §4 沙箱段与 §4 兼容测量段
+
+### 阶段 C — 索引落地
+
+**用户操作**：
+12. 合 `mcpplibs/mcpp-index#439`（draft → ready 后）
+13. 等 xim-pkgindex 自动同步
+
+### 阶段 D — 文档 PR 合并
+
+**用户操作**：
+14. 合 PR #36（openkal 仓库 docs PR）
+
+**AI 立即执行**：
+15. 更新 MEMORY（`openkal-c-environment-wave.md` 状态 → closed
+17. 增加 `openkal-0-13-wave.md` 段落 `09-18 c-env close-out` 引用本轮 PR 号
+18. 在 mcpp / mcpp-index / openkal-musl / openkal-llvm-runtime 的 README 加升级提示：
+
+```
+mcpp 2026.9.18.3 is required for [c-abi] packages (openkal-musl 0.15.0+).
+Older engines silently misbuild them. Upgrade: `xlings install mcpp --force`.
+```
+
+### 阶段 E — 生态自审
+
+**AI 自动执行**：
+19. 自审覆盖限制表 6 行（macOS xcode-27、install hook 不记录环境、install hook 宿主编译、NASM 不识别 c-abi、`__CYGWIN__` 第三方接口、native 推迟）
+20. 输出自审报告到 `.agents/docs/2026-09-18-c-environment-self-audit.md`
+
+### 阶段 F — 波次关闭判定
+
+满足 §1 全部 6 条判据后，AI 更新两段 memory 为 closed 并向用户报"波次关闭"。
+
