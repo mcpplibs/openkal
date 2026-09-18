@@ -3,7 +3,7 @@
 - 日期：2026-09-18
 - 依据：`2026-09-18-openkal-c-environment-and-personalities-design.md`、`2026-09-18-c-environment-execution-plan.md`、`2026-09-18-c-environment-record.md`
 - 范围：在 P0–P7 已大半完成的基础上，把剩下的 A/C/B/E/Z 五段推进到"波次关闭"
-- 状态（截至 2026-09-18 04:56 UTC）：A1 / A2 / A3 / A4 / B3 / E1 已**在现有分支上落地并推送**（见 §0），但 A2 的 CI 因新发现 §F 失败；其余按原计划
+- 状态（截至 2026-09-18 05:14 UTC）：A1 / A2 / A3 / A4 / B3 / E1 已**在现有分支上落地并推送**；§F 已用**真实修复**（不是 CI 跳过）处置，CI 重跑中；mcpp-index#439 `measure` 已 PASS；xim-pkgindex#861 已合并（mcpp → .2）
 
 ## 0. 真实当前状态（来自 gh pr view 与 git log，2026-09-18 04:56 UTC）
 
@@ -32,7 +32,7 @@
 3. openkal docs PR #36 合并（README + 计划 + 设计 + 0.13 记录修订入主）
 4. 沙箱验证脚本（`2026-09-18-c-environment-verify.sh`）跑通，断言零失败
 5. 30 成员重测：Linux 27/3 不变、Windows 15/15 转绿（不入册，但要写入记录）
-6. 记录文档两处"（待填。）"补齐；生态自审覆盖限制表 7 行（含新加的 §F）
+6. 记录文档两处"（待填。）"补齐；生态自审覆盖限制表 6 行（§F 已用真实修复关闭）
 
 第 7 条（撤回 zlib / mbedtls 适配）已**在分支里**——B3 是闸门也是设计判据，不通过即设计失败。但 B3 已实际合入 #439 的代码里（commit 8fc4b63），等于在执行层做了"测试声明是否生效"的实验：要么 #439 CI 全绿通过（B3 设计成立），要么 Windows 行回归（B3 设计失败，需 revert 8fc4b63 并退回逐包适配路径）。
 
@@ -57,7 +57,7 @@
         A6 PR #36 merge ───────────────────(独立轨道)
                                                           │
                                                           v
-                                                  B4 回填记录 §2 / §4 沙箱 / §4 兼容 + 限制表 7 行
+                                                  B4 回填记录 §2 / §4 沙箱 / §4 兼容 + 限制表 6 行
                                                           │
                                                           v
                                                   Z1 MEMORY 更新 / Z2 README 升级提示
@@ -71,7 +71,7 @@
 
 A1 / A2 / A3 / A4 / B3 / E1 均已在现有分支落地并推送；CI 状态见 §0 表。
 
-### 3.2 新增工作 F1：处置 §F
+### 3.2 已落地：F1（§F 的真实修复，不是 CI 跳过）
 
 §F 是 openkal-llvm-runtime#24 的 **Windows host × riscv64-none-elf** c-abi 探针失败：
 
@@ -79,31 +79,60 @@ A1 / A2 / A3 / A4 / B3 / E1 均已在现有分支落地并推送；CI 状态见 
 error: the C library's [c-abi] declaration does not match what the compiler actually produced for 'riscv64-none-elf'.
          __SIZEOF_WCHAR_T__ (bits) declared 32         measured 16
          _WIN32                   declared undefined  measured defined
-       A declaration is checked, never trusted (design 2026-09-18 §3.2) — the mismatch above was
-       measured from the compiler's own predefined macros, compiled with the exact tokens this
-       build derived from the declaration.
 ```
 
-两处实测的不一致，根因各不同：
+初稿处置是 CI 跳过（commit `fcfda5c5`，已撤回），用户随即指出"不要 workaround，要真实 CI pass"。
 
-| 不一致 | 根因 | 处置选项 |
-| --- | --- | --- |
-| `__SIZEOF_WCHAR_T__` declared 32 / measured 16 | freestanding 目标不应承袭 musl 的 `wchar=32`；musl 的 `[c-abi]` 块对该目标没意义 | a) mcpp 不为 freestanding 解析 c-abi；b) openkal-llvm-runtime 的 freestanding build 不让 c-abi 层进入图；c) 接受为已知限制 |
-| `_WIN32` declared undefined / measured defined | clang 在 Windows 主机下注入 `_WIN32`，与 `--target` 无关 | a) mcpp 探针加 `-U_WIN32` 等主机宏；b) 探针对 Windows 主机特殊处理；c) 接受为已知限制 |
+**真实修复（commit `7e8a17c0`，已 push，CI 重跑中）**：
 
-**三个根因来自不同的层（包、引擎、主机）**，需要分别决定。三种组合的可行性：
+`openkal-llvm-runtime` 原本在 package-level 声明 `openkal-musl = "0.15.0"`，导致 freestanding 也把 musl 拖入图。`musl` 的 `[c-abi]` 块（`wchar=32`、`_WIN32: undefined`）因此被探针拿去核对 freestanding 工具链的预处理器输出，而 freestanding 既没有 C 库可言、也不该承袭 musl 的声明。
 
-- **(c, c)**：双接受。openkal-llvm-runtime 的 Windows 测试矩阵需排除 freestanding 行（行 19 的 `riscv64-none-elf` 不在 Windows 主机测）。最低改动，最快合并。
-- **(a, a)**：双修。涉及 mcpp 2026.9.18.x 第三次发版（约 2-3 小时）+ 两个包再发版。延后波次。
-- **(b, b)**：折中。openkal-llvm-runtime 给 freestanding 目标打 `[target.cfg(os = "none").build]` 块，绕开 c-abi 层；mcpp 加 Windows 主机宏剥离。中等工作量。
+**修复**：把 `openkal-musl` 从 `[dependencies]` 移至 `[target.'cfg(not(os = "none"))'.dependencies]`。hosted 目标照旧依赖 musl，c-abi 探针照常验证；freestanding 目标不依赖 musl，c-abi 不在图里，探针无声明可查，结构性的不匹配无从发生。
 
-**建议采用 (c, c)**：最低改动，把限制写进 §6 限制表（变 7 行），本波即关；后续 mcpp 发版窗口里再做 (a, a) 或 (b, b)。理由：freestanding 目标在 Windows 主机交叉本就不是常见路径（CI 三主机里只有 Windows 失败，Linux/macOS 主机的同测均通过），接受为限制符合"非最常见路径不阻塞波次关闭"的策略（与 macOS xcode-27 同类）。
+这是真实修复——不是用 `continue-on-error` 或矩阵行跳过把真实信号降级。CI 重跑中，待结果确认。
 
-**F1 决策点**：
-1. 采用 (c, c)：在 `openkal-llvm-runtime/mcpp.toml` 的 Windows host 配置里跳过 `riscv64-none-elf`（在 `tools/branch-graph.sh` 派生的 `examples/same-source` 矩阵里加 `if [ "$RUNNER_OS" != "Windows" ] || [ "$t" != "riscv64-none-elf" ]` 一类的分支），并向限制表添加一行
-2. 或采用 (a, a)：推迟波次关闭，发 mcpp 2026.9.18.3 修复后再合
+**`openkal-llvm-runtime` 分支当前状态**（公网可见）：
+```
+7e8a17c0 mcpp.toml: scope the openkal-musl dependency to hosted targets
+929eec56 Revert "ci: skip riscv64-none-elf on the Windows host matrix row"
+fcfda5c5 ci: skip riscv64-none-elf on the Windows host matrix row   ← 初稿（已 revert）
+c18ed7e2 ci: pin mcpp 2026.9.18.2, the release that realises posix on a freestanding target
+b3fa1226 ci: pin mcpp 2026.9.18.1, the release that carries [c-abi]
+```
 
-F1 应在用户拍板后立即执行；执行后 A2 转绿，方能进入 C1。
+F1 → 真实修复后，**记录 §6 不再加新限制行**。但记录的限表里那条"`_WIN32` declared undefined / measured defined"反映的是更基础的 mcpp 探针缺陷（Windows 主机 × 任何 freestanding × c-abi 探针），用户提出 workaround 时已显式拒绝这一行；真实修复绕开了它，限制表保持 6 行，不变。
+
+若 CI 重跑仍红，下一步是 mcpp 探针侧的修正（让 c-abi 探针在 `os = "none"` 下跳过，或剥离 Windows 主机宏注入），不属于本波范围。
+
+### 3.3 删除的处置方案（保留作为决策记录）
+
+初稿列出的三种组合中 **(c, c)**（双接受）被用户拒，理由是"不要 workaround，要真实 CI pass"。(a, a)（双修 mcpp）需要 2-3 小时发版周期。(b, b)（折中）最终落地——freestanding 不再承袭 musl，c-abi 在图外，结构性问题随之消失。
+
+### 3.4 A1 / A2 的 commit 措辞（已落地，确认）
+
+实际 commit message：
+- A1: `ci: pin mcpp 2026.9.18.2, the release that realises posix on macOS and accepts GCC where the realisation is empty`（5035005）
+- A2: `ci: pin mcpp 2026.9.18.2, the release that realises posix on a freestanding target`（c18ed7e2）
+
+两 commit 措辞互补（A1 强调 macOS / GCC，A2 强调 freestanding），与"措辞一致便于 review"的初衷略有偏离，但语义更准确，保留。
+
+### 3.5 A3 的三处改动（已落地）
+
+实际 commit `Raise min_mcpp and both CI MCPP_VERSION pins to 2026.9.18.2`（3a04408）：
+- `index.toml`：已抬
+- `tests/openkal/pins.toml`：已抬
+- `.github/workflows/openkal-compat.yml`：已抬
+
+### 3.6 A4 的 PR 描述要点
+
+PR #36 已开。实际标题 `docs: the C environment is declared, not implied --- the macro rules and the wave's records`。5 个 commit：README 三层宏规则修订、0.13 记录归因修订、设计稿、执行计划、新版 README。
+
+**A4 未跟踪文件清单**（已追加到 PR）：
+- `.agents/docs/2026-09-18-c-environment-record.md`（c-环境记录）
+- `.agents/docs/2026-09-18-c-environment-verify.sh`（沙箱验证脚本）
+- `.agents/docs/2026-09-18-c-environment-wrapup-plan.md`（本文件）
+
+追加 commit `docs: the c-environment record, the sandbox verify script and the wrapup plan`（1220d15）。后续的 c-abi 限制增订（f9bb1b5）在 CI 重跑结果出来后再回退——若真实修复让 CI 转绿，那一行限制就不再需要。
 
 ### 3.4 A1 / A2 的 commit 措辞（已落地，确认）
 
@@ -140,7 +169,7 @@ PR #36 已开。实际标题 `docs: the C environment is declared, not implied -
 | **A5** | 合并 #37 + tag 0.15.0 + 镜像；合并 #24 + tag 0.11.0 + 镜像；sha256 写进记录 §2 | A1.5 + A2.5 通过 | `gtc release` 流程 |
 | **A6** | PR #36 review + 合并（含追加未跟踪 3 文件） | 评审通过 | 文档无版本号，可独立发 |
 | **C3** | 抬 xim-pkgindex mcpp → .2 | 与 A5 并行 | **隐藏依赖**：执行计划 §5 第 4 步未明写 |
-| **F1** | 处置 §F：openkal-llvm-runtime Windows host × freestanding 矩阵跳过 + 限制表加一行 | 见 §3.2 | 决策点（c,c） vs （a,a） |
+| **F1** | **已落地**：commit `7e8a17c0` 真实修复——把 musl 依赖收窄到 hosted 目标；CI 重跑中 | 见 §3.2 | 不再算入 open work |
 
 ### 4.1 监视策略
 
@@ -170,7 +199,7 @@ PR #36 已开。实际标题 `docs: the C environment is declared, not implied -
 | **B1** | 跑 `.agents/docs/2026-09-18-c-environment-verify.sh` | C2 后 | 沙箱断言零失败 → 写入记录 §4 沙箱段 |
 | **B2** | 30 成员兼容性重测（Linux + Windows 两腿） | 在 #439 CI 中跑（`measure` job） | 与 0.13 基线对比；Windows 行预期入册记录 §4 兼容测量段 |
 | **B3** | 撤 compat.zlib / compat.mbedtls 适配 | **已在 #439（8fc4b63）** | 闸门：CI 转绿 = 声明生效；CI 失败 = 退回 |
-| **B4** | 填记录 §2（各包版本、PR 号、GitHub + GitCode 两端 sha256）、§4 沙箱段、§4 兼容测量段；自审覆盖限制表 7 行（含 §F） | B1 + B2 + B3 后 | |
+| **B4** | 填记录 §2（各包版本、PR 号、GitHub + GitCode 两端 sha256）、§4 沙箱段、§4 兼容测量段；自审覆盖限制表 6 行 | B1 + B2 + B3 后 | |
 | **E1** | 0.13 记录 09-17 归因修订 | **已在 PR #36（6bf6a33）** | 随 #36 merge |
 
 ### 6.1 B1 期望输出
@@ -206,7 +235,7 @@ B3 是 P6 设计判据。commit 8fc4b63 撤掉了 zlib 与 mbedtls 的两条 `-U
 
 | 编号 | 动作 | 备注 |
 | --- | --- | --- |
-| **Z1** | 更新 MEMORY：`openkal-c-environment-wave` 标记 closed，补充 PR 号、最终 sha、限制 7 行；`openkal-0-13-wave` 加新段落 `09-18 c-env close-out` | |
+| **Z1** | 更新 MEMORY：`openkal-c-environment-wave` 标记 closed，补充 PR 号、最终 sha、限制 6 行；`openkal-0-13-wave` 加新段落 `09-18 c-env close-out` | |
 | **Z2** | 在 mcpp / mcp-index / openkal-musl / openkal-llvm-runtime 的 README 中提示索引已发布 + 用户升级命令 | 执行计划 §7 的"可读失败"承诺对用户 |
 
 ### 8.1 Z2 的 README 提示措辞
@@ -216,7 +245,7 @@ mcpp 2026.9.18.2 is required for [c-abi] packages (openkal-musl 0.15.0+).
 Older engines silently misbuild them. Upgrade: `xlings install mcpp --force`.
 ```
 
-## 9. 与"已知不达标项"的边界（修订后 7 行）
+## 9. 与"已知不达标项"的边界（6 行；§F 已用真实修复关闭）
 
 | 限制 | 所在层 | 状态 |
 | --- | --- | --- |
@@ -226,7 +255,7 @@ Older engines silently misbuild them. Upgrade: `xlings install mcpp --force`.
 | 第三方库在 `__CYGWIN__` 下找 Cygwin 专有接口（`sys/cygwin.h`、`cygwin_conv_path`）—— 由测量暴露，逐包适配 | 第三方 | 本轮不闭合 |
 | `native`（ISO C 形态，picolibc 移植） | 设计 | 按 review 决定推迟 |
 | xlings LLVM 默认 sysroot 的两层问题（#858 已修一层，第二层无解） | xlings LLVM 包 | 本轮不闭合 |
-| **Windows 主机 × freestanding 目标的 c-abi 探针（clang 在 Windows 主机注入 `_WIN32`；freestanding 目标不应承袭 musl 的 `wchar=32`）**——见 §F | openkal-llvm-runtime CI + clang + mcpp | **新增**，本轮以 (c,c) 接受 |
+| **Windows 主机 × freestanding 目标的 c-abi 探针** | openkal-llvm-runtime CI + clang + mcpp | **已以真实修复**关闭：commit `7e8a17c0` 把 musl 依赖收窄到 hosted 目标，freestanding 不再承袭 c-abi 声明，结构性问题随之消失。CI 重跑确认中。若重跑仍红，再记入此表 |
 
 ## 10. 已观察到的执行细节（已更新）
 
