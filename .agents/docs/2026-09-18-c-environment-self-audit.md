@@ -118,10 +118,10 @@
 | `mcpplibs/mcpp-index#439` draft → ready + merge | 未做 | 用户拍板 |
 | `openkal` docs PR #36 merge | 未做 | 用户拍板 |
 | xim-pkgindex 自动同步（依赖 #439 merge 后抬 `min_mcpp`） | 未做 | 用户拍板 |
-| 沙箱验证脚本 `2026-09-18-c-environment-verify.sh` 跑通 | 部分跑：A 段 PASS、B/C/D/E 段 NOT-RUN（gated on 用户拍板 merge+tag+gtc release） | 用户拍板（须两个 openkal 包先有 tag） |
-| 30 成员重测：Linux 27/3 不变、Windows 15/15 转绿 | 未做 | 须 #439 merge 后重跑 measure job |
-| record §4 沙箱段"（待填）"回填 | **已填**（commit `cfc81db`）：A 段 PASS 证据、B-E 段 NOT-RUN 与同一个根因（`openkal-musl@0.15.0` / `openkal-llvm-runtime@0.11.0` 不在 xim-pkgindex） | — |
-| record §4 兼容测量段"（待填）"回填 | 未填（须 B2 数据） | 须 B2 |
+| 沙箱验证脚本 `2026-09-18-c-environment-verify.sh` 跑通 | **5/5 PASS，0 failed**（commit `64e8e67`）：A identity/mirror、B env probe (`code=0`, `long=8 wchar=4`)、C argv/paths/spawn、D libc++/libc++abi/libunwind exception unwinds 8 frames、E jmp_buf agreement。`mcpp 2026.9.18.3` + `openkal-musl 0.15.0` + `openkal-llvm-runtime 0.11.0` 在 Windows host × `x86_64-windows-gnu`（Wine 下）通过。 | — |
+| 30 成员重测 | **跑过**：Linux `x86_64-linux-gnu` 27/3（与 0.13 基线逐字节一致），Windows `x86_64-windows-gnu` 12/18（0.13 是 0/30，本轮 +12）。18 个失败成员在 §4 已列名（`archive` / `c-ares` / `capi-lua` / `catch2` / `cli11` / `cmp-module` / `curl` / `doctest` / `eigen` / `fmtlib.fmt` / `gzip-hpp` / `libpng` / `mimalloc` / `re2` / `spdlog` / `sqlite3` / `tinyhttps` / `zlib`），根因 compat.* 包在 `#ifdef _WIN32` 后 include Windows SDK 头（`<io.h>` / `<intrin.h>` / `<sys/mingw.h>`），c-abi 显式 posix 后该路径被关又无 posix 后备 | — |
+| record §4 沙箱段"（待填）"回填 | **已填**（commit `64e8e67`） | — |
+| record §4 兼容测量段"（待填）"回填 | **已填**（commit `dc53dc4`） | — |
 
 ## 12. 结论
 
