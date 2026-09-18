@@ -24,6 +24,10 @@ builtins   = "iso"
 
 | 包 | 版本 | PR | sha256 |
 | --- | --- | --- | --- |
+| mcpp 2026.9.18.3（linux-x86_64） | 2026.9.18.3 | mcpp#673 | `73caf98b7e58fa305dbd4add2abe2dc11e863a9bb6528ee33b28a7e757fbb423` |
+| mcpp 2026.9.18.3（linux-aarch64） | 2026.9.18.3 | mcpp#673 | `cd645375b0a56007470ef69b31e2384779759f8c41e32e9b664850d6bdb25c39` |
+| mcpp 2026.9.18.3（macosx-arm64） | 2026.9.18.3 | mcpp#673 | `ed21b8e54700a8b6068b647ebea92c1558e6d0b8261491934708997f99162d56` |
+| mcpp 2026.9.18.3（windows-x86_64） | 2026.9.18.3 | mcpp#673 | `d8ff25f7cb02ac318620d1b3689e1e8c358047c1aa90d77c1809d54aa1414f49` |
 | mcpp 2026.9.18.2（linux-x86_64） | 2026.9.18.2 | mcpp#671 | `161233baf04dc144658587c7ae3b9477ec138b1e1315068dfb78e379444dd269` |
 | mcpp 2026.9.18.2（linux-aarch64） | 2026.9.18.2 | mcpp#671 | `315206f074cb5e4fb4b6a3cc8f2f25088d252e76a702968b58e4dfe7bb9ddc8c` |
 | mcpp 2026.9.18.2（macosx-arm64） | 2026.9.18.2 | mcpp#671 | `f88da71a0b0354e47a4de6d95e334576fc93e48446b01d4356080435be6c7bec` |
@@ -32,7 +36,7 @@ builtins   = "iso"
 | openkal-llvm-runtime | 0.11.0 | openkal-llvm-runtime#24 | 待发布（§F 阻塞解除后打 tag + 镜像） |
 | mcpp-index（描述文件 + 闸门） | — | mcpplibs/mcpp-index#439 | 已合并前的准备阶段 |
 
-发版顺序由 xim-pkgindex 的 `min_mcpp` 闸门决定：mcpp → xim-pkgindex → 两个 openkal 包 → 索引抬闸门并登记描述文件 → 重新测量 → openkal 文档 PR → 沙箱验证 → 生态自审。mcpp 2026.9.18.1 与 2026.9.18.2 已发布；xim-pkgindex #861 已合并（注册 2026.9.18.2）。两个 openkal 仓库 PR-CI 在 draft mcpp 2026.9.18.3（mcpp-community/mcpp PR #673）下均 **5/5 PASS**（`MCPP_SOURCE_REF` repo variable 拉 draft 分支源码）；包本身的合并/tag/镜像等 mcpp#673 用户拍板后再做。
+发版顺序由 xim-pkgindex 的 `min_mcpp` 闸门决定：mcpp → xim-pkgindex → 两个 openkal 包 → 索引抬闸门并登记描述文件 → 重新测量 → openkal 文档 PR → 沙箱验证 → 生态自审。mcpp 2026.9.18.1、2026.9.18.2、2026.9.18.3 均已发布；xim-pkgindex #861 已合并（注册 2026.9.18.2）。两个 openkal 仓库 PR-CI 在 draft mcpp 2026.9.18.3（mcpp-community/mcpp PR #673）下均 **5/5 PASS**（`MCPP_SOURCE_REF` repo variable 拉 draft 分支源码）；2026.9.18.3 发版后，PR-CI 已切回 release 走 .3，再次 5/5 验证中。包本身的合并/tag/镜像等用户拍板后再做。
 
 **§F** 在 draft mcpp 上验证为真实修复：`cenv_probe::verify` 加 `hostStripMacros` 参数；`prepare.cppm` 在 Windows 主机下注入 `-U_WIN32 -U_WIN64 -U__MINGW32__ -U__MINGW64__`，Windows × freestanding 再加 `-ffreestanding`；freestanding wchar 无条件发 `-fno-short-wchar`。包层四条路径均已试过且均失败：CI 跳过（workaround，用户拒）、scope musl 到 hosted（破坏 `<__mbstate_t.h>`）、per-target `[c-abi] presents = "none"`、per-target `[c-abi] wchar = 16`——前两条已被 `git revert` 清出分支历史，后两条在 musl 分支留下 revert 记录。
 
