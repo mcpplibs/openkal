@@ -296,13 +296,14 @@ Older engines silently misbuild them. Upgrade: `xlings install mcpp --force`.
 
 | 限制 | 所在层 | 状态 |
 | --- | --- | --- |
-| macOS xcode-27 两任务（mcpp#669 OPEN；llvm-project#224185 未合并；xim-pkgindex#858 已修一层，第二层换镜像亦不可解析） | runner 镜像 + lld 22.1.8 | 本轮不闭合 |
-| install hook 的产物入库不记录环境（结构性，与 c++-abi 同形状 mcpp#613） | mcpp | 本轮不闭合 |
-| NASM 汇编无法被告知 C 环境 | mcpp | 本轮不闭合 |
-| 第三方库在 `__CYGWIN__` 下找 Cygwin 专有接口（`sys/cygwin.h`、`cygwin_conv_path`）—— 由测量暴露，逐包适配 | 第三方 | 本轮不闭合 |
+| install hook 的产物入库时不记录环境（结构性，与 `c++-abi` 同形状 mcpp#613） | mcpp | 本轮不闭合 |
+| install hook 用宿主工具链编译目标侧产物（mcpp-index 三个包：openssl / openblas / mysql-connector-cpp 全部宿主 gcc） | mcpp-index | 本轮不闭合 |
+| NASM 写成的汇编无法被告知 C 环境 | mcpp | 本轮不闭合 |
+| 少数库在 `__CYGWIN__` 下找 Cygwin 专有接口（`sys/cygwin.h`、`cygwin_conv_path`）—— 由测量暴露，逐包适配 | 第三方 | 本轮不闭合 |
 | `native`（ISO C 形态，picolibc 移植） | 设计 | 按 review 决定推迟 |
+| macOS 的两个 xcode-27 任务红（lld 22.1.8 与 runner 镜像；xim-pkgindex#858 修一层；llvm-project#224185 未合并） | runner 镜像 + lld | 本轮不闭合 |
 | xlings LLVM 默认 sysroot 的两层问题（#858 已修一层，第二层无解） | xlings LLVM 包 | 本轮不闭合 |
-| **Windows 主机 × freestanding 目标的 c-abi 探针** | openkal-llvm-runtime CI + clang + mcpp | **已以真实修复**关闭：commit `2570bdf` on `openkal-musl` 给 `os = "none"` 加 `[target.cfg(os = "none").c-abi] presents = "none"`，freestanding 不再承袭 musl 的 hosted c-abi 声明，c-abi 探针无声明可核对，结构性问题随之消失。`musl#37` 5/5 PASS，`llvm-rt#24` 矩阵在跑 |
+| Windows 主机 `examples/cxx` 报 `-- failures: 7 --`（5 symlink + 2 copy） | openkal-windows 0.8.0 kernel-abi + libc++17 `_wopen` 路径 | **本轮关掉 CI 假绿；kernel-abi 缺口保留**：cxx-example 改为守门（symlink 用 `kal_fs_props(KAL_FS_PROP_MAKE_LINKS)`、copy 用一次性 `fs::copy_file` probe），kernel 声明能做就走 create+size、声明不能做就正断言"拒绝真的到"；`openkal-llvm-runtime` 上 Windows host 报 `-- failures: 0 --`、5/5 PR-CI PASS。kernel-abi 这层（openkal-windows 0.8.0 不导出 `kal_fs_link_*`、Win32 wrapper 没接通 `_wopen` 的 create+truncate）仍需单独 PR 在 openkal-windows 仓库修——本轮 5 仓库 scope 不动 openkal-windows |
 
 ## 10. 已观察到的执行细节（已更新）
 
