@@ -3,31 +3,32 @@
 - 日期：2026-09-18
 - 依据：`2026-09-18-openkal-c-environment-and-personalities-design.md`、`2026-09-18-c-environment-execution-plan.md`、`2026-09-18-c-environment-record.md`
 - 范围：在 P0–P7 已大半完成的基础上，把剩下的 A/C/B/E/Z 五段推进到"波次关闭"
-- 状态（截至 2026-09-18 06:40 UTC）：A1 / A2 / A3 / A4 / B3 / E1 已**在现有分支上落地并推送**；§F 已用 mcpp 引擎侧**真实修复**（PR #673 draft）处置；两个 openkal 包 PR-CI 在 draft mcpp 下均 **5/5 PASS**；mcpp-index#439 `measure` 已 PASS（用 2026.9.18.2）；xim-pkgindex#861 已合并（mcpp → .2）；**mcpp#673 等待用户评估决定是否合入**
+- 状态（截至 2026-09-18 07:55 UTC）：A1 / A2 / A3 / A4 / B3 / E1 已**在现有分支上落地并推送**；§F 已用 mcpp 引擎侧**真实修复**（PR #673 已合并至 main，commit `7788d3e6`，release `2026.9.18.3` 已发版）处置；两个 openkal 包 PR-CI 在 released `2026.9.18.3` 下：musl `35320919702` 4/4 PASS、llvm-rt `35320580063` 5/5 PASS（c-environment 相关全绿）；用户已标记"windows ci 假绿"为 kernel-abi（openkal-windows 0.8.0）pre-existing 限制，撤 `|| true` 让 Windows host cxx-example 报 7 个真实失败，按 record §6 处理；xim-pkgindex#861 / #862 已合并（mcpp → .2 / .3）；xim-pkgindex 验证 .3 artifact 已发布（run `35317558823`）
 
-## 0. 真实当前状态（来自 gh pr view 与 git log，2026-09-18 04:56 UTC）
+## 0. 真实当前状态（来自 gh pr view 与 git log，2026-09-18 07:55 UTC）
 
 | 项 | 计划编号 | 实际位置 | 状态 | 下一步 |
 | --- | --- | --- | --- | --- |
-| openkal-musl 2026.9.18.2 pin | **A1** | `feat/c-environment` 5035005（推送于 04:46:54） | **CI 全绿**（5/5） | 合并 + tag 0.15.0 + 镜像 |
-| openkal-llvm-runtime 2026.9.18.2 pin | **A2** | `feat/c-environment` c18ed7e2（推送于 04:46:54） | **CI 4/5 绿，1 红**：Windows host × riscv64-none-elf 的 c-abi 探针（详见 §F） | 决定 §F 处置后再合并 |
+| openkal-musl 2026.9.18.3 pin | **A1** | `feat/c-environment` `f9ec0c2`（推送于 07:39:30，含 2026.9.18.3 提 pin） | **PR-CI 4/4 PASS**（run `35320919702`，released .3 路径） | 合并 + tag 0.15.0 + gtc release |
+| openkal-llvm-runtime 2026.9.18.3 pin | **A2** | `feat/c-environment` `4a297023` + `e9678aef`（撤 `|| true`） | **PR-CI 5/5 矩阵 + Windows host cxx 7 红**（run `35320580063`，5 个矩阵 job 全绿，c-environment 相关全绿；Windows host reach job 因 openkal-windows 0.8.0 kernel-abi 限制报 7 个真实失败——见 record §6 新增行） | 合并 + tag 0.11.0 + gtc release |
 | mcpp-index 三处 pin 抬 .2 | **A3** | `openkal-c-environment` 3a04408（推送于 04:50:26） | **CI 13/14 绿，1 待定**（measure linux/windows 仍在跑） | 等 measure 完成 → ready-for-review |
-| openkal docs PR | **A4** | PR #36，5 commits | **无 CI**（docs 分支无 workflow） | 等评审 |
+| openkal docs PR | **A4** | PR #36，6 commits（latest `6e295f7` fill §2 .3 sha256s） | **无 CI**（docs 分支无 workflow） | 等评审 |
 | compat.zlib / compat.mbedtls 适配撤回 | **B3** | `openkal-c-environment` 8fc4b63（已在 PR 中） | 含在 #439 | 随 #439 merge |
 | 0.13 记录 09-17 归因修订 | **E1** | `docs/c-environment` 6bf6a33 | 含在 PR #36 | 随 #36 merge |
+| §F 处置（Windows host × freestanding c-abi 探针） | **F1** | mcpp#673 merged `7788d3e6` → release `2026.9.18.3` | **真实修复已合入引擎** | 关闭本项；record §F 行已写明 |
 | 沙箱验证脚本 | **B1** | `.agents/docs/2026-09-18-c-environment-verify.sh`（未跟踪） | **未跑** | 索引发布后跑 |
 | 30 成员重测 | **B2** | 在 #439 CI 的 `measure (linux, windows through wine)` job | **待跑** | 等 #439 CI 完成 |
-| 记录 §2 / §4 沙箱 / §4 兼容 | **B4** | `.agents/docs/2026-09-18-c-environment-record.md`（未跟踪） | **未填** | 等 B1 + B2 + B3 完成 |
-| xim-pkgindex mcpp → .2 | **C3** | 仍为 .1 | **未做** | A5 后并行 |
+| 记录 §2 / §4 沙箱 / §4 兼容 | **B4** | `.agents/docs/2026-09-18-c-environment-record.md` | **§2 .3 sha256s 已填**；§4 沙箱 / §4 兼容待 B1 + B2 | 等 B1 + B2 |
+| xim-pkgindex mcpp → .3 | **C3** | #862 已合并（mcpp → .3），artifact 在 run 35317558823 发布 | **已做** | — |
 | 内存 / README 更新 | **Z1 / Z2** | — | **未做** | 关波前 |
 
-**实际剩 5 件实质工作**：处置 §F + C3 + C1（转 ready）+ A5/A6（合并+tag+镜像）+ B1（沙箱）+ B4（回填）+ Z1/Z2（关波）。E1 / B3 已在分支里。
+**实际剩**：A5/A6（合并+tag+镜像）+ C1（#439 转 ready + merge）+ B1（沙箱）+ B4（§4 回填）+ Z1/Z2（关波）。E1 / B3 / F1 已在分支或仓库里。
 
 ## 1. 关闭判据
 
 满足下列全部六条，波次即关：
 
-1. openkal-musl #37、openkal-llvm-runtime #24 CI 全绿（或 §F 处置被接受）、合并、tag 落地、镜像发出
+1. openkal-musl #37、openkal-llvm-runtime #24 **c-environment 相关 CI 全绿**、合并、tag 落地、镜像发出。"c-environment 相关"指 §F（探针 / 包层 / 引擎）这一对修复所触及的所有断言与 c-abi 探针匹配；其他与本轮无关、且 pre-existing 的限制（如 openkal-windows 0.8.0 的 kernel-abi 限制导致 Windows host cxx-example 的 7 个 symlink/copy 失败）按 record §6 处理，本条不予隐藏，也不视为关波阻塞
 2. mcpp-index #439 合并（含抬 `min_mcpp` / `MCPP_VERSION` + 登记两版 + 撤 zlib / mbedtls 适配）
 3. openkal docs PR #36 合并（README + 计划 + 设计 + 0.13 记录修订入主）
 4. 沙箱验证脚本（`2026-09-18-c-environment-verify.sh`）跑通，断言零失败
@@ -332,29 +333,23 @@ Older engines silently misbuild them. Upgrade: `xlings install mcpp --force`.
 2. 走 release.yml 发版 mcpp 2026.9.18.3
 
 **AI 立即执行**（无人值守）：
-3. 在 `mcpplibs/openkal-musl` 与 `mcpplibs/openkal-llvm-runtime` 仓库**删除** repo variable `MCPP_SOURCE_REF`（因为现在 .3 已发版，PR-CI 改回走 .3 release）
-4. 给两个 PR 加 commit `ci: pin mcpp 2026.9.18.3`（内容与 A1/A2 类似，但版本号改为 .3）：
-
-```
-ci: pin mcpp 2026.9.18.3, the release that strips the [c-abi] probe's
-host contamination on Windows and forces wchar = 32 on freestanding
-
-Closes §F: the Windows-host × riscv64-none-elf c-abi probe mismatch
-that 2026.9.18.2 could not detect through the package layer alone.
-```
+3. 在 `mcpplibs/openkal-musl` 与 `mcpplibs/openkal-llvm-runtime` 仓库**删除** repo variable `MCPP_SOURCE_REF`（因为现在 .3 已发版，PR-CI 改回走 .3 release） —— **完成**（07:38 UTC）
+4. 给两个 PR 加 commit `ci: pin mcpp 2026.9.18.3` —— **完成**（07:39 UTC，`openkal-musl` `f9ec0c2`、`openkal-llvm-runtime` `4a297023`）
+5. 撤 `openkal-llvm-runtime/.github/workflows/ci.yml:581` 与 `:602` 的 `|| true`，把"挑 OK 断言"的 grep 改成 `grep -q 'failures: 0'`，让 Windows host cxx-example 报真实状态 —— **完成**（07:54 UTC，`openkal-llvm-runtime` `e9678aef`）。本轮 kernel-abi 限制见 record §6 新增行
+6. 在 record §6 增"Windows host cxx-example 7 个失败"行；在 §1 第 1 条准则改写为"c-environment 相关 CI 全绿"，pre-existing 限制不再视为关波阻塞 —— **完成**
 
 ### 阶段 B — 包 PR 转绿后的 merge + tag + 镜像
 
 **用户操作**：
-5. 合 `openkal-musl#37`，tag `0.15.0`，`gtc release` 到 GitCode `mcpp-res/openkal-musl`
-6. 合 `openkal-llvm-runtime#24`，tag `0.11.0`，`gtc release` 到 GitCode `mcpp-res/openkal-llvm-runtime`
+7. 合 `openkal-musl#37`，tag `0.15.0`，`gtc release` 到 GitCode `mcpp-res/openkal-musl`
+8. 合 `openkal-llvm-runtime#24`，tag `0.11.0`，`gtc release` 到 GitCode `mcpp-res/openkal-llvm-runtime`（**注意**：llvm-rt PR-CI 在 Windows host reach job 上会红——这是 §6 已记录限制，不是 c-environment 回归；用户拍板时按"c-environment 相关全绿"判定，不要求该 job 绿）
 
 **AI 立即执行**（拿到 sha256 后）：
-7. 回填 `.agents/docs/2026-09-18-c-environment-record.md` §2 的 sha256
-8. 回退 `docs(record): add the Windows host × freestanding c-abi probe to the limits`（commit f9bb1b5）——真实修复已让 §F 关闭，限制行不再需要
-9. 跑 `2026-09-18-c-environment-verify.sh`（B1）——沙箱验证
-10. 触发 `mcpplibs/mcpp-index#439` 的 measure job 重测（B2）
-11. 回填 §4 沙箱段与 §4 兼容测量段
+9. 回填 `.agents/docs/2026-09-18-c-environment-record.md` §2 的 sha256 —— **完成**（07:48 UTC）
+10. 回退 `docs(record): add the Windows host × freestanding c-abi probe to the limits`（commit f9bb1b5）——真实修复已让 §F 关闭，限制行不再需要
+11. 跑 `2026-09-18-c-environment-verify.sh`（B1）——沙箱验证
+12. 触发 `mcpplibs/mcpp-index#439` 的 measure job 重测（B2）
+13. 回填 §4 沙箱段与 §4 兼容测量段
 
 ### 阶段 C — 索引落地
 
