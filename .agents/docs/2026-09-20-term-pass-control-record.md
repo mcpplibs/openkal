@@ -20,7 +20,7 @@
 | openkal-opensbi | [#17](https://github.com/mcpplibs/openkal-opensbi/pull/17) | 0.7.0 → 0.8.0 | 同上 |
 | openkal-musl | [#38](https://github.com/mcpplibs/openkal-musl/pull/38) | 0.15.0 → 0.16.0 | ioctl 路由到 `openkal.terminal`；信号处置只接受已生效的；`examples/terminal` + `tools/pty-keys.py` |
 | openkal-llvm-runtime | [#25](https://github.com/mcpplibs/openkal-llvm-runtime/pull/25) | 0.11.0 → 0.12.0 | 跟随 musl 0.16.0（并把停在 main 的 0.11.0 带回） |
-| mcpp-index | 待填 | — | 注册以上全部描述符 |
+| mcpp-index | [#442](https://github.com/mcpplibs/mcpp-index/pull/442) | — | 一次注册九个描述符；顺带补上 `main` 上缺的两处 `xpm.macosx` |
 
 ## 2. 设计落点（与设计稿的差异）
 
@@ -81,12 +81,74 @@ done
 
 **比较时去掉回车，排除的是一件已记录的事**：openkal 的模式字管「键入」，不管「写出」，所以输出后处理（`OPOST`/`ONLCR`）在本端口的 `tcsetattr` 下不受影响，而宿主 C 库的 `cfmakeraw` 会清掉它。两份 transcript 因此每行差一个字节，其余完全一致。这条限制写进了 openkal-musl 的 README 限制表，并作为下一波的候选问题记在设计稿 §7 O2。
 
-### 3.4 生态级
+### 3.4 生态级：一个真实的全屏程序
 
-（待填：发布、index 注册、沙箱解析、真实 TUI 程序 `re-cloud-code` 的构建与运行。）
+`/home/speak/workspace/scode/re-cloud-code` 是报告这个问题的项目——一个 C++ 全屏 TUI，`packages/tui-kit/src/term.cppm` 里正是 `tcgetattr` / `cfmakeraw` / `tcsetattr` 加 `sigaction(SIGINT)` 的写法，源码注释里还留着「openkal-musl 的 tcsetattr 答 ENOTTY」这一句。
+
+在本波的链上构建（`openkal-linux@0.14.0` · `openkal-musl@0.16.0` · `openkal-llvm-runtime@0.12.0`，目标 `x86_64-linux-musl`），在带尺寸的伪终端里运行：
+
+| 观察 | 结果 |
+| --- | --- |
+| 程序进入全屏并绘制 | 是（边框、颜色、状态行都在） |
+| 键入的文本到达程序 | 是——输入框里出现 `❯ hello openkal` |
+| 按下 `^C` 之后程序还在 | 是，且它把 `^C` 当作「清空输入」处理，而不是被结束 |
+
+对照 issue #36：同一类程序在旧链上 `tcsetattr rc=-1 errno=25`，然后 `Pane is dead (signal 2)`。
+
+这一项是用本地工作树（path 依赖）测的，因为它跑在 index 注册之前；注册之后的同一条链由 §3.5 的沙箱脚本按发布版本重新验证一次。
 
 ## 4. 本波修掉的、与设计无关但同源的缺陷
 
 - **`KAL_VERSION_MINOR` 停在 11**：整个生态的 `kal_version` 都答 0.11，条款 6.2 给 load 期绑定消费者的比较形同虚设。修正并加了检查。
 - **openkal-musl 的三处「报告成功却什么都没做」**：`TCGETS`、`TIOCGWINSZ` 不回写调用者结构，`SIG_IGN` 不安装。前两者由本波的 ioctl 路由一并解决，第三者改为「只接受已经生效的处置」。
 - **openkal-emscripten 的 absence 检查依赖 index**：它按本仓库清单里的版本号去 index 取规范，于是在提升版本的分支上必然失败，并把失败报成「链接没有提到 kal_process_spawn」。改为两个依赖都取工作树。
+
+## 5. 发布
+
+| 包 | 版本 | tag | sha256（GitHub archive 与 GitCode 资产逐字节相同） |
+| --- | --- | --- | --- |
+| openkal | 0.14.0 | `0.14.0` | `0e0410fbda5f246c79e45ff157c919e23173b3a8a12a90a9538aeeacea1e692c` |
+| openkal-linux | 0.14.0 | `0.14.0` | `331a6524a4ff604a208330f45c5b9f0ea17943f4783523a6170444341a27ef45` |
+| openkal-macos | 0.11.0 | `0.11.0` | `576356ead9a99bb299d9d8ac6e7d266064112cff1775252935922e67e6a45809` |
+| openkal-windows | 0.9.0 | `0.9.0` | `27122bef192b14998ba603ad54031b8c454e0ca372ce907ed5487fe5f7f33d02` |
+| openkal-emscripten | 0.3.0 | `0.3.0` | `34067d2ac9011344cd6cdf6f4866d771ba49b5e05d392bb0d51f573f31fe6606` |
+| openkal-uefi | 0.8.0 | `0.8.0` | `a1c920dc862a974431b7c8518cdb8085bc6d0ff22bbacbd4d97fe7f8b16720ac` |
+| openkal-opensbi | 0.8.0 | `0.8.0` | `557a28f7d775871df7dad68422617d9bbcd844e8bb2be190f38fe87aab05e693` |
+| openkal-musl | 0.16.0 | `0.16.0` | `8ffa4a2a79fcc7fe7565c1e69624b9d3b575020ed97d2043e20cdf542d519105` |
+| openkal-llvm-runtime | 0.12.0 | `0.12.0` | `e009f6195ef517c40beaf5093cde59764fc870502aab5967f5a2817f8df47cff` |
+
+mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注册以上九个描述符。
+
+### 5.1 发布惯例上发现的一处缺陷（上一波留下的，本波未能修好）
+
+`openkal-musl 0.15.0` 与 `openkal-llvm-runtime 0.11.0` 在 GitHub 上的标签带 `v` 前缀，而描述符的 GLOBAL 地址按惯例写无前缀形式，**这两个版本的 GLOBAL 地址返回 14 字节的 Not Found**。补一个无前缀标签也修不好：GitCode 上的资产不是 GitHub archive 本身（`75803192…` 对 `ee953bd8…`），而一个版本只有一个 sha256。要修得把 GitCode 资产换成 GitHub 的 archive，而同名资产 `gtc` 拒绝覆盖。已在 index PR 里记录，留给仓库所有者。
+
+本波九个包都按惯例发布：无前缀标签，GitCode 资产是 GitHub archive 原样上传，两边 sha256 相同（openkal 0.14.0 下载两边比对确认）。
+
+## 6. 生态级自我 review
+
+按本波计划 §1 的八个角度逐条回答，附上没有做到的那几项。
+
+| 角度 | 结论与证据 |
+| --- | --- |
+| 架构 | 净增一个模式位、一条条款 6.2 的规则、两条实现规则、一条 §11 记录。不新增接口、不新增操作、不动结构布局、不动 props 字 |
+| 稳定性 | 旧实现读回 0 仍是真话，因此没有「先还债才能诚实」的前置；index 旧描述符原样保留，0.13 消费者不受影响 |
+| 优雅简洁 | 与被取代的方案相比，少了一条条款 6.2 的例外与一个强制 props 位；发现机制用的是 terminal.h 已承诺、套件已观察的 get/set 往返 |
+| 用户体验 | 消费者零改动：`tcgetattr` / `cfmakeraw` / `tcsetattr` 的既有写法在真实 TUI 上直接正确（§3.4） |
+| 兼容性 | 0.14 程序在 0.13 实现上读回 0 并可降级；版本号变真之后，用旧实现配新规范的组合会被套件判为过旧——这正是 version.h 那段话要的行为 |
+| 跨平台 | 四个实现各自映射本机机制的**全集**；没有线路规程的环境恒报 1 并忽略置 0 |
+| 一致性 | 规范文字不提 termios、不提 console；端口层的映射方向不对称，理由写在端口里 |
+| 无感升级 | 九个包按依赖序发布并一次注册；消费者改一行版本号 |
+| 测试覆盖 | 见下 |
+
+**测试覆盖的实情，包括没有覆盖到的部分。**
+
+- Linux 腿：端到端全覆盖——套件 199 held（带尺寸 pty）、端口探针与宿主 C 库逐行一致（CI 每次运行）、真实 TUI 程序在 pty 中键入与 `^C` 都正确。
+- macOS / Windows / emscripten 三条腿：编译、链接、套件都通过，但**CI 没有伪终端**，所以 `openkal.terminal` 段在这三条腿上报告为「未观察」。新位在它们上面是「按同一份源码形状映射、按同一套声明编译」而不是「被观察到」。
+- 可做而本波没做的下一步：macOS 的 CI 有 `script`，`OPENKAL_CONFORMANCE_RUNNER="script -q /dev/null"` 就能把套件放进伪终端里跑（`tools/run-conformance.sh` 里 `$runner "./$binary"` 是不加引号展开的，本就为此留着）。Windows 需要一个控制台宿主，代价更高。
+
+  **但现在打开它会立刻红，而红的原因是另一件事。** 没有父终端的 CI 里，`script` 开出来的伪终端窗口尺寸是 0x0；openkal-linux 与 openkal-macos 把这对零原样报成一个尺寸并返回 `kal_ok`，于是套件的「a reported display size is not zero in either dimension」不成立。openkal-emscripten 对同一情况的处理相反，它的注释写着 "A ZERO DIMENSION IS NOT A SIZE"，报 `kal_err_not_supported`。**三个实现对「尺寸是零」的答法不一致，而规范没有就此落过字**：本地用 `pty.fork` 不设尺寸跑套件就能重现（本波 §3.2 记的那一次）。
+
+  这项缺陷早于本波，影响面小（只在没有尺寸的伪终端上），修法也小（`terminal.h` 一句 + 两个实现各两行），但要动三个包的版本，所以记在这里留给下一波，和「打开 macOS 的伪终端行」一起做。
+
+**其余已知且记录在案的限制**：输出后处理（`OPOST`）不在模式字内，raw 模式下写 `\n` 仍会先得到回车；混合保留态恢复为环境惯常的集合；`VMIN`/`VTIME` 不可表达，要「会放弃的读」用 `kal_timeout_read`；openkal-musl 0.15.0 与 openkal-llvm-runtime 0.11.0 的 GLOBAL 镜像地址仍然取不到东西（上一波留下，修法需要所有者在 GitCode 侧删除同名资产）。
