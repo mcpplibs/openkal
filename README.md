@@ -179,6 +179,42 @@ Clause 9 has two halves, and both are here.
 names against `SURFACE.txt`. It detects the one freedom an implementation retains
 after the language has removed the others: the addition of names.
 
+**Which interfaces an implementation provides, derived rather than declared.**
+`tools/check-surface.sh --interfaces` prints the interfaces the artefact exports
+whole; `--toml` prints them as the array a package manifest carries:
+
+```bash
+bash tools/check-surface.sh --toml SURFACE.txt $(find target -name '*.o')
+```
+
+```toml
+provides-interfaces = [
+    "openkal.abort",
+    "openkal.stream",
+    "openkal.memory",
+]
+```
+
+It is a mode of the surface comparison rather than a second script because it is
+that comparison stopped one step earlier: clause 9 already walks `SURFACE.txt`
+group by group and decides, for each, whether the artefact exports it whole, in
+part, or not at all. A second derivation of the same walk would go stale the
+first time a group was added.
+
+A package's `provides-interfaces` is therefore generated from the artefact and
+not written by hand. A declaration derived from the thing it describes cannot
+disagree with it, and an implementation that gains an interface cannot forget to
+say so. A group exported in part is not listed: an interface is provided in whole
+or not at all (clause 3), so half of one is not a smaller claim but a different
+and false one.
+
+A build tool reads that array at dependency resolution, against the
+`requires-interfaces` a consumer states in its own package, and refuses a
+combination before anything is compiled. That is the first of the three times
+clause 6.2 tabulates, and the earliest at which the question can be answered —
+source that asks the same question with `#ifdef` asks it during preprocessing,
+which is earlier than any answer exists.
+
 **The behaviour.** [`conformance/`](conformance/) is a program an implementation
 runs against itself — 193 observations across fifteen interfaces, in four kinds:
 behaviour, ABI, stability and cost.

@@ -6,16 +6,43 @@
 # incomplete coverage, and it detects the one freedom an implementation retains
 # after the language has removed the others: the addition of names.
 #
-#   check-surface.sh [--complete] <surface-list> <object-or-archive>...
+#   check-surface.sh [--complete] [--interfaces|--toml] <surface-list> <object>...
 #
 # Without --complete, an absent name denotes an interface the implementation
 # does not provide, which clause 3 permits. With --complete, every name in the
 # list is required, which is what an implementation claiming the whole
 # specification asserts.
+#
+# --interfaces WRITES THE ANSWER THE COMPARISON ALREADY REACHES, AND THAT IS
+# WHY IT IS A MODE OF THIS SCRIPT RATHER THAN A SECOND ONE. Clause 9's surface
+# comparison walks SURFACE.txt group by group and decides, for each, whether
+# the artefact exports it whole, in part, or not at all. "Which interfaces does
+# this implementation provide" is that same walk, stopped one step earlier.
+# Deriving it anywhere else would be the same decision written twice, and the
+# copy would go stale the first time a group was added.
+#
+# --interfaces prints one interface name per line. --toml prints the array a
+# manifest carries, so that a package's `[kernel-abi] provides-interfaces` is
+# GENERATED FROM THE ARTEFACT rather than written by hand: a declaration
+# derived from the thing it describes cannot disagree with it, and a package
+# that gains an interface cannot forget to say so.
+#
+# A group exported in PART is a defect under --complete and is reported as
+# such; under --interfaces it is simply not listed, because an interface is
+# provided in whole or not at all (clause 3) and half of one is not a smaller
+# claim but a different, false one.
 set -euo pipefail
 
 complete=0
-if [ "${1:-}" = "--complete" ]; then complete=1; shift; fi
+emit=''
+while :; do
+    case "${1:-}" in
+        --complete)   complete=1; shift ;;
+        --interfaces) emit=lines;  shift ;;
+        --toml)       emit=toml;   shift ;;
+        *) break ;;
+    esac
+done
 
 list="${1:?usage: check-surface.sh [--complete] <surface-list> <object>...}"
 shift
@@ -93,6 +120,57 @@ done <<< "$found"
 # implementation does not provide and is not a deviation". A group none of whose
 # names is exported is an interface not provided. A group SOME of whose names
 # are exported is the thing this check exists to catch: half an interface.
+# --interfaces / --toml: the same group walk, reporting which interfaces the
+# artefact provides WHOLE. Written before the --complete block so that a caller
+# asking for both gets the list and the verdict from one reading of the list.
+if [ -n "$emit" ]; then
+    provided=''
+    group=''; want=''
+    emit_group() {
+        [ -n "$group" ] && [ -n "$want" ] || return 0
+        # `openkal.version` is not an interface (SURFACE.txt says so in its own
+        # header: it provides no resource). Every conforming implementation
+        # exports it, so listing it would put a name in every package's
+        # declaration that answers nothing.
+        [ "$group" != "openkal.version" ] || return 0
+        local present=0 absent=0
+        while read -r name; do
+            [ -n "$name" ] || continue
+            if grep -qxF -- "$name" <<< "$found"; then present=$((present+1))
+            else absent=$((absent+1)); fi
+        done <<< "$want"
+        if [ "$present" -gt 0 ] && [ "$absent" -eq 0 ]; then
+            provided="$provided$group
+"
+        fi
+    }
+    while IFS= read -r line; do
+        case "$line" in
+            # The heading may carry prose after the name --- SURFACE.txt's
+            # `openkal.version` row explains there why it is spelled as a group
+            # and is not an interface --- so the name is the first word of it
+            # and not the rest of the line.
+            '# openkal.'*) emit_group; group="${line#\# }"; group="${group%% *}"; want='' ;;
+            '#'*|'') ;;
+            *) want="$want$line
+" ;;
+        esac
+    done < "$list"
+    emit_group
+    if [ -z "$provided" ]; then
+        echo "no interface is exported whole; refusing to write an empty declaration" >&2
+        exit 1
+    fi
+    if [ "$emit" = toml ]; then
+        echo "provides-interfaces = ["
+        while read -r g; do [ -n "$g" ] && printf '    "%s",\n' "$g"; done <<< "$provided"
+        echo "]"
+    else
+        printf '%s' "$provided"
+    fi
+    exit 0
+fi
+
 if [ "$complete" -eq 1 ]; then
     group=''; want=''
     check_group() {
