@@ -571,6 +571,55 @@ jobs:
           fi
           rm -f src/extra.cpp
 
+      - name: The interface list is derived from the artefact
+        working-directory: examples/substitution/impl-fd
+        run: |
+          # `provides-interfaces` in a package manifest is a declaration, and a
+          # declaration is checked rather than trusted. The check available to
+          # it is clause 9's surface comparison, stopped one step earlier: the
+          # walk that decides whether each group is exported whole already
+          # answers "which interfaces does this implementation provide". This
+          # step asserts that the answer comes from the artefact and moves with
+          # it.
+          mcpp build > /dev/null
+          objs="$(find target -name '*.o' | tr '\n' ' ')"
+          bash ../../../tools/check-surface.sh --interfaces \
+            ../../../SURFACE.txt $objs > provided.txt
+          grep -qx 'openkal.stream' provided.txt || {
+            echo "the implementation exports openkal.stream whole and it was not listed"
+            cat provided.txt; exit 1
+          }
+          # `openkal.version` is exported by every conforming implementation
+          # and is not an interface --- SURFACE.txt says so in its own header.
+          # Listing it would put a name that answers nothing in every package.
+          if grep -qx 'openkal.version' provided.txt; then
+            echo "openkal.version is not an interface and must not be listed"; exit 1
+          fi
+
+          # REMOVE ONE DEFINITION AND THE INTERFACE MUST LEAVE THE LIST. An
+          # interface is provided in whole or not at all (clause 3), so a group
+          # exported in part is not a smaller claim but a different and false
+          # one. Without this leg the step above passes against a script that
+          # lists every group in SURFACE.txt and reads no artefact at all.
+          # `sed -i` reports success when it changes nothing, so the edit is
+          # asserted rather than assumed: an edit that silently missed would
+          # rebuild the same artefact and this leg would pass for the one
+          # reason it exists to rule out.
+          sed -i 's/^int kal_stream_flush/int kal_stream_flush_removed/' src/stream.cpp
+          grep -q 'kal_stream_flush_removed' src/stream.cpp || {
+            echo "the edit that removes one definition did not apply"; exit 1
+          }
+          rm -rf target
+          mcpp build > /dev/null
+          objs="$(find target -name '*.o' | tr '\n' ' ')"
+          bash ../../../tools/check-surface.sh --interfaces \
+            ../../../SURFACE.txt $objs > partial.txt || true
+          if grep -qx 'openkal.stream' partial.txt; then
+            echo "half an interface was reported as provided"
+            cat partial.txt; exit 1
+          fi
+          git checkout -- src/stream.cpp
+
   # ---------------------------------------------------------------------------
   # The suite, against the implementation for each system.
   #
