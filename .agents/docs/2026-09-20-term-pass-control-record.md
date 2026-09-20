@@ -147,9 +147,11 @@ B 这一行是版本修正的可观察形式：实现自述 0.14.0，而在本�
 
 mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注册以上九个描述符。
 
-### 5.1 发布惯例上发现的一处缺陷（上一波留下的，本波未能修好）
+### 5.1 发布惯例上发现的一处缺陷（上一波留下的，本波已修好）
 
-`openkal-musl 0.15.0` 与 `openkal-llvm-runtime 0.11.0` 在 GitHub 上的标签带 `v` 前缀，而描述符的 GLOBAL 地址按惯例写无前缀形式，**这两个版本的 GLOBAL 地址返回 14 字节的 Not Found**。补一个无前缀标签也修不好：GitCode 上的资产不是 GitHub archive 本身（`75803192…` 对 `ee953bd8…`），而一个版本只有一个 sha256。要修得把 GitCode 资产换成 GitHub 的 archive，而同名资产 `gtc` 拒绝覆盖。已在 index PR 里记录，留给仓库所有者。
+`openkal-musl 0.15.0` 与 `openkal-llvm-runtime 0.11.0` 在 GitHub 上的标签带 `v` 前缀，而描述符的 GLOBAL 地址按惯例写无前缀形式，**这两个版本的 GLOBAL 地址曾返回 14 字节的 Not Found**。只补一个无前缀标签修不好：GitCode 上的资产不是 GitHub archive 本身（`75803192…` 对 `ee953bd8…`），而一个版本只有一个 sha256，所以无论地址怎么写两边都不可能同时对。
+
+**改源头而不是改描述符**：仓库所有者在 GitCode 侧删除了那两个资产之后，两个仓库各补了指向同一提交的无前缀标签，该标签的 GitHub archive 用 `gtc` 上传顶替原资产，描述符写这同一个文件的哈希。下载两边比对：`openkal-musl 0.15.0` = `ee953bd8…`、`openkal-llvm-runtime 0.11.0` = `b9b8eddb…`，GLOBAL 与 CN 逐字节相同。mcpp-index PR [#443](https://github.com/mcpplibs/mcpp-index/pull/443)。
 
 本波九个包都按惯例发布：无前缀标签，GitCode 资产是 GitHub archive 原样上传，两边 sha256 相同（openkal 0.14.0 下载两边比对确认）。
 
@@ -179,4 +181,4 @@ mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注�
 
   这项缺陷早于本波，影响面小（只在没有尺寸的伪终端上），修法也小（`terminal.h` 一句 + 两个实现各两行），但要动三个包的版本，所以记在这里留给下一波，和「打开 macOS 的伪终端行」一起做。
 
-**其余已知且记录在案的限制**：输出后处理（`OPOST`）不在模式字内，raw 模式下写 `\n` 仍会先得到回车；混合保留态恢复为环境惯常的集合；`VMIN`/`VTIME` 不可表达，要「会放弃的读」用 `kal_timeout_read`；openkal-musl 0.15.0 与 openkal-llvm-runtime 0.11.0 的 GLOBAL 镜像地址仍然取不到东西（上一波留下，修法需要所有者在 GitCode 侧删除同名资产）。
+**其余已知且记录在案的限制**：输出后处理（`OPOST`）不在模式字内，raw 模式下写 `\n` 仍会先得到回车；混合保留态恢复为环境惯常的集合；`VMIN`/`VTIME` 不可表达，要「会放弃的读」用 `kal_timeout_read`；openkal-musl 0.15.0 与 openkal-llvm-runtime 0.11.0 的镜像不一致（上一波留下）已在本波修好，见 §5.1。
