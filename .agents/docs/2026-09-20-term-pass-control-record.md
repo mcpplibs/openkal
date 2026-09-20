@@ -95,7 +95,7 @@ done
 
 对照 issue #36：同一类程序在旧链上 `tcsetattr rc=-1 errno=25`，然后 `Pane is dead (signal 2)`。
 
-这一项是用本地工作树（path 依赖）测的，因为它跑在 index 注册之前；注册之后的同一条链由 §3.5 的沙箱脚本按发布版本重新验证一次。
+这一项先用本地工作树（path 依赖）测了一遍，因为它跑在 index 注册之前；注册之后又按**只写版本号**的方式重做了一遍——十六个清单里只有一行 `openkal-llvm-runtime = "0.12.0"`，其余不变，重新构建后同样的两项观察：键入的文本到达程序、按下 `^C` 之后程序还在。消费者要做的就是这一行。
 
 ### 3.5 沙箱：只写版本号，从已发布的 index 解析
 
@@ -152,6 +152,8 @@ mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注�
 `openkal-musl 0.15.0` 与 `openkal-llvm-runtime 0.11.0` 在 GitHub 上的标签带 `v` 前缀，而描述符的 GLOBAL 地址按惯例写无前缀形式，**这两个版本的 GLOBAL 地址曾返回 14 字节的 Not Found**。只补一个无前缀标签修不好：GitCode 上的资产不是 GitHub archive 本身（`75803192…` 对 `ee953bd8…`），而一个版本只有一个 sha256，所以无论地址怎么写两边都不可能同时对。
 
 **改源头而不是改描述符**：仓库所有者在 GitCode 侧删除了那两个资产之后，两个仓库各补了指向同一提交的无前缀标签，该标签的 GitHub archive 用 `gtc` 上传顶替原资产，描述符写这同一个文件的哈希。下载两边比对：`openkal-musl 0.15.0` = `ee953bd8…`、`openkal-llvm-runtime 0.11.0` = `b9b8eddb…`，GLOBAL 与 CN 逐字节相同。mcpp-index PR [#443](https://github.com/mcpplibs/mcpp-index/pull/443)。
+
+修的过程中 index 自己的 CN 检查抓到一处附带损伤：`openkal-llvm-runtime 0.1.1` 的 GitCode 资产也不在了。用 GitHub 上同标签的 archive 补回，它的哈希正是描述符里原本写的那个（`d3c460e0…`），所以描述符不动。随后把九个 openkal 包的 135 条 CN 地址全扫了一遍，全部 200。
 
 本波九个包都按惯例发布：无前缀标签，GitCode 资产是 GitHub archive 原样上传，两边 sha256 相同（openkal 0.14.0 下载两边比对确认）。
 
