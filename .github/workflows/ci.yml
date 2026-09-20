@@ -581,8 +581,14 @@ jobs:
           # answers "which interfaces does this implementation provide". This
           # step asserts that the answer comes from the artefact and moves with
           # it.
-          mcpp build > /dev/null
+          # FROM A CLEAN BUILD. The step before this one introduces an
+          # unspecified name, requires the checker to reject it, and removes
+          # the source -- without removing the object it produced. A `find`
+          # over `target/` therefore still reports that name, and this step
+          # would be examining an artefact no source in the tree describes.
+          rm -rf target && mcpp build > /dev/null
           objs="$(find target -name '*.o' | tr '\n' ' ')"
+          [ -n "$objs" ] || { echo "no objects to examine"; exit 1; }
           bash ../../../tools/check-surface.sh --interfaces \
             ../../../SURFACE.txt $objs > provided.txt
           grep -qx 'openkal.stream' provided.txt || {
