@@ -153,6 +153,8 @@ mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注�
 
 **改源头而不是改描述符**：仓库所有者在 GitCode 侧删除了那两个资产之后，两个仓库各补了指向同一提交的无前缀标签，该标签的 GitHub archive 用 `gtc` 上传顶替原资产，描述符写这同一个文件的哈希。下载两边比对：`openkal-musl 0.15.0` = `ee953bd8…`、`openkal-llvm-runtime 0.11.0` = `b9b8eddb…`，GLOBAL 与 CN 逐字节相同。mcpp-index PR [#443](https://github.com/mcpplibs/mcpp-index/pull/443)。
 
+修的过程中 index 自己的 CN 检查抓到一处附带损伤：`openkal-llvm-runtime 0.1.1` 的 GitCode 资产也不在了。用 GitHub 上同标签的 archive 补回，它的哈希正是描述符里原本写的那个（`d3c460e0…`），所以描述符不动。随后把九个 openkal 包的 135 条 CN 地址全扫了一遍，全部 200。
+
 本波九个包都按惯例发布：无前缀标签，GitCode 资产是 GitHub archive 原样上传，两边 sha256 相同（openkal 0.14.0 下载两边比对确认）。
 
 ## 6. 生态级自我 review
