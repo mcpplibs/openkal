@@ -97,6 +97,34 @@ done
 
 这一项是用本地工作树（path 依赖）测的，因为它跑在 index 注册之前；注册之后的同一条链由 §3.5 的沙箱脚本按发布版本重新验证一次。
 
+### 3.5 沙箱：只写版本号，从已发布的 index 解析
+
+`xlings subos use term014 --sandbox --cmd "… bash 2026-09-20-term-pass-control-verify.sh"`，CN 镜像，mcpp 2026.9.18.3：
+
+```
+== A. identity and mirror ==
+ok: mcpp 2026.9.18.3
+ok: xlings mirror is CN
+
+== B. openkal 0.14.0 resolves and states its version ==
+ok: header 0.14.0 implementation 0.14.0 pass_control 4
+
+== C. the position is reachable as a macro and as a module constant ==
+ok: kal::terminal::pass_control and KAL_TERM_PASS_CONTROL_M are the same position
+
+== D. the interrupt keystroke arrives as data above openkal-musl 0.16.0 ==
+ok: the transcripts agree, keystroke for keystroke
+
+0 assertion(s) failed
+```
+
+B 这一行是版本修正的可观察形式：实现自述 0.14.0，而在本波之前每个实现都答 0.11.0。
+
+两件在这一步才暴露的事，都已修：
+
+1. **index 是按构件分发的，不是按 main 分支。** 合并之后 `Publish Index Artifact` 工作流把 `pkgs/**` 发成 `xlings-res/mcpp-index@v<sha>`，客户端同步到的是那个构件；在它发完之前，沙箱解析 0.14.0 会报「not found in the synced index (mcpplibs@artifact:8d87b18)」。等构件发布并 `mcpp index update` 之后一次通过。
+2. **脚本里的 pty 辅助文件不能叫 `pty.py`。** Python 把脚本自己所在目录放在导入路径最前面，于是它遮蔽了标准库的 `pty`，报 `AttributeError: partially initialized module 'pty' has no attribute 'fork'`——而脚本把这次失败归到了「本机 C 库也没收到这个按键」，即把自己的缺陷说成了对照组的。改名为 `ptykeys.py`。
+
 ## 4. 本波修掉的、与设计无关但同源的缺陷
 
 - **`KAL_VERSION_MINOR` 停在 11**：整个生态的 `kal_version` 都答 0.11，条款 6.2 给 load 期绑定消费者的比较形同虚设。修正并加了检查。
