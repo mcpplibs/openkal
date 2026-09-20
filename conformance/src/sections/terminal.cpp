@@ -85,6 +85,38 @@ void run() {
         kal_terminal_set_mode(out, original);
     }
 
+    // THE POSITION VERSION 0.14 ADDED, OBSERVED IN THE ONLY TERMS A SUITE HAS.
+    //
+    // Whether a keystroke arrives as a byte cannot be observed without a
+    // terminal somebody types at, and a run under continuous integration has
+    // none. What is observable is the pair: asking for the position is not an
+    // error, and what is read back is either the position or zero --- the two
+    // answers clause 6.2 permits, one from an implementation that distinguishes
+    // it and one from an implementation that does not. A third answer would
+    // mean a set that half took effect, which is the failure this interface can
+    // least afford.
+    {
+        const kal_uintptr pass = kal::terminal::pass_control.bits;
+        const int rc = kal_terminal_set_mode(out, original | pass);
+        observe(kind::behaviour, rc == kal_ok,
+                "asking that every keystroke be passed on is not an error");
+
+        kal_uintptr after = 0;
+        const int re = kal_terminal_get_mode(out, &after);
+        const kal_uintptr got = after & pass;
+        observe(kind::behaviour, re == kal_ok && (got == pass || got == 0),
+                "the position is either distinguished or reads as zero");
+
+        // AND THE TERMINAL IS PUT BACK, which is the other half of clause 7.11
+        // and the half a reader of this suite depends upon: the position that
+        // was just asked for is the one that stops the interrupt key working.
+        kal_terminal_set_mode(out, original);
+        kal_uintptr back = 0;
+        observe(kind::behaviour,
+                kal_terminal_get_mode(out, &back) == kal_ok && back == original,
+                "the mode the section found is the mode it leaves");
+    }
+
     // The display size, where it is known. An environment that cannot ask
     // reports not_supported and leaves both outputs untouched, so the outputs
     // are pre-set to a value the operation would not produce.

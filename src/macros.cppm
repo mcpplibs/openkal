@@ -104,6 +104,7 @@ inline constexpr kal_uintptr KAL_TASK_PROP_THREAD_LOCAL_M       = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_TASK_PROP_WAIT_TIMEOUT_M       = (kal_uintptr)(KAL_TASK_PROP_WAIT_TIMEOUT);
 inline constexpr kal_uintptr KAL_TERM_ECHO_M                    = (kal_uintptr)(KAL_TERM_ECHO);
 inline constexpr kal_uintptr KAL_TERM_LINE_EDIT_M               = (kal_uintptr)(KAL_TERM_LINE_EDIT);
+inline constexpr kal_uintptr KAL_TERM_PASS_CONTROL_M            = (kal_uintptr)(KAL_TERM_PASS_CONTROL);
 inline constexpr kal_uintptr KAL_TERM_PROP_MODE_M               = (kal_uintptr)(KAL_TERM_PROP_MODE);
 inline constexpr kal_uintptr KAL_TERM_PROP_SIZE_M               = (kal_uintptr)(KAL_TERM_PROP_SIZE);
 inline constexpr kal_uintptr KAL_TIME_PROP_MONOTONIC_SUSPENDS_M = (kal_uintptr)(KAL_TIME_PROP_MONOTONIC_SUSPENDS);

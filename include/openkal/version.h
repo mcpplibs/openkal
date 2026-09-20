@@ -31,9 +31,18 @@
  * consumer compares it with what `kal_version' answers and refuses to proceed
  * against an implementation older than the declarations it holds --- because an
  * older implementation reports conditions this consumer distinguishes as
- * conditions it does not, which is a wrong answer rather than a refusal. */
+ * conditions it does not, which is a wrong answer rather than a refusal.
+ *
+ * THE NUMBER IS CHECKED AGAINST THE PACKAGE, BECAUSE IT HAD DRIFTED. Every
+ * implementation answers `kal_version' with this constant, so a number left
+ * behind here is a number the whole ecosystem states: releases 0.12 and 0.13
+ * each went out with 11 written above, and the comparison a consumer makes was
+ * therefore between two equal numbers on every implementation there is.
+ * tools/check-version.sh compares these three with the package's own manifest,
+ * for the reason tools/check-readme-versions.sh exists --- the one fact a
+ * consumer actually asks for was checked by nobody. */
 #define KAL_VERSION_MAJOR 0u
-#define KAL_VERSION_MINOR 11u
+#define KAL_VERSION_MINOR 14u
 #define KAL_VERSION_PATCH 0u
 
 #define KAL_VERSION_MAKE(major, minor, patch)             \

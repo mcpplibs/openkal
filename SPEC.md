@@ -1,4 +1,4 @@
-# openkal Specification, version 0.13
+# openkal Specification, version 0.14
 
 ## 1. Scope
 
@@ -50,7 +50,7 @@ provides an interface in whole or not at all.
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.13 specifies the core and optional interfaces. The reserved row is not
+Version 0.14 specifies the core and optional interfaces. The reserved row is not
 specified, and its name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -521,6 +521,16 @@ and the positions within it. A position, once assigned, retains its meaning; a
 position that has not been assigned reads as zero, so that a program compiled
 against a later specification behaves correctly against an earlier
 implementation.
+
+A position is therefore assigned the sense in which zero is the weaker claim.
+An implementation that has never heard of a position answers with zero, and
+that answer is a statement about the implementation which has to be true; a
+position spelled the other way about would make the silence of every earlier
+implementation assert the stronger thing. The rule is stated here because it
+was recognised while assigning one: version 0.14 states whether an environment
+reserves keystrokes for itself, and the spelling in which zero meant *reserves
+none* would have had every implementation released before it claim a guarantee
+that none of them provides.
 
 A property that varies between the *resources* of an interface rather than
 between implementations cannot be a word, because there is no one answer to
@@ -1280,3 +1290,37 @@ The following are recorded so that they are not mistaken for oversights.
     with zero and does not require it; a caller that cannot tolerate the
     ambiguity reports the request as unsupported, which is what openkal-musl
     does.
+20. **A keystroke the environment keeps for itself.** **Settled in 0.14.**
+    `KAL_TERM_PASS_CONTROL` states whether the environment reserves any
+    keystroke for an action of its own, and a program that reads what is typed
+    asks for the position and reads the mode back. Admitted on the grounds
+    entry 10 records for locking: every environment this specification has been
+    implemented on reserves such keystrokes and spells the switch almost
+    identically — `ISIG` and the flags beside it, `ENABLE_PROCESSED_INPUT` — so
+    what was missing was a word and not a capability. The admission test of
+    clause 7.11 is met by three ordinary programs that cannot be written above
+    the interface without it: an editor, a pager, and a prompt with line editing
+    of its own.
+
+    **What its absence cost, and it was not a refusal.** A C environment above
+    this interface answers `tcsetattr` with the mode word. With no position for
+    the reserved keystrokes, a program that cleared line assembly and the echo
+    was still ended by the interrupt key, and no operation had misbehaved: the
+    implementation preserved what the specification had not named. Measured
+    against a host C library upon one terminal, and reported by the consumer
+    who met it.
+
+    **The position is spelled in the sense clause 6.2 now states**, so an
+    implementation released before it reads as zero and thereby says something
+    true about itself. The arrangement in which zero would have been the
+    guarantee was considered and not adopted: it required an exception to
+    clause 6.2 and a property position beside the mode position, to repair a
+    hazard that the spelling itself removes.
+
+    **What one position cannot record.** An environment may reserve several
+    classes of keystroke through separate mechanisms of its own, and a terminal
+    upon which some of them had been released is restored to the set the
+    environment ordinarily reserves. A position for each class was weighed and
+    declined: one of the three environments governs the classes with a single
+    switch, so the finer interface would have required of it a distinction it
+    does not have (clause 6.4).
