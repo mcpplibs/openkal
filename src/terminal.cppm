@@ -32,8 +32,13 @@ export namespace kal::terminal {
 struct mode_tag;
 using mode = kal::props<mode_tag>;
 
-inline constexpr mode line_edit{KAL_TERM_LINE_EDIT};
-inline constexpr mode echo     {KAL_TERM_ECHO};
+inline constexpr mode line_edit   {KAL_TERM_LINE_EDIT};
+inline constexpr mode echo        {KAL_TERM_ECHO};
+// Set, every keystroke reaches the program, including the ones the environment
+// would otherwise keep for itself; clear, the environment may reserve a set of
+// its own choosing. The position is spelled so that zero is the weaker claim,
+// which is what lets an implementation that predates it answer honestly.
+inline constexpr mode pass_control{KAL_TERM_PASS_CONTROL};
 
 struct props_tag;
 using props = kal::props<props_tag>;

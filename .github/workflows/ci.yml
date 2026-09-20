@@ -313,6 +313,39 @@ jobs:
             exit 1
           }
 
+      # WHAT THE DECLARATIONS SAY THE VERSION IS, AND WHAT THE PACKAGE IS.
+      #
+      # `kal_version' is `return KAL_VERSION;' in every implementation there is,
+      # so the three constants in version.h are what the ecosystem states about
+      # itself and the only thing a consumer bound at load can ask. They had
+      # drifted through two releases, and the comparison clause 6.2 gives that
+      # consumer was between two equal numbers the whole time.
+      - name: The declarations state the version this package is
+        if: runner.os != 'Windows'
+        run: bash tools/check-version.sh
+
+      # AND THE CHECK DETECTS WHAT IT EXISTS TO DETECT, for the reason the type
+      # check below is proved the same way: a check that reports success by
+      # finding nothing reports it identically when it has read nothing.
+      - name: The version check detects a drift
+        if: runner.os != 'Windows'
+        run: |
+          # `sed -i` IS NOT PORTABLE AND THIS MATRIX REACHES THE SYSTEM WHERE
+          # IT IS NOT: one of the three reads the next argument as the suffix
+          # for a backup file, so the edit is attempted upon a file named by
+          # the expression. Measured on this row, on the first run of this
+          # step. The edit is therefore written beside and moved over.
+          cp include/openkal/version.h /tmp/version.h.orig
+          sed 's/^#define KAL_VERSION_MINOR .*/#define KAL_VERSION_MINOR 11u/' \
+            /tmp/version.h.orig > include/openkal/version.h
+          if bash tools/check-version.sh; then
+            cp /tmp/version.h.orig include/openkal/version.h
+            echo "the version check accepted a number the package is not" >&2
+            exit 1
+          fi
+          cp /tmp/version.h.orig include/openkal/version.h
+          echo "the version check rejects a drifted number, as it must"
+
       - name: The module form compiles
         run: mcpp build
 
