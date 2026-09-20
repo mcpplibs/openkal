@@ -202,7 +202,14 @@ if [ $rc -ne 0 ] || [ -z "$bin" ]; then
     fail "the terminal probe did not build above openkal-musl $MUSL"
     printf '%s\n' "$out" | tail -10
 else
-    cat > "$work/pty.py" <<'PY'
+    # NOT NAMED pty.py. Python puts the script's own directory first on the import
+    # path, so a helper called pty.py shadows the standard module it imports:
+    #
+    #   AttributeError: partially initialized module 'pty' has no attribute 'fork'
+    #
+    # Measured in the sandbox, where it turned D into "not run" and said the
+    # machine's own C library was at fault.
+    cat > "$work/ptykeys.py" <<'PY'
 import os, pty, select, sys, time
 marker, keys, cmd = sys.argv[1].encode(), bytes.fromhex(sys.argv[2]), sys.argv[3:]
 pid, fd = pty.fork()
@@ -224,10 +231,10 @@ PY
     if ! command -v python3 >/dev/null 2>&1; then
         skip "D: no python3 here, so nothing can type at a pseudo-terminal"
     else
-        port=$(python3 "$work/pty.py" reading 61620371 "$bin" 2>/dev/null)
+        port=$(python3 "$work/ptykeys.py" reading 61620371 "$bin" 2>/dev/null)
         cc="$(command -v cc || command -v gcc || true)"
         if [ -n "$cc" ] && "$cc" "$work/term/src/main.c" -o "$work/control" 2>/dev/null; then
-            ctrl=$(python3 "$work/pty.py" reading 61620371 "$work/control" 2>/dev/null)
+            ctrl=$(python3 "$work/ptykeys.py" reading 61620371 "$work/control" 2>/dev/null)
             if printf '%s\n' "$ctrl" | grep -q 'byte 0x03'; then
                 if [ "$port" = "$ctrl" ]; then
                     ok "the transcripts agree, keystroke for keystroke"

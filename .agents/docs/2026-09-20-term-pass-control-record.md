@@ -97,6 +97,34 @@ done
 
 这一项是用本地工作树（path 依赖）测的，因为它跑在 index 注册之前；注册之后的同一条链由 §3.5 的沙箱脚本按发布版本重新验证一次。
 
+### 3.5 沙箱：只写版本号，从已发布的 index 解析
+
+`xlings subos use term014 --sandbox --cmd "… bash 2026-09-20-term-pass-control-verify.sh"`，CN 镜像，mcpp 2026.9.18.3：
+
+```
+== A. identity and mirror ==
+ok: mcpp 2026.9.18.3
+ok: xlings mirror is CN
+
+== B. openkal 0.14.0 resolves and states its version ==
+ok: header 0.14.0 implementation 0.14.0 pass_control 4
+
+== C. the position is reachable as a macro and as a module constant ==
+ok: kal::terminal::pass_control and KAL_TERM_PASS_CONTROL_M are the same position
+
+== D. the interrupt keystroke arrives as data above openkal-musl 0.16.0 ==
+ok: the transcripts agree, keystroke for keystroke
+
+0 assertion(s) failed
+```
+
+B 这一行是版本修正的可观察形式：实现自述 0.14.0，而在本波之前每个实现都答 0.11.0。
+
+两件在这一步才暴露的事，都已修：
+
+1. **index 是按构件分发的，不是按 main 分支。** 合并之后 `Publish Index Artifact` 工作流把 `pkgs/**` 发成 `xlings-res/mcpp-index@v<sha>`，客户端同步到的是那个构件；在它发完之前，沙箱解析 0.14.0 会报「not found in the synced index (mcpplibs@artifact:8d87b18)」。等构件发布并 `mcpp index update` 之后一次通过。
+2. **脚本里的 pty 辅助文件不能叫 `pty.py`。** Python 把脚本自己所在目录放在导入路径最前面，于是它遮蔽了标准库的 `pty`，报 `AttributeError: partially initialized module 'pty' has no attribute 'fork'`——而脚本把这次失败归到了「本机 C 库也没收到这个按键」，即把自己的缺陷说成了对照组的。改名为 `ptykeys.py`。
+
 ## 4. 本波修掉的、与设计无关但同源的缺陷
 
 - **`KAL_VERSION_MINOR` 停在 11**：整个生态的 `kal_version` 都答 0.11，条款 6.2 给 load 期绑定消费者的比较形同虚设。修正并加了检查。
@@ -119,9 +147,11 @@ done
 
 mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注册以上九个描述符。
 
-### 5.1 发布惯例上发现的一处缺陷（上一波留下的，本波未能修好）
+### 5.1 发布惯例上发现的一处缺陷（上一波留下的，本波已修好）
 
-`openkal-musl 0.15.0` 与 `openkal-llvm-runtime 0.11.0` 在 GitHub 上的标签带 `v` 前缀，而描述符的 GLOBAL 地址按惯例写无前缀形式，**这两个版本的 GLOBAL 地址返回 14 字节的 Not Found**。补一个无前缀标签也修不好：GitCode 上的资产不是 GitHub archive 本身（`75803192…` 对 `ee953bd8…`），而一个版本只有一个 sha256。要修得把 GitCode 资产换成 GitHub 的 archive，而同名资产 `gtc` 拒绝覆盖。已在 index PR 里记录，留给仓库所有者。
+`openkal-musl 0.15.0` 与 `openkal-llvm-runtime 0.11.0` 在 GitHub 上的标签带 `v` 前缀，而描述符的 GLOBAL 地址按惯例写无前缀形式，**这两个版本的 GLOBAL 地址曾返回 14 字节的 Not Found**。只补一个无前缀标签修不好：GitCode 上的资产不是 GitHub archive 本身（`75803192…` 对 `ee953bd8…`），而一个版本只有一个 sha256，所以无论地址怎么写两边都不可能同时对。
+
+**改源头而不是改描述符**：仓库所有者在 GitCode 侧删除了那两个资产之后，两个仓库各补了指向同一提交的无前缀标签，该标签的 GitHub archive 用 `gtc` 上传顶替原资产，描述符写这同一个文件的哈希。下载两边比对：`openkal-musl 0.15.0` = `ee953bd8…`、`openkal-llvm-runtime 0.11.0` = `b9b8eddb…`，GLOBAL 与 CN 逐字节相同。mcpp-index PR [#443](https://github.com/mcpplibs/mcpp-index/pull/443)。
 
 本波九个包都按惯例发布：无前缀标签，GitCode 资产是 GitHub archive 原样上传，两边 sha256 相同（openkal 0.14.0 下载两边比对确认）。
 
@@ -151,4 +181,4 @@ mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注�
 
   这项缺陷早于本波，影响面小（只在没有尺寸的伪终端上），修法也小（`terminal.h` 一句 + 两个实现各两行），但要动三个包的版本，所以记在这里留给下一波，和「打开 macOS 的伪终端行」一起做。
 
-**其余已知且记录在案的限制**：输出后处理（`OPOST`）不在模式字内，raw 模式下写 `\n` 仍会先得到回车；混合保留态恢复为环境惯常的集合；`VMIN`/`VTIME` 不可表达，要「会放弃的读」用 `kal_timeout_read`；openkal-musl 0.15.0 与 openkal-llvm-runtime 0.11.0 的 GLOBAL 镜像地址仍然取不到东西（上一波留下，修法需要所有者在 GitCode 侧删除同名资产）。
+**其余已知且记录在案的限制**：输出后处理（`OPOST`）不在模式字内，raw 模式下写 `\n` 仍会先得到回车；混合保留态恢复为环境惯常的集合；`VMIN`/`VTIME` 不可表达，要「会放弃的读」用 `kal_timeout_read`；openkal-musl 0.15.0 与 openkal-llvm-runtime 0.11.0 的镜像不一致（上一波留下）已在本波修好，见 §5.1。
