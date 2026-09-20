@@ -574,57 +574,69 @@ jobs:
       - name: The interface list is derived from the artefact
         working-directory: examples/substitution/impl-fd
         run: |
+          set -euo pipefail
           # `provides-interfaces` in a package manifest is a declaration, and a
           # declaration is checked rather than trusted. The check available to
-          # it is clause 9's surface comparison, stopped one step earlier: the
+          # it is clause 9's surface comparison stopped one step earlier: the
           # walk that decides whether each group is exported whole already
-          # answers "which interfaces does this implementation provide". This
-          # step asserts that the answer comes from the artefact and moves with
-          # it.
-          # FROM A CLEAN BUILD. The step before this one introduces an
-          # unspecified name, requires the checker to reject it, and removes
-          # the source -- without removing the object it produced. A `find`
-          # over `target/` therefore still reports that name, and this step
-          # would be examining an artefact no source in the tree describes.
-          rm -rf target && mcpp build > /dev/null
-          objs="$(find target -name '*.o' | tr '\n' ' ')"
-          [ -n "$objs" ] || { echo "no objects to examine"; exit 1; }
+          # answers which interfaces an implementation provides.
+          #
+          # THE SUBJECT IS A SYNTHETIC OBJECT BUILT FROM SURFACE.txt, AND NOT
+          # THIS EXAMPLE. `impl-fd` exists to show substitution, not
+          # conformance: it defines six of openkal.stream's seven names and
+          # none of the other groups, so no interface is exported whole and
+          # every leg below would be measuring an implementation that claims
+          # nothing. The object here is constructed so that the answer is known
+          # in advance, which is what lets the check fail for the one reason it
+          # exists to catch.
+          python3 - ../../../SURFACE.txt > fake.c <<'PY'
+          import sys
+          groups, cur = {}, None
+          for line in open(sys.argv[1], encoding='utf-8'):
+              line = line.rstrip('\n')
+              if line.startswith('# openkal.'):
+                  cur = line[2:].split(' ')[0]; groups[cur] = []
+              elif line.startswith('#') or not line.strip():
+                  continue
+              elif cur:
+                  groups[cur].append(line.strip())
+          # Three groups whole, and two names of a fourth: an interface is
+          # provided in whole or not at all, so the fourth must not be listed.
+          for g in ('openkal.version', 'openkal.abort', 'openkal.stream', 'openkal.memory'):
+              for n in groups.get(g, []):
+                  print(f'int {n}(void);\nint {n}(void) {{ return 0; }}')
+          for n in groups.get('openkal.fs', [])[:2]:
+              print(f'int {n}(void);\nint {n}(void) {{ return 0; }}')
+          PY
+          cc -c fake.c -o fake.o
           bash ../../../tools/check-surface.sh --interfaces \
-            ../../../SURFACE.txt $objs > provided.txt
-          grep -qx 'openkal.stream' provided.txt || {
-            echo "the implementation exports openkal.stream whole and it was not listed"
-            cat provided.txt; exit 1
-          }
+            ../../../SURFACE.txt fake.o > provided.txt
+          cat provided.txt
+
+          for want in openkal.abort openkal.stream openkal.memory; do
+            grep -qx "$want" provided.txt || {
+              echo "::error::$want is exported whole and was not listed"; exit 1; }
+          done
           # `openkal.version` is exported by every conforming implementation
           # and is not an interface --- SURFACE.txt says so in its own header.
           # Listing it would put a name that answers nothing in every package.
           if grep -qx 'openkal.version' provided.txt; then
-            echo "openkal.version is not an interface and must not be listed"; exit 1
+            echo "::error::openkal.version is not an interface and must not be listed"; exit 1
           fi
-
-          # REMOVE ONE DEFINITION AND THE INTERFACE MUST LEAVE THE LIST. An
-          # interface is provided in whole or not at all (clause 3), so a group
-          # exported in part is not a smaller claim but a different and false
-          # one. Without this leg the step above passes against a script that
-          # lists every group in SURFACE.txt and reads no artefact at all.
-          # `sed -i` reports success when it changes nothing, so the edit is
-          # asserted rather than assumed: an edit that silently missed would
-          # rebuild the same artefact and this leg would pass for the one
-          # reason it exists to rule out.
-          sed -i 's/^int kal_stream_flush/int kal_stream_flush_removed/' src/stream.cpp
-          grep -q 'kal_stream_flush_removed' src/stream.cpp || {
-            echo "the edit that removes one definition did not apply"; exit 1
-          }
-          rm -rf target
-          mcpp build > /dev/null
-          objs="$(find target -name '*.o' | tr '\n' ' ')"
-          bash ../../../tools/check-surface.sh --interfaces \
-            ../../../SURFACE.txt $objs > partial.txt || true
-          if grep -qx 'openkal.stream' partial.txt; then
-            echo "half an interface was reported as provided"
-            cat partial.txt; exit 1
+          # HALF AN INTERFACE IS NOT A SMALLER CLAIM. Without this leg the
+          # checks above pass against a script that prints every group in
+          # SURFACE.txt and reads no artefact at all.
+          if grep -qx 'openkal.fs' provided.txt; then
+            echo "::error::a group exported in part was reported as provided"; exit 1
           fi
-          git checkout -- src/stream.cpp
+          # And the --toml spelling is the same answer in the shape a manifest
+          # carries, because a package's declaration is generated from it.
+          bash ../../../tools/check-surface.sh --toml \
+            ../../../SURFACE.txt fake.o > provided.toml
+          grep -qx 'provides-interfaces = \[' provided.toml
+          grep -qx '    "openkal.stream",' provided.toml
+          rm -f fake.c fake.o provided.txt provided.toml
+          echo "  ok  the list is the artefact's own answer"
 
   # ---------------------------------------------------------------------------
   # The suite, against the implementation for each system.
