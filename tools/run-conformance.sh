@@ -221,13 +221,23 @@ fi
 # afterwards is what was just produced. Only the binaries are removed, so the
 # rebuild is a link and not a compile; and finding more than one afterwards is
 # now a condition rather than a choice.
-find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \) \
+#
+# AND THE NAME OF WHAT WAS BUILT IS NOT ONE NAME. Two of the targets this suite
+# is run for produce a program with a suffix: `.exe' on one system, and `.js'
+# beside a `.wasm' on the Web, where the file the runner is handed is the first
+# of the two. Measured 2026-09-20 on mcpp 2026.9.18.3, where the Web row
+# reported "expected exactly one suite to have been produced, found 0" for a
+# build that had just succeeded --- which names neither the cause nor anything
+# a reader can act upon.
+find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \
+                     -o -name 'openkal-conformance.js' \) \
     -delete 2> /dev/null || true
 
 mcpp build --features "$features" "$@"
 mkdir -p target && printf '%s' "$want_stamp" > "$stamp"
 
-produced="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \))"
+produced="$(find target -type f \( -name 'openkal-conformance' -o -name 'openkal-conformance.exe' \
+                                  -o -name 'openkal-conformance.js' \))"
 count="$(printf '%s\n' "$produced" | grep -c . || true)"
 [ "$count" = 1 ] || {
     echo "expected exactly one suite to have been produced, found $count:" >&2
