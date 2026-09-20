@@ -145,6 +145,10 @@ mcpp-index PR [#442](https://github.com/mcpplibs/mcpp-index/pull/442) 一次注�
 
 - Linux 腿：端到端全覆盖——套件 199 held（带尺寸 pty）、端口探针与宿主 C 库逐行一致（CI 每次运行）、真实 TUI 程序在 pty 中键入与 `^C` 都正确。
 - macOS / Windows / emscripten 三条腿：编译、链接、套件都通过，但**CI 没有伪终端**，所以 `openkal.terminal` 段在这三条腿上报告为「未观察」。新位在它们上面是「按同一份源码形状映射、按同一套声明编译」而不是「被观察到」。
-- 可做而本波没做的下一步：macOS 的 CI 有 `script`，可以把套件放进伪终端里跑，那条腿的终端段就能真正被观察。Windows 需要一个控制台宿主，代价更高。
+- 可做而本波没做的下一步：macOS 的 CI 有 `script`，`OPENKAL_CONFORMANCE_RUNNER="script -q /dev/null"` 就能把套件放进伪终端里跑（`tools/run-conformance.sh` 里 `$runner "./$binary"` 是不加引号展开的，本就为此留着）。Windows 需要一个控制台宿主，代价更高。
+
+  **但现在打开它会立刻红，而红的原因是另一件事。** 没有父终端的 CI 里，`script` 开出来的伪终端窗口尺寸是 0x0；openkal-linux 与 openkal-macos 把这对零原样报成一个尺寸并返回 `kal_ok`，于是套件的「a reported display size is not zero in either dimension」不成立。openkal-emscripten 对同一情况的处理相反，它的注释写着 "A ZERO DIMENSION IS NOT A SIZE"，报 `kal_err_not_supported`。**三个实现对「尺寸是零」的答法不一致，而规范没有就此落过字**：本地用 `pty.fork` 不设尺寸跑套件就能重现（本波 §3.2 记的那一次）。
+
+  这项缺陷早于本波，影响面小（只在没有尺寸的伪终端上），修法也小（`terminal.h` 一句 + 两个实现各两行），但要动三个包的版本，所以记在这里留给下一波，和「打开 macOS 的伪终端行」一起做。
 
 **其余已知且记录在案的限制**：输出后处理（`OPOST`）不在模式字内，raw 模式下写 `\n` 仍会先得到回车；混合保留态恢复为环境惯常的集合；`VMIN`/`VTIME` 不可表达，要「会放弃的读」用 `kal_timeout_read`；openkal-musl 0.15.0 与 openkal-llvm-runtime 0.11.0 的 GLOBAL 镜像地址仍然取不到东西（上一波留下，修法需要所有者在 GitCode 侧删除同名资产）。
