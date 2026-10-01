@@ -33,6 +33,8 @@ const char* argument_for(errand e) {
         case errand::exit_after_writing: return "--child-exit-after-writing";
         case errand::abort_with_message: return "--child-abort";
         case errand::wait_to_be_terminated: return "--child-wait";
+        case errand::report_grants:      return "--child-grants";
+        case errand::report_no_preopens: return "--child-no-preopens";
         case errand::none:               break;
     }
     return "";
@@ -50,6 +52,8 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::exit_after_writing))) return errand::exit_after_writing;
         if (same(a, len, argument_for(errand::abort_with_message))) return errand::abort_with_message;
         if (same(a, len, argument_for(errand::wait_to_be_terminated))) return errand::wait_to_be_terminated;
+        if (same(a, len, argument_for(errand::report_grants)))      return errand::report_grants;
+        if (same(a, len, argument_for(errand::report_no_preopens))) return errand::report_no_preopens;
     }
 #endif
     return errand::none;
@@ -134,6 +138,32 @@ after g_after;
 #else
             for (;;) { }
 #endif
+        case errand::report_grants:
+            // The copy reports through its status which part disagreed: the
+            // number of preopens, a name, or the directory behind a name.
+#ifdef MCPP_FEATURE_FS
+            {
+                if (kal_fs_preopen_count() != 2) kal_exit(40);
+                for (kal_uintptr i = 0; i < 2; ++i) {
+                    kal_dir d{}; char name[64]; kal_uintptr nlen = 0;
+                    if (kal_fs_preopen(i, &d, name, sizeof name, &nlen) != kal_ok) kal_exit(41);
+                    if (!same(name, nlen, grant_names[i])) kal_exit(42);
+                    kal_file f{}; char buf[8];
+                    if (kal_fs_open(d, grant_marker_file, sizeof grant_marker_file - 1,
+                                    kal::fs::open::read.bits, &f) != kal_ok) kal_exit(43);
+                    const kal_intptr r = kal_stream_read(kal_fs_stream(f), buf, sizeof buf);
+                    kal_fs_close_file(f);
+                    if (r < 0 || !same(buf, static_cast<kal_uintptr>(r), grant_markers[i])) kal_exit(44);
+                }
+                kal_exit(0);
+            }
+#endif
+            kal_exit(45);
+        case errand::report_no_preopens:
+#ifdef MCPP_FEATURE_FS
+            kal_exit(kal_fs_preopen_count() == 0 ? 0 : 46);
+#endif
+            kal_exit(45);
         case errand::none:
             break;
     }
@@ -232,10 +262,31 @@ bool start_copy(const char* first_element, const char* errand_argument,
     return e == kal_ok;
 }
 
+bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
+                         kal_uintptr count, int& status, int& terminated) {
+    kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
+    if (!locate_self(base, rel, rel_len)) return false;
+
+    const char* argv[2] = { "openkal-conformance-child", errand_argument };
+    kal_uintptr lens[2];
+    for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
+
+    const kal_spawn_streams streams{ 0, 0, 0 };
+    const kal_spawn         how{ base, base, nullptr, grants, count, 0 };
+    kal_process child{};
+    if (kal_process_spawn(&how, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
+                          &streams, &child) != kal_ok)
+        return false;
+    const int e = kal_process_wait(child, &status, &terminated);
+    kal_process_close(child);
+    return e == kal_ok;
+}
+
 #else
 
 bool start_copy(const char*, const char*, int&, int&) { return false; }
 bool start_copy_running(const char*, const char*, kal_process&) { return false; }
+bool start_copy_granting(const char*, const kal_preopen*, kal_uintptr, int&, int&) { return false; }
 
 #endif
 

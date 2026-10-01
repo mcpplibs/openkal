@@ -43,7 +43,7 @@
  * consumer actually asks for was checked by nobody. */
 #define KAL_VERSION_MAJOR 0u
 #define KAL_VERSION_MINOR 14u
-#define KAL_VERSION_PATCH 0u
+#define KAL_VERSION_PATCH 1u
 
 #define KAL_VERSION_MAKE(major, minor, patch)             \
     (((kal_u64)(major) << 32) | ((kal_u64)(minor) << 16) | \

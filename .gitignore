@@ -17,3 +17,8 @@ compile_commands.json
 # What a system leaves behind.
 .DS_Store
 Thumbs.db
+
+# Reviews of other people's issues and pull requests. They quote work that is not
+# ours and judge it before its authors have answered, so they stay on the machine
+# that wrote them.
+.agents/docs/reviews/

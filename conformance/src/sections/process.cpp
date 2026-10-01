@@ -292,6 +292,72 @@ void run() {
                        "a unit this implementation cannot form is refused, not ignored",
                        "the implementation claims prop_job");
         }
+
+        // A GRANT IS OBSERVED BY ITS EFFECT, WHICH IS VISIBLE TO AN openkal
+        // PROGRAM: the directories a started program receives are the ones it
+        // reads back through `kal_fs_preopen'. The copy is granted two
+        // directories, each holding a marker of its own, and reports whether it
+        // enumerates exactly those, in order, under the names given. A count of
+        // zero is a request for none, which is different from not asking.
+        //
+        // An implementation that does not claim the position refuses a grant
+        // rather than starting a program without it (clause 6.2). Version 0.14.1
+        // added both observations, because two implementations claimed the
+        // position for three releases while the program they started read back
+        // the directories it would have had anyway.
+        if (kal::process::has(kal::process::grant_dir)) {
+            const char* dirs[2] = { "okc-grant-a.tmp", "okc-grant-b.tmp" };
+            kal_preopen grants[2]{};
+            bool made = true;
+            for (int i = 0; i < 2; ++i) {
+                kal_uintptr n = 0; while (dirs[i][n]) ++n;
+                kal_fs_mkdir(kal::fs::working(), dirs[i], n);
+                kal_dir d{};
+                kal_file f{};
+                made = made && kal_fs_open_dir(kal::fs::working(), dirs[i], n, &d) == kal_ok
+                     && kal::fs::open_file(d, grant_marker_file, sizeof grant_marker_file - 1,
+                                           kal::fs::open::write | kal::fs::open::create
+                                               | kal::fs::open::truncate, &f) == kal_ok
+                     && kal_stream_write(kal_fs_stream(f), grant_markers[i], 1) == 1;
+                if (f.h) kal_fs_close_file(f);
+                kal_uintptr nl = 0; while (grant_names[i][nl]) ++nl;
+                grants[i] = kal_preopen{ d, grant_names[i], nl };
+            }
+            // A start that a claimed grant prevents is itself the failure: the
+            // copy is started from the directory that holds it, and placing a
+            // grant over that directory is one of the ways this went wrong.
+            int status = -1, terminated = -1;
+            if (made) {
+                const bool started = start_copy_granting(argument_for(errand::report_grants),
+                                                         grants, 2, status, terminated);
+                observe(kind::behaviour, started && terminated == 0 && status == 0,
+                        "granted directories are the started program's preopens, in order and by name");
+            } else {
+                unobserved(kind::behaviour, "granted directories are the started program's preopens",
+                           "the directories to grant could not be made");
+            }
+            const bool started = start_copy_granting(argument_for(errand::report_no_preopens),
+                                                     grants, 0, status, terminated);
+            observe(kind::behaviour, started && terminated == 0 && status == 0,
+                    "a count of zero starts a program with no preopens");
+            for (int i = 0; i < 2; ++i) {
+                kal_fs_remove(grants[i].dir, grant_marker_file, sizeof grant_marker_file - 1);
+                if (grants[i].dir.h) kal_fs_close_dir(grants[i].dir);
+                kal_uintptr n = 0; while (dirs[i][n]) ++n;
+                kal_fs_remove(kal::fs::working(), dirs[i], n);
+            }
+        } else {
+            kal_process p{};
+            const char* argv[1] = { "x" };
+            const kal_uintptr lens[1] = { 1 };
+            const kal_preopen grant{ kal::fs::working(), "x", 1 };
+            const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr,
+                                 &grant, 1, 0 };
+            const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
+                                            nullptr, nullptr, 0, nullptr, &p);
+            observe(kind::behaviour, e == kal_err_not_supported,
+                    "a grant this implementation cannot convey is refused, not ignored");
+        }
     }
 
     if (performs(kind::stability)) {

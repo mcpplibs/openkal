@@ -23,7 +23,17 @@ enum class errand {
     exit_after_writing,  // ... and shall not run what a C library would run after
     abort_with_message,  // kal_abort shall report the message and not return
     wait_to_be_terminated,   // so that a request to terminate has something to reach
+    report_grants,       // the directories a starter granted are its preopens
+    report_no_preopens,  // ... and a count of zero leaves it none (clause 7.13)
 };
+
+// The names the starter grants and the copy expects, in order, and the marker
+// each directory holds. The second name carries both separators an
+// implementation might use to convey names, so that one that does not quote
+// them is reported.
+inline constexpr const char* grant_names[2]   = { "/okc-grant-a", "okc-grant-b;," };
+inline constexpr const char* grant_markers[2] = { "A", "B" };
+inline constexpr const char  grant_marker_file[] = "okc-grant-marker";
 
 // What this program was started to do, or `none' if it was started by a person.
 errand child_errand();
@@ -55,5 +65,9 @@ bool start_copy(const char* first_element, const char* errand_argument,
 // running when it is made.
 bool start_copy_running(const char* first_element, const char* errand_argument,
                         kal_process& out);
+
+// The same, granting the copy the given directories.
+bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
+                         kal_uintptr count, int& status, int& terminated);
 
 }  // namespace okc
