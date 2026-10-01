@@ -1,6 +1,6 @@
 # 被起的程序收到什么:openkal-linux#30/#31、grant 传递,以及 tinyhttps#20–22 的设计方案
 
-日期:2026-10-01。状态:**v3,已按自我 review 修订,进入实现**(修订内容见 §12)。
+日期:2026-10-01。状态:**v4,已实施**(v3 修订见 §12;实施中发现并更正的前提见 §14)。
 v1 → v2:根据评审意见改动了以下几处:
 - D1 改为"现在就把 grant 做对",并补充对功能和需求的影响分析(§3);
 - 每个项目只发一次版,版本号用补丁版本避免下游连锁重发(§7);
@@ -343,3 +343,14 @@ KAL_PREOPENS=<pid>{;<fd>,<len>,<name>}
 | U1 | openkal-musl | `FDOP_CLOSE` 注释引用 §7.13(不发版) | S1 | 主线 |
 | R | 发布 | 规范 0.14.1 → linux 0.15.1 / macos 0.12.1 → tinyhttps 0.3.3 → mcpp-index | 全部 CI 通过 | 主线 |
 | V | 验证 | xlings subos 沙箱(CN 镜像)只写版本号解析;re-cloud-code 真实场景(bwrap) | R | 主线 |
+
+## 14. v4 更正(实施中发现):版本号写法是精确锁定,而非 caret
+
+§7 与 §12 假定 mcpp 对 `dep = "X.Y.Z"` 按 caret 解析,因而补丁版本无需下游重发即可传播。该假定不成立。`modules/versioning/src/version_req.cppm` 的 `is_constraint` 只把以 `^ ~ > < =` 开头或含逗号的写法视为约束;`src/build/prepare/graph_load.cpp` 对非约束的写法不做 semver 解析,按原样锁定。文档所说的"caret 默认"指约束语法内部的缺省运算符。沙箱实测:`openkal = "0.14.0"` 在 0.14.1 已登记后仍解析为 0.14.0。
+
+后果与处理:
+
+1. 修复到达使用者需要一次清单改动(写新的版本号),这一点写入各发布说明与 GHSA。tinyhttps 取 0.3.3 而非 0.4.0 的结论不变(补丁在语义上正确),但理由改为语义版本本身,而不是传播。
+2. 同一个图里对同一个包的两个精确版本无法满足。openkal-linux 0.15.1 与 openkal-macos 0.12.1 锁定规范 0.14.1,因此所有锁定规范、并可能与它们同图出现的包都要随之发布一次:openkal-windows 0.10.2、openkal-opensbi 0.8.1、openkal-uefi 0.8.1、openkal-emscripten 0.3.1(只改锁定版本),openkal-musl 0.19.3(锁定以上全部),openkal-llvm-runtime 0.15.3(锁定 musl 0.19.3)。每个仓库仍只发一次。
+3. 登记分三批进行,因为 musl 与 llvm-runtime 的 CI 从已发布的 index 解析其依赖:实现与规范(#498);四个只改锁定版本的实现;musl 与 llvm-runtime。
+4. 是否把生态内部的锁定改为 `^` 写法,使今后的补丁自动传播,属于生态策略,不在本轮决定。代价是规范 CI 的版本一致性检查按字符串比较,需要一并调整。
