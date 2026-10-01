@@ -162,8 +162,8 @@ inline int open_file(dir base, const char* name, kal_uintptr len,
 
 inline kal_uintptr preopen_count() { return kal_fs_preopen_count(); }
 
-// The first entry, which every implementation supplies and which denotes the
-// directory the program was started in.
+// The first entry, which denotes the directory the program was started in: the
+// one an implementation supplies, or the first a starter granted (clause 7.13).
 inline dir working() {
     dir d{}; kal_uintptr l = 0;
     kal_fs_preopen(0, &d, nullptr, 0, &l);

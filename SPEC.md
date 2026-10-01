@@ -1,4 +1,4 @@
-# openkal Specification, version 0.14
+# openkal Specification, version 0.14.1
 
 ## 1. Scope
 
@@ -925,6 +925,36 @@ handle.
 `".."` remains invalid. The asymmetry is the point: the first names the thing
 the program already holds, and the second names something it does not.
 
+### 7.13 What a started program receives
+
+A program started by `kal_process_spawn` shall receive the three streams and the
+directories its caller granted, and no other handle. The requirement includes a
+handle the calling program itself received from its own environment: such a
+handle was not granted by the caller, and a caller that starts programs inside a
+confinement relies on nothing reaching them that it did not name.
+
+Where the environment's mechanism for starting a program that needs an
+interpreter requires a handle to survive the start, an implementation may leave
+one. It shall name no more than the program being started, and shall be left
+only for a program that needs it.
+
+A granted directory is received as a preopen: the started program enumerates,
+through `kal_fs_preopen`, exactly the directories granted, in the order given and
+under the names given, and a grant of none leaves it none. The first grant is
+the directory the started program regards as the one it was started in, as the
+first preopen is for every program. How an implementation conveys a grant is its
+own concern; a grant confines a program that uses only its preopens, and the
+confinement of one that does not is the environment's responsibility (clause 11,
+entry 6).
+
+The requirement was descriptive in version 0.13, in clause 11, entry 18, and two
+implementations departed from it without any observation reporting the
+departure. One conveyed every inheritable handle of the caller; another conveyed
+a handle for the directory a program was found in, which reached the whole file
+system from inside a confinement. Each implementation observes the first
+paragraph in its own tests, since positions and handle tables are not portable;
+the conformance suite observes the third.
+
 ## 8. Evolution
 
 Each interface is versioned independently. A revision may add declarations and
@@ -1275,7 +1305,8 @@ The following are recorded so that they are not mistaken for oversights.
     waiting.
 18. **A stream at an arbitrary position of a started program.** Considered in
     0.13 and not defined. A started program receives three streams, and a
-    descriptor at any other position is not conveyed. A position is the shape of
+    descriptor at any other position is not conveyed; version 0.14.1 states this
+    as a requirement in clause 7.13. A position is the shape of
     one environment's descriptor table (clause 7.1): another environment conveys
     handles to a started program as a list of values and has no positions, and a
     started program would still need to be told where to look. Were the need

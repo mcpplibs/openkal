@@ -186,8 +186,19 @@ struct kal_spawn {
     struct kal_job* job;
 
     /* The directories the started program receives, read back through
-     * `kal_fs_preopen'. A count of zero starts a program with no preopens at
-     * all, which is a different thing from not asking. */
+     * `kal_fs_preopen' in the order given and under the names given. A count
+     * of zero starts a program with no preopens at all, which is a different
+     * thing from not asking (a null `grants'), which leaves the directories an
+     * implementation supplies by default.
+     *
+     * The first grant is the directory the started program regards as the one
+     * it was started in, as the first preopen is for every program; a C
+     * library above openkal resolves a relative name against it and an absolute
+     * name against the grant whose name is the longest prefix, so names that
+     * are absolute paths serve such a program best. A grant confines a program
+     * that uses only its preopens; one that reaches beyond them through its
+     * environment is confined by the environment or not at all. How a grant is
+     * conveyed is the implementation's concern. Clause 7.13. */
     const struct kal_preopen* grants;
     kal_uintptr               grant_count;
 
