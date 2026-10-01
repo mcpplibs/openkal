@@ -86,7 +86,7 @@ openkal-linux = "0.15.1"
 openkal-macos = "0.12.1"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.10.1"
+openkal-windows = "0.10.2"
 ```
 
 The program imports the interface and names no implementation.
