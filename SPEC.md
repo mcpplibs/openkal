@@ -1,4 +1,4 @@
-# openkal Specification, version 0.14.1
+# openkal Specification, version 0.15
 
 ## 1. Scope
 
@@ -50,7 +50,7 @@ provides an interface in whole or not at all.
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.14 specifies the core and optional interfaces. The reserved row is not
+Version 0.15 specifies the core and optional interfaces. The reserved row is not
 specified, and its name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1355,3 +1355,58 @@ The following are recorded so that they are not mistaken for oversights.
     declined: one of the three environments governs the classes with a single
     switch, so the finer interface would have required of it a distinction it
     does not have (clause 6.4).
+21. **The stack a running context stands on.** **Settled in 0.15.**
+    `kal_task_stack` reports the region the calling context's stack occupies.
+    It was asked for by the C library this specification is implemented
+    beneath: `pthread_getattr_np` had no honest answer above an implementation
+    of `openkal.task`, and the port replaced musl's two wrong answers with a
+    refusal (`mcpplibs/openkal-musl#49`). A refusal is correct and is still not
+    an answer, and the callers that want one are ordinary rather than exotic —
+    a run-time that keeps its own stacks off the native stack's end, a
+    collector that scans the region it stands on, an interpreter that checks
+    for room before it recurses. Whether the need is measured *here* is not
+    what admits the operation; clause 6.4 is, and it is answered below.
+
+    **It asks about the caller and takes no handle, and clause 7.2 is why.**
+    A handle is meaningful in the context of the party that obtained it, and
+    `kal_task_current` reports an identity rather than a handle — so a context
+    is the one resource its own code always stands on and can never hold. An
+    enquiry taking a context would have to answer for a context the
+    implementation does not control, which is the registry clause 7.1 refuses;
+    addressed this way, the implementation answers about the resource it is
+    running on and records nothing about any other.
+
+    **Every resource answers, which is what clause 6.4 requires.** A context
+    that is running can find its own stack in every environment
+    `openkal.task` is provided for, and the three mainstream systems are the
+    evidence: one answers a limit it grows the mapping against, one answers the
+    region it allocated for the thread, and one answers the bounds it built the
+    thread's stack from. The context a program was *started* on is the easiest
+    case rather than the hardest, because the program's first code is already
+    running on it. An environment that genuinely cannot answer does not provide
+    `openkal.task`, which clause 3 already expresses as an absence at the link:
+    a machine with firmware and no operating system provides none of that
+    interface and is unaffected, and an implementation that provides the
+    interface only when it can answer provides it whole, as
+    `openkal-emscripten` already does by defining the interface under one
+    feature and nothing without it.
+
+    **The size is the region the implementation vouches for, and where an
+    environment separates a reservation from a commitment it is the
+    reservation.** A caller places a guard below the region or measures the
+    room above it, and a bound that moved as the stack grew would answer the
+    second question wrongly and the first one not at all. The consequence is
+    stated where it can be met: an implementation that reports the reservation
+    and an implementation that reports only what is committed both conform, and
+    a caller is told which region it has rather than how large the environment
+    would have let it become.
+
+    **What this costs.** A context can be asked only about itself, so the C
+    library above answers `pthread_getattr_np` for the calling thread and
+    refuses every other thread rather than describing one it cannot see. That
+    is a smaller surface than the name suggests, it is uniform across the
+    contexts an implementation did not create, and it is recorded in that
+    port's own table of what it does not supply. The alternative — an answer
+    composed from a record the implementation kept about contexts it does not
+    control — is the shape clause 7.1 excludes, and the defect this entry
+    follows was a wrong range rather than a missing one.

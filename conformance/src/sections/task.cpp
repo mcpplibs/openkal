@@ -92,6 +92,43 @@ void records_its_identity(void*) {
     if (slot < kIdentities) g_identities[slot] = kal_task_current();
 }
 
+// Whether one reported region contains a given address, and whether it is a
+// region at all: not empty, and not wrapping the end of the address space.
+//
+// THESE THREE ARE THE WHOLE OF WHAT A CALLER CAN CHECK FROM WHERE IT STANDS,
+// and they are what the defect that produced this operation violated. The
+// range musl's implementation reported above this specification named a page of
+// the port's auxiliary vector for one context and a mapping the context never
+// ran on for another; both were plausible numbers and neither contained the
+// caller's own stack.
+int holds(kal_uintptr at, int e, void* base, kal_uintptr size) {
+    const kal_uintptr b = reinterpret_cast<kal_uintptr>(base);
+    return e == kal_ok && size != 0 && b + size > b && at >= b && at - b < size;
+}
+
+volatile int g_self_holds  = -1;
+volatile int g_self_stable = -1;
+
+// A started context asks about itself, from inside itself. The address of a
+// local is on its own stack, and taking that address is what makes the
+// compiler keep the variable in the frame rather than in a register.
+void asks_about_itself(void*) {
+    char here = 0;
+    const kal_uintptr at = reinterpret_cast<kal_uintptr>(&here);
+
+    void* base = nullptr;
+    kal_uintptr size = 0;
+    const int e = kal_task_stack(&base, &size);
+
+    void* base_again = nullptr;
+    kal_uintptr size_again = 0;
+    const int e_again = kal_task_stack(&base_again, &size_again);
+
+    store_release(&g_self_holds, holds(at, e, base, size));
+    store_release(&g_self_stable,
+                  e_again == kal_ok && base_again == base && size_again == size);
+}
+
 #endif
 
 }  // namespace
@@ -131,6 +168,55 @@ void run() {
             // nothing a consumer needs.
             observe(kind::behaviour, g_identity != 0,
                     "the identity of a started context is not zero");
+        }
+    }
+
+    // The region the calling context stands on, asked from where it stands.
+    //
+    // A RANGE THAT DOES NOT CONTAIN THE CALLER'S OWN STACK IS THE DEFECT THIS
+    // OPERATION EXISTS TO REMOVE, and containment is therefore the observation
+    // rather than the shape of the numbers. Every implementation that answers a
+    // plausible range and not the caller's one holds all of the others below.
+    {
+        char here = 0;
+        const kal_uintptr at = reinterpret_cast<kal_uintptr>(&here);
+
+        void* base = nullptr;
+        kal_uintptr size = 0;
+        const int e = kal_task_stack(&base, &size);
+        observe(kind::behaviour, e == kal_ok,
+                "the calling context's stack bounds are reported");
+        if (e == kal_ok) {
+            observe(kind::behaviour, holds(at, e, base, size),
+                    "the reported stack contains the calling context");
+            // A stack that moved while its context ran would answer a question
+            // about a region that is no longer this context's, and clause 7.2
+            // makes the answer a fact about where the caller stands.
+            void* base_again = nullptr;
+            kal_uintptr size_again = 0;
+            const int e_again = kal_task_stack(&base_again, &size_again);
+            observe(kind::behaviour,
+                    e_again == kal_ok && base_again == base && size_again == size
+                        && holds(at, e_again, base_again, size_again),
+                    "the same stack is reported for as long as the context runs");
+        } else {
+            unobserved(kind::behaviour, "the reported stack contains the calling context",
+                       "the enquiry did not answer");
+        }
+
+        // The same question from a context the implementation did not start on,
+        // which is the case an implementation is likeliest to answer with the
+        // starter's region.
+        kal_task t{};
+        if (kal_task_start(asks_about_itself, nullptr, &t) == kal_ok) {
+            kal_task_join(t);
+            observe(kind::behaviour, load_acquire(&g_self_holds) == 1,
+                    "a started context's stack bounds contain that context");
+            observe(kind::behaviour, load_acquire(&g_self_stable) == 1,
+                    "a started context is told the same stack each time it asks");
+        } else {
+            unobserved(kind::behaviour, "a started context's stack bounds contain that context",
+                       "a context could not be started");
         }
     }
 

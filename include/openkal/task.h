@@ -64,6 +64,44 @@ void kal_task_yield(void);
  * same moment; may be reused after one finishes. */
 kal_uintptr kal_task_current(void);
 
+/* The stack the CALLING context runs on: `base` is the lowest address it may
+ * use and `size` its length in bytes, so the usable region is
+ * [base, base + size). Version 0.15.
+ *
+ * IT ASKS ABOUT THE CALLER, AND TAKES NO HANDLE. A handle is meaningful in the
+ * context of the party that obtained it (clause 7.2), and `kal_task_current'
+ * reports an identity rather than a handle --- so a context is the one resource
+ * its own code always stands on and can never hold. An enquiry taking a context
+ * would have to be answered for a context the implementation does not control,
+ * which is the registry clause 7.1 excludes; addressed this way, an
+ * implementation answers only about the context it is running on.
+ *
+ * EVERY RESOURCE ANSWERS, WHICH IS WHAT ADMITS IT. Clause 6.4 refuses an
+ * operation that some resources of an interface can never satisfy, and clause
+ * 6.2 gives the shape a resource-varying property takes: an enquiry taking the
+ * resource, which transfers nothing and which no resource can fail to answer.
+ * A running context can find its own stack in every environment this interface
+ * is provided for; one that cannot does not provide `openkal.task' (clause 3),
+ * and there is no per-call refusal, which clause 6.1 forbids inside an
+ * interface that is provided.
+ *
+ * WHAT SIZE MEANS. The region the implementation is prepared to vouch for as
+ * usable by this context. Where an environment distinguishes a reservation it
+ * will grow on demand from what is committed to it at this moment, this is the
+ * reservation: a caller lays a guard below `base', or measures how much room
+ * remains above it, and a bound that moved as the stack grew would answer the
+ * second question wrongly and the first one not at all.
+ *
+ * `size' is never zero, because a running context has a stack. The answer does
+ * not change while the context runs --- a stack that moved would belong to a
+ * different context --- and it stops being meaningful when the context ends.
+ *
+ * A CALLER THAT WRITES BELOW `base' HAS LEFT THE REGION THIS NAMES, and what
+ * the environment then does is its own affair: some fault, and some map what
+ * was written. Naming the region is what this operation does; keeping off its
+ * end is what a caller does with the answer. */
+int kal_task_stack(void** base, kal_uintptr* size);
+
 /* How many contexts this environment can run at the same moment, or zero where
  * it cannot say. Version 0.10.
  *
