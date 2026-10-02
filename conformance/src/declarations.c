@@ -66,9 +66,9 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_fs_remove);
     (void)sizeof(&kal_fs_rename);
     (void)sizeof(&kal_fs_seek);
+    (void)sizeof(&kal_fs_set_executable_at);
     (void)sizeof(&kal_fs_set_modified);
     (void)sizeof(&kal_fs_set_modified_at);
-    (void)sizeof(&kal_fs_set_executable_at);
     (void)sizeof(&kal_fs_stream);
     (void)sizeof(&kal_fs_truncate);
     (void)sizeof(&kal_fs_unlock);
@@ -88,12 +88,12 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_process_channel);
     (void)sizeof(&kal_process_channel_close);
     (void)sizeof(&kal_process_close);
+    (void)sizeof(&kal_process_job_close);
+    (void)sizeof(&kal_process_job_enter);
+    (void)sizeof(&kal_process_job_terminate);
     (void)sizeof(&kal_process_props);
     (void)sizeof(&kal_process_spawn);
-    (void)sizeof(&kal_process_job_enter);
     (void)sizeof(&kal_process_stop_requested);
-    (void)sizeof(&kal_process_job_terminate);
-    (void)sizeof(&kal_process_job_close);
     (void)sizeof(&kal_process_terminate);
     (void)sizeof(&kal_process_wait);
     (void)sizeof(&kal_random_fill);
@@ -111,6 +111,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_task_join);
     (void)sizeof(&kal_task_parallelism);
     (void)sizeof(&kal_task_props);
+    (void)sizeof(&kal_task_stack);
     (void)sizeof(&kal_task_start);
     (void)sizeof(&kal_task_wait);
     (void)sizeof(&kal_task_wake);
