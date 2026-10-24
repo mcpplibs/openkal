@@ -498,6 +498,14 @@ kal_intptr kal_fs_link_read  (struct kal_dir base, const char* name, kal_uintptr
  * by closing the directory that produced it. The end is reported by the
  * iterator becoming zero.
  *
+ * AN ITERATOR IS PASSED WITH THE DIRECTORY THAT PRODUCED IT, and a closed
+ * directory is a released handle (clause 6.7): kal_fs_list_next given one
+ * reports kal_err_invalid and does not use the iterator, which closing the
+ * directory has released. An enumeration abandoned before its end is therefore
+ * ended by the close, and holds nothing afterwards --- measured before version
+ * 0.16 stated it, one implementation kept a descriptor for every directory a C
+ * library above it had stopped reading early, until the program ran out.
+ *
  * The name is copied into the caller's buffer for the reason given at
  * kal_fs_preopen; `name_len' reports the length it has. `kind' describes the
  * node the entry IS --- enumeration does not resolve, because a directory

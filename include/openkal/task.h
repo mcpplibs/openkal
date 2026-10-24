@@ -46,12 +46,44 @@ extern "C" {
  *     is what this interface provides. Copying an address space is
  *     `openkal.space'.
  *
- * The stack is provided by the implementation; its size is a property rather
- * than a parameter, because an environment that does not allocate stacks
- * separately cannot honour a request for one. An implementation across a
- * boundary allocates it too, so the crossed form asks for nothing the linked
+ * The stack is provided by the implementation, and here its size is the
+ * implementation's too; `kal_task_start_sized' states a least size. Where the
+ * stack is remains the implementation's in both forms. An implementation across
+ * a boundary allocates it too, so the crossed form asks for nothing the linked
  * form does not. */
 int kal_task_start(void (*entry)(void*), void* arg, struct kal_task* out);
+
+/* Starts a context whose stack is at least `stack_size' bytes. Version 0.16.
+ *
+ * Everything kal_task_start states holds, and in addition the started context,
+ * asking kal_task_stack, is told a size of at least `stack_size'. An
+ * implementation may provide more --- a size rounded to its granularity, or a
+ * least size of its own below which it does not go --- and zero asks for
+ * nothing beyond what kal_task_start provides.
+ *
+ * A LEAST SIZE AND NOT A SIZE, because a program that states one states what it
+ * needs: a recursion that must not fault, a run-time that keeps frames of its
+ * own. An implementation that rounded down would fault the program that asked,
+ * and one that is required to honour a smaller request than its own default has
+ * been required to do something no caller depends upon. The C library this
+ * specification is implemented beneath asks for its own default on every
+ * thread, and that default is smaller than what the implementations beneath it
+ * provide; under an exact size every thread would have lost room by asking.
+ *
+ * A REQUEST THE ENVIRONMENT CANNOT MEET IS kal_err_no_memory. A stack is
+ * memory, and an environment that bounds how large one may be bounds what is
+ * available, which clause 3.1 calls a supply: the outcome is the one kal_alloc
+ * reports when it is exhausted. It is not kal_err_not_supported. Every
+ * environment that starts a context gives it a stack, so the operation is not
+ * one some environments lack (clause 6.1), and an environment whose stacks are
+ * of one size meets every request up to that size.
+ *
+ * THERE IS NO FORM THAT TAKES A REGION. An environment that allocates a
+ * context's stack itself cannot run the context on a region it did not
+ * allocate, and the interface would then contain an operation some
+ * environments can never perform (clause 6.4). */
+int kal_task_start_sized(void (*entry)(void*), void* arg, kal_uintptr stack_size,
+                         struct kal_task* out);
 
 /* Waits for a context to finish. A context is waited for at most once. */
 int kal_task_join(struct kal_task);
