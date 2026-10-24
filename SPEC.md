@@ -1443,9 +1443,12 @@ The following are recorded so that they are not mistaken for oversights.
     `KAL_TERM_PASS_INPUT` states that what is typed reaches the program as the
     keystrokes produced it. Without it the return key reached a program in raw
     mode as a line feed in two of the three environments, the same byte
-    another key produces, and a program that inserts a line break on one key
-    and submits on the other could not be written (`mcpplibs/openkal#48`,
-    measured against a host C library on one terminal).
+    another key produces, and in the third Ctrl+J produced no byte at all; a
+    program that inserts a line break on one key and submits on the other
+    could not be written (`mcpplibs/openkal#48`, measured against a host C
+    library on one terminal, and on the third environment's console with the
+    keys written into it as key events). With the position set, all three
+    deliver the return key as 0x0d and Ctrl+J as 0x0a.
 
     **It is a position of its own and not a widening of
     `KAL_TERM_PASS_CONTROL`.** That position was assigned in 0.14 and retains
@@ -1463,11 +1466,14 @@ The following are recorded so that they are not mistaken for oversights.
     dimension, and it is spelled at the same granularity entry 20 chose: one
     position covers every mechanism by which the environment alters input.
 
-    **An environment that alters input only while it assembles lines** has no
-    separate switch, and reports the position as it stands rather than
-    composing one. The program asking is told by `kal_terminal_get_mode`, and
-    the C library above, which knows what it asked for, performs the
-    alteration itself where the environment would not have.
+    **An environment whose line assembly alters input whatever it is asked**
+    reports the position clear while it assembles lines, and a request leaves
+    it so; the program asking is told by `kal_terminal_get_mode`. The
+    alterations an environment applies when the position is clear are its own
+    and differ between the three, so the C library above, which knows what its
+    caller asked for, asks for unaltered input in raw mode and performs the
+    rewriting its caller asked for itself. That is how a caller of the C
+    library reads the same bytes on every environment.
 
 24. **What closing a directory does to its enumerations.** **Stated in
     0.16.** `openkal.fs` said from its first version that closing a directory

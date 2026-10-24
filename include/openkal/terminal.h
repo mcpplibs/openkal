@@ -106,12 +106,15 @@
  * no longer ends a line. That is what the same request does in the environments
  * that offer it natively, and it is what the C library above them maps to.
  *
- * AN ENVIRONMENT THAT CANNOT SEPARATE IT FROM ANOTHER POSITION reports it as it
- * stands and leaves it there. One environment alters input only while it
- * assembles lines and has no switch of its own for the alteration: it reports
- * this position set whenever line assembly is off, and a request it cannot
- * establish independently leaves the position as it is. kal_terminal_get_mode is
- * how a caller learns which happened, which is what the pair exists for. */
+ * AN ENVIRONMENT WHOSE LINE ASSEMBLY ALTERS INPUT WHATEVER IT IS ASKED reports
+ * the position clear while it assembles lines, and a request for it there
+ * leaves it clear. One environment does: assembling lines, it ends one at the
+ * return key as a carriage return and a line feed, and no switch it has changes
+ * that. With line assembly off its own switch for delivering what a key
+ * produces establishes the position, and without that switch it consumes
+ * Ctrl+J and delivers no byte --- measured, and the reason the position reads
+ * clear there. kal_terminal_get_mode is how a caller learns which happened,
+ * which is what the pair exists for. */
 
 /* Positions in the result of kal_terminal_props. */
 #define KAL_TERM_PROP_MODE ((kal_uintptr)1u << 0)  /* get_mode/set_mode are answered */
