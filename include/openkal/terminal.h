@@ -40,15 +40,14 @@
 /* KAL_TERM_PASS_CONTROL IS A GUARANTEE IN ONE DIRECTION AND A PERMISSION IN THE
  * OTHER. Set, every keystroke reaches the program, including the ones an
  * environment ordinarily keeps for itself. Clear, the environment may reserve
- * an agreed set of keystrokes for actions of its own. Whether the bytes a
+ * an agreed set of keystrokes for actions of its own. Which keystrokes those
+ * are belongs to the environment: an interface that required every environment
+ * to reserve the same ones would require of all of them what one of them
+ * happens to spell, which is the shape clause 7.1 excludes. Whether the bytes a
  * keystroke produces are altered on their way is a different question, and
  * KAL_TERM_PASS_INPUT answers it: up to version 0.15 this paragraph said that a
  * keystroke arrived "as the bytes it produces", which no environment that
  * rewrites the return key had done.
- * Which keystrokes those are belongs to the environment: an interface that
- * required every environment to reserve the same ones would require of all of
- * them what one of them happens to spell, which is the shape clause 7.1
- * excludes.
  *
  * A PROGRAM THAT READS KEYSTROKES CANNOT BE WRITTEN WITHOUT IT. openkal has no
  * signals, so a program that has turned line assembly off and reads what is
