@@ -131,7 +131,6 @@ void asks_about_itself(void*) {
 
 volatile int g_sized_holds  = -1;
 volatile int g_sized_room   = -1;
-volatile kal_uintptr g_sized_size = 0;
 
 // A recursion whose frames are touched one after another, so that an
 // environment which grows a stack a page at a time is given every page in
@@ -159,7 +158,6 @@ void asks_for_room(void*) {
     void* base = nullptr;
     kal_uintptr size = 0;
     const int e = kal_task_stack(&base, &size);
-    g_sized_size = size;
     store_release(&g_sized_holds, holds(at, e, base, size) && size >= kSizedAsk);
     g_recurse(static_cast<long>(kSizedAsk / 4 * 3 / 1024));
     store_release(&g_sized_room, 1);
