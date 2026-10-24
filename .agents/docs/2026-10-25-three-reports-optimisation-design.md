@@ -174,6 +174,6 @@ musl：
 
 ## 7. 待定与已知限制
 
-1. **macOS（standalone）上 fork 后的线程启动**：复制出的程序中 `pthread_create` 返回 `EAGAIN`。在 CI 上以未修改的 main（openkal-musl 0.20.1、openkal-macos 0.13.0）复现：`parent rc=0`，`copy rc=11`。这是既有缺陷，不由本轮引入，另行报告。
+1. **macOS（standalone）上 fork 后的线程启动**：复制出的程序中 `pthread_create` 返回 `EAGAIN`。在 CI 上以未修改的 main（openkal-musl 0.20.1、openkal-macos 0.13.0）复现：`parent rc=0`，`copy rc=11`。这是既有缺陷，不由本轮引入，已报告为 `mcpplibs/openkal-musl#55`。
 2. **Windows 行输入模式**下回车以 `0d 0a` 结束一行，与 Unix 的 `0a` 不同。这是行编辑而非 raw 输入的差异，不在本轮范围内。
 3. **`do_mmap` 对一切映射逐字节清零**（不止线程栈），根治需要 openkal.memory 声明零页属性。另行处理。
