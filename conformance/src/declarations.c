@@ -113,6 +113,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_task_props);
     (void)sizeof(&kal_task_stack);
     (void)sizeof(&kal_task_start);
+    (void)sizeof(&kal_task_start_sized);
     (void)sizeof(&kal_task_wait);
     (void)sizeof(&kal_task_wake);
     (void)sizeof(&kal_task_yield);

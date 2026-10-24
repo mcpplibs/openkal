@@ -129,6 +129,40 @@ void asks_about_itself(void*) {
                   e_again == kal_ok && base_again == base && size_again == size);
 }
 
+volatile int g_sized_holds  = -1;
+volatile int g_sized_room   = -1;
+
+// A recursion whose frames are touched one after another, so that an
+// environment which grows a stack a page at a time is given every page in
+// order. It is not a tail call, and it is reached through a pointer the compiler
+// cannot see through, so neither inlining nor the elimination of the frames
+// removes what it measures.
+long recurse(long n);
+long (*volatile g_recurse)(long) = recurse;
+long recurse(long n) {
+    volatile char pad[1000];
+    pad[0] = static_cast<char>(n);
+    if (n == 0) return 0;
+    return g_recurse(n - 1) + pad[0];
+}
+
+constexpr kal_uintptr kSizedAsk = 4u * 1024u * 1024u;
+
+// THE PROPERTY A CALLER RELIES ON IS ROOM, AND THE SIZE REPORTED IS HOW IT IS
+// NAMED. So both are observed: the region the context is told of is at least
+// what was asked for and contains the context, and a recursion of three
+// quarters of the request completes.
+void asks_for_room(void*) {
+    char here = 0;
+    const kal_uintptr at = reinterpret_cast<kal_uintptr>(&here);
+    void* base = nullptr;
+    kal_uintptr size = 0;
+    const int e = kal_task_stack(&base, &size);
+    store_release(&g_sized_holds, holds(at, e, base, size) && size >= kSizedAsk);
+    g_recurse(static_cast<long>(kSizedAsk / 4 * 3 / 1024));
+    store_release(&g_sized_room, 1);
+}
+
 #endif
 
 }  // namespace
@@ -217,6 +251,34 @@ void run() {
         } else {
             unobserved(kind::behaviour, "a started context's stack bounds contain that context",
                        "a context could not be started");
+        }
+
+        // A LEAST SIZE, version 0.16. A request the environment cannot meet is
+        // reported as exhaustion, which is an answer and not a defect, so it is
+        // recorded as not observed rather than as a failure.
+        kal_task sized{};
+        const int es = kal_task_start_sized(asks_for_room, nullptr, kSizedAsk, &sized);
+        if (es == kal_ok) {
+            kal_task_join(sized);
+            observe(kind::behaviour, load_acquire(&g_sized_holds) == 1,
+                    "a context started with a least stack size is told at least that size");
+            observe(kind::behaviour, load_acquire(&g_sized_room) == 1,
+                    "a context started with a least stack size has that room");
+        } else if (es == kal_err_no_memory) {
+            unobserved(kind::behaviour,
+                       "a context started with a least stack size is told at least that size",
+                       "the environment cannot provide a stack of four mebibytes");
+        } else {
+            observe(kind::behaviour, false,
+                    "a least stack size is met or reported as exhaustion");
+        }
+        kal_task plain{};
+        if (kal_task_start_sized(does_nothing, nullptr, 0, &plain) == kal_ok) {
+            observe(kind::behaviour, kal_task_join(plain) == kal_ok,
+                    "a least stack size of zero starts a context as kal_task_start does");
+        } else {
+            observe(kind::behaviour, false,
+                    "a least stack size of zero starts a context as kal_task_start does");
         }
     }
 

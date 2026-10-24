@@ -117,6 +117,30 @@ void run() {
                 "the mode the section found is the mode it leaves");
     }
 
+    // THE POSITION VERSION 0.16 ADDED, IN THE SAME TERMS. Asking that input
+    // arrive unaltered is not an error, and what is read back is the position
+    // or zero: zero from an implementation that predates it, and from an
+    // environment whose line assembly alters input whatever it is asked, which
+    // terminal.h states. The terminal is put back.
+    {
+        const kal_uintptr pass = kal::terminal::pass_input.bits;
+        const int rc = kal_terminal_set_mode(out, original | pass);
+        observe(kind::behaviour, rc == kal_ok,
+                "asking that input arrive unaltered is not an error");
+
+        kal_uintptr after = 0;
+        const int re = kal_terminal_get_mode(out, &after);
+        const kal_uintptr got = after & pass;
+        observe(kind::behaviour, re == kal_ok && (got == pass || got == 0),
+                "the unaltered-input position is either distinguished or reads as zero");
+
+        kal_terminal_set_mode(out, original);
+        kal_uintptr back = 0;
+        observe(kind::behaviour,
+                kal_terminal_get_mode(out, &back) == kal_ok && back == original,
+                "the mode the section found is the mode it leaves, after the input position");
+    }
+
     // The display size, where it is known. An environment that cannot ask
     // reports not_supported and leaves both outputs untouched, so the outputs
     // are pre-set to a value the operation would not produce.

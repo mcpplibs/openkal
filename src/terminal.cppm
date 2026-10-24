@@ -39,6 +39,10 @@ inline constexpr mode echo        {KAL_TERM_ECHO};
 // its own choosing. The position is spelled so that zero is the weaker claim,
 // which is what lets an implementation that predates it answer honestly.
 inline constexpr mode pass_control{KAL_TERM_PASS_CONTROL};
+// Set, what is typed arrives as the keystrokes produced it: the return key is a
+// carriage return and is not rewritten into a line feed. Independent of
+// pass_control, which says whether a keystroke is kept rather than altered.
+inline constexpr mode pass_input  {KAL_TERM_PASS_INPUT};
 
 struct props_tag;
 using props = kal::props<props_tag>;

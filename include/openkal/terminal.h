@@ -35,15 +35,19 @@
 #define KAL_TERM_LINE_EDIT    ((kal_uintptr)1u << 0)  /* the environment assembles lines       */
 #define KAL_TERM_ECHO         ((kal_uintptr)1u << 1)  /* the environment shows what is typed   */
 #define KAL_TERM_PASS_CONTROL ((kal_uintptr)1u << 2)  /* the environment reserves no keystroke */
+#define KAL_TERM_PASS_INPUT   ((kal_uintptr)1u << 3)  /* the environment alters nothing typed  */
 
 /* KAL_TERM_PASS_CONTROL IS A GUARANTEE IN ONE DIRECTION AND A PERMISSION IN THE
- * OTHER. Set, every keystroke reaches the program as the bytes it produces,
- * including the ones an environment ordinarily keeps for itself. Clear, the
- * environment may reserve an agreed set of keystrokes for actions of its own.
- * Which keystrokes those are belongs to the environment: an interface that
- * required every environment to reserve the same ones would require of all of
- * them what one of them happens to spell, which is the shape clause 7.1
- * excludes.
+ * OTHER. Set, every keystroke reaches the program, including the ones an
+ * environment ordinarily keeps for itself. Clear, the environment may reserve
+ * an agreed set of keystrokes for actions of its own. Which keystrokes those
+ * are belongs to the environment: an interface that required every environment
+ * to reserve the same ones would require of all of them what one of them
+ * happens to spell, which is the shape clause 7.1 excludes. Whether the bytes a
+ * keystroke produces are altered on their way is a different question, and
+ * KAL_TERM_PASS_INPUT answers it: up to version 0.15 this paragraph said that a
+ * keystroke arrived "as the bytes it produces", which no environment that
+ * rewrites the return key had done.
  *
  * A PROGRAM THAT READS KEYSTROKES CANNOT BE WRITTEN WITHOUT IT. openkal has no
  * signals, so a program that has turned line assembly off and reads what is
@@ -67,6 +71,49 @@
  * reserves. A position for each class of keystroke would record it, and would
  * require of an environment whose single switch governs them together a
  * distinction it does not have --- the defect clause 6.4 describes. */
+
+/* KAL_TERM_PASS_INPUT, VERSION 0.16. Set, what is typed reaches the program as
+ * the bytes the keystrokes produced: the return key is a carriage return
+ * (0x0d), and is not rewritten into the line feed (0x0a) another key produces.
+ * Clear, the environment may alter input on its way, and which alterations it
+ * makes are its own.
+ *
+ * A PROGRAM THAT TELLS KEYS APART CANNOT BE WRITTEN WITHOUT IT. An environment
+ * that rewrites the return key into a line feed delivers the return key and the
+ * key that produces a line feed as the same byte, and nothing above this
+ * interface can separate them again once the rewrite has happened. A program
+ * that inserts a line break on one and submits on the other is the ordinary
+ * case, not a contrived one.
+ *
+ * IT IS NOT KAL_TERM_PASS_CONTROL. That position says whether the environment
+ * KEEPS a keystroke; this one says whether it REWRITES one it delivers. The two
+ * are independent in every environment that has both, a program that reads
+ * keystrokes for line editing of its own wants the second without the first,
+ * and folding them into one position would have changed what the first had
+ * already said about every implementation released before this one (clause 8).
+ *
+ * THE POSITION COVERS EVERY MECHANISM BY WHICH THE ENVIRONMENT ALTERS INPUT, for
+ * the reason given for KAL_TERM_PASS_CONTROL: rewriting a carriage return or a
+ * line feed into the other, discarding a carriage return, and clearing the high
+ * bit of every byte, where the environment has them. It is read as set only
+ * where none is in effect. Clearing it restores the alteration the environment
+ * ordinarily applies.
+ *
+ * IT IS INDEPENDENT OF LINE ASSEMBLY, AND THE CONSEQUENCE IS STATED HERE. An
+ * environment that assembles lines ends one at a line feed, so a program that
+ * sets this position and keeps KAL_TERM_LINE_EDIT may find that the return key
+ * no longer ends a line. That is what the same request does in the environments
+ * that offer it natively, and it is what the C library above them maps to.
+ *
+ * AN ENVIRONMENT WHOSE LINE ASSEMBLY ALTERS INPUT WHATEVER IT IS ASKED reports
+ * the position clear while it assembles lines, and a request for it there
+ * leaves it clear. One environment does: assembling lines, it ends one at the
+ * return key as a carriage return and a line feed, and no switch it has changes
+ * that. With line assembly off its own switch for delivering what a key
+ * produces establishes the position, and without that switch it consumes
+ * Ctrl+J and delivers no byte --- measured, and the reason the position reads
+ * clear there. kal_terminal_get_mode is how a caller learns which happened,
+ * which is what the pair exists for. */
 
 /* Positions in the result of kal_terminal_props. */
 #define KAL_TERM_PROP_MODE ((kal_uintptr)1u << 0)  /* get_mode/set_mode are answered */

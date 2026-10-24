@@ -1,4 +1,4 @@
-# openkal Specification, version 0.15
+# openkal Specification, version 0.16
 
 ## 1. Scope
 
@@ -1410,3 +1410,80 @@ The following are recorded so that they are not mistaken for oversights.
     composed from a record the implementation kept about contexts it does not
     control — is the shape clause 7.1 excludes, and the defect this entry
     follows was a wrong range rather than a missing one.
+22. **A least size for a started context's stack.** **Settled in 0.16.**
+    `kal_task_start_sized` starts a context whose stack is at least the size
+    asked for. Version 0.15 said the size was "a property rather than a
+    parameter" and offered no enquiry that reported it, so it was neither: a
+    C library above accepted `pthread_attr_setstacksize`, ran every thread on
+    the implementation's own stack whatever was asked, and could not say how
+    large that was (`mcpplibs/openkal-musl#48`). The reason given — that an
+    environment which does not allocate stacks separately cannot honour a
+    request — named no environment, and every environment `openkal.task` is
+    implemented on takes a size natively: two of them as an argument of the
+    call that starts a thread, and the third because the implementation maps
+    the region itself.
+
+    **A least size, and a request beyond what the environment can give is
+    `kal_err_no_memory`.** Clause 3.1 is why this is a supply: a stack is
+    memory, and an environment that bounds its size bounds what is available,
+    which is the outcome `kal_alloc` reports when it is exhausted. A position
+    in `kal_task_props` saying whether requests are honoured was considered
+    and not adopted: it would have admitted an operation that a provided
+    interface answers with a refusal, which clause 6.1 treats as a defect, and
+    there is no environment it would have described. An exact size was
+    considered and not adopted, because the C library above asks for its own
+    default on every thread and that default is smaller than what the
+    implementations beneath it provide.
+
+    **There is no form taking a region**, for the reason the declaration
+    gives, and the C library above refuses a thread whose attributes name a
+    region rather than run it somewhere else and report success.
+
+23. **Whether input is altered on its way.** **Settled in 0.16.**
+    `KAL_TERM_PASS_INPUT` states that what is typed reaches the program as the
+    keystrokes produced it. Without it the return key reached a program in raw
+    mode as a line feed in two of the three environments, the same byte
+    another key produces, and in the third Ctrl+J produced no byte at all; a
+    program that inserts a line break on one key and submits on the other
+    could not be written (`mcpplibs/openkal#48`, measured against a host C
+    library on one terminal, and on the third environment's console with the
+    keys written into it as key events). With the position set, all three
+    deliver the return key as 0x0d and Ctrl+J as 0x0a.
+
+    **It is a position of its own and not a widening of
+    `KAL_TERM_PASS_CONTROL`.** That position was assigned in 0.14 and retains
+    its meaning (clause 6.2): implementations released before this one report
+    it set whenever no keystroke is reserved, and a reading that included the
+    alteration of input would have had each of them claim something about it
+    that it had never established. The two questions are also independent —
+    whether a keystroke is kept, and whether one that is delivered is
+    rewritten — and a program performing line editing of its own wants the
+    second without the first.
+
+    **It is not entry 20's declined finer position.** That entry declined a
+    position for each class of *reserved* keystroke, because one environment
+    governs the classes with a single switch. This position is a different
+    dimension, and it is spelled at the same granularity entry 20 chose: one
+    position covers every mechanism by which the environment alters input.
+
+    **An environment whose line assembly alters input whatever it is asked**
+    reports the position clear while it assembles lines, and a request leaves
+    it so; the program asking is told by `kal_terminal_get_mode`. The
+    alterations an environment applies when the position is clear are its own
+    and differ between the three, so the C library above, which knows what its
+    caller asked for, asks for unaltered input in raw mode and performs the
+    rewriting its caller asked for itself. That is how a caller of the C
+    library reads the same bytes on every environment.
+
+24. **What closing a directory does to its enumerations.** **Stated in
+    0.16.** `openkal.fs` said from its first version that closing a directory
+    releases the iterators it produced, and no observation reached the case.
+    One implementation released them only at the end, so a C library above
+    that stopped reading a directory early kept a descriptor for every
+    directory it closed, until a program that polled a directory ran out of
+    them (`mcpplibs/openkal-linux#34`). The declaration now states the
+    consequence for a caller as well: the directory is a released handle, and
+    `kal_fs_list_next` given it refuses rather than using an iterator the close
+    has released. Each implementation observes the release in its own tests,
+    because a count of open handles is not portable — clause 7.13 observes its
+    first paragraph the same way, for the same reason.

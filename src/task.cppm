@@ -20,6 +20,7 @@ export import openkal.types;
 export using ::kal_task;
 
 export using ::kal_task_start;
+export using ::kal_task_start_sized;
 export using ::kal_task_join;
 export using ::kal_task_yield;
 export using ::kal_task_current;
