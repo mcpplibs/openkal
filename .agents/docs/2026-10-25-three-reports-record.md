@@ -105,8 +105,8 @@ asked for and the implementations do not.
 
 **What a consumer must know.** A version written without an operator is an
 exact pin, so a program moves by naming the new versions. A program that
-carries the C++ runtime names `openkal-llvm-runtime` 0.15.5, which locks
-`openkal-musl` 0.21.0 and through it the implementations of this round.
+carries the C++ runtime names `openkal-llvm-runtime` 0.15.6, which locks
+`openkal-musl` 0.21.1 and through it the implementations of this round.
 
 What changes for such a program:
 - An iterator used after its directory was closed is refused. `fs.h` had always said it was released.
