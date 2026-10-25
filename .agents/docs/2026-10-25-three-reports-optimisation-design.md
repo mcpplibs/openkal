@@ -132,7 +132,7 @@ musl：
 | PASS_INPUT 的往返与"不重写" | Linux、macOS：自建 pty；Windows：自建控制台并写入键事件 | 成立 |
 | 规范 conformance | 三平台五行 + emscripten | Linux 200 held / 0 / 3 not observed；Windows 182 / 0 / 6 |
 
-另见：macOS 上 musl 经 `fork` 复制的程序中，`pthread_create` 返回 `EAGAIN`；未修改的 main 同样如此（§7）。
+另见：macOS 上 musl 经 `fork` 复制的程序中，`pthread_create` 返回 `EAGAIN`；未修改的 main 同样如此，已在本轮修复（§7）。
 
 ---
 
@@ -174,6 +174,6 @@ musl：
 
 ## 7. 待定与已知限制
 
-1. **macOS（standalone）上 fork 后的线程启动**：复制出的程序中 `pthread_create` 返回 `EAGAIN`。在 CI 上以未修改的 main（openkal-musl 0.20.1、openkal-macos 0.13.0）复现：`parent rc=0`，`copy rc=11`。这是既有缺陷，不由本轮引入，已报告为 `mcpplibs/openkal-musl#55`。
+1. **macOS（standalone）上 fork 后的线程启动**：复制出的程序中 `pthread_create` 返回 `EAGAIN`。在 CI 上以未修改的 main（openkal-musl 0.20.1、openkal-macos 0.13.0）复现：`parent rc=0`，`copy rc=11`。这是既有缺陷，不由本轮引入（`mcpplibs/openkal-musl#55`），已在本轮修复：openkal-macos 0.14.1 在复制原语前后按系统库自身的顺序调用其各部分的 fork 准备函数，详见记录 §5。
 2. **Windows 行输入模式**下回车以 `0d 0a` 结束一行，与 Unix 的 `0a` 不同。这是行编辑而非 raw 输入的差异，不在本轮范围内。
 3. **`do_mmap` 对一切映射逐字节清零**（不止线程栈），根治需要 openkal.memory 声明零页属性。另行处理。

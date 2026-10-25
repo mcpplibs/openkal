@@ -20,6 +20,10 @@ and the review of the round at the scale of the ecosystem. The verification is
 | `openkal-musl` | 0.21.0 | #54 | the stack size passed on; no stack mapped for a thread; a supplied stack refused; raw input; the dispatcher's frame |
 | `openkal-llvm-runtime` | 0.15.5 | #36 | the pin |
 | `mcpp-index` | — | #565 | the rows; two consumer members; the candidate gate schedules a platform package on its own platform |
+| `openkal-macos` | 0.14.1 | #29 | a copy of the space can start a thread (`mcpplibs/openkal-musl#55`) |
+| `openkal-musl` | 0.21.1 | #56 | the pin that reaches it; a program duplicated by `fork` starts a thread, asserted on every row |
+| `openkal-llvm-runtime` | 0.15.6 | #37 | the pin |
+| `mcpp-index` | — | #566 | the rows for the three; the two members move |
 
 Each release is a tag on the merge commit. The GLOBAL address is the tag
 archive and the CN address is the gitcode asset in `mcpp-res`, uploaded with
@@ -62,15 +66,16 @@ implementations merged passed.
 ## 4. The verification
 
 `2026-10-25-three-reports-verify.sh` resolves every package from the published
-index (artifact `0292416`, the index's merge of #565) with the CN mirror
+index (artifact `ad0f019`, the index's merge of #566) with the CN mirror
 selected, so each archive came from the gitcode asset. It builds the reporters'
 own programs:
+- a program duplicated by `fork` starting a thread (`mcpplibs/openkal-musl#55`);
 - the directory scan of `mcpplibs/openkal-linux#34`;
 - the recursion of `mcpplibs/openkal-musl#48`;
 - the raw-mode reader of `mcpplibs/openkal#48`, typed at through a pseudo terminal.
 
 It builds them above the C library both directly and through
-`openkal-llvm-runtime` 0.15.5 on `x86_64-linux-musl` with `llvm@23.1.3`, which
+`openkal-llvm-runtime` 0.15.6 on `x86_64-linux-musl` with `llvm@23.1.3`, which
 is the arrangement the reports were written in.
 
 It was run in the agent's own `xlings` environment, with the mirror chosen for
@@ -117,10 +122,23 @@ packages are named only for targets no runner builds (a musl environment,
 WebAssembly, a RISC-V machine), so the gate schedules none of them; their
 repositories measure them on their targets.
 
+**What was found, and fixed in the same round.**
+On macOS a program duplicated by `fork` could not start a thread: `pthread_create` returned `EAGAIN` in the copy (`mcpplibs/openkal-musl#55`). This was reproduced on unmodified `main`, so it predates the round. `kal_space_start` made the copy with the duplication primitive alone, and this system's `fork` does more: around the primitive each part of the system library takes its locks, and in the copy each makes its state true of the new process.
+
+Measured on macOS 14.8.9, in a program that duplicated itself with the primitive:
+
+| What the copy was given | What `pthread_create` returned in the copy |
+| --- | --- |
+| no preparation | `EAGAIN` |
+| the two child preparations alone | the copy was killed |
+| those, and the thread library's locks around the primitive | 0 |
+| the whole set in the library's own order | 0, in five rounds of twenty threads each |
+
+The routine `fork` calls these from (`_libSystem_atfork_*`) is not exported, but each part is. `openkal-macos` 0.14.1 calls the parts in that order, which is how the copy of `examples/stack-size` on the macOS row starts a thread (`exited=1 status=3`).
+
 **What was found and not changed.**
-1. On macOS, beneath the C library, a program duplicated by `fork` cannot start a thread: `pthread_create` returns `EAGAIN`. Reproduced on unmodified `main` (openkal-musl 0.20.1, openkal-macos 0.13.0). It predates this round and is `mcpplibs/openkal-musl#55`.
-2. On Windows, line assembly ends a line as `0d 0a`. That is line editing, not raw input, and is outside this round.
-3. The C library's `mmap` zeroes every mapping it returns, not only thread stacks. Removing that needs `openkal.memory` to state that a fresh page-sized allocation reads as zero.
+1. On Windows, line assembly ends a line as `0d 0a`. That is line editing, not raw input, and is outside this round.
+2. The C library's `mmap` zeroes every mapping it returns, not only thread stacks. Removing that needs `openkal.memory` to state that a fresh page-sized allocation reads as zero.
 
 ## 6. Transcript
 
@@ -137,27 +155,28 @@ ok: enumeration before=8 after=8
 ok: pty position=1 bytes=0d 0a
 ok: the lock records openkal-linux 0.17.0
 
-== C. openkal-musl 0.21.0: the reporters' three programs ==
+== C. openkal-musl 0.21.1: the reporters' three programs ==
 ok: #34: descriptors before=7 after=7
 ok: musl#48: 1024 KiB asked, 900 levels recursed
 ok: musl#48: a supplied stack is refused with EINVAL
 ok: musl#48: 4096 KiB asked, 3900 levels recursed
 ok: musl#48: a supplied stack is refused with EINVAL
+ok: musl#55: a program duplicated by fork starts a thread
 ok: #48: ICRNL reads back cleared after cfmakeraw
 ok: #48: Enter, Ctrl+J, q arrive as byte 0x0d byte 0x0a byte 0x71 
-ok: the lock records openkal-musl 0.21.0
+ok: the lock records openkal-musl 0.21.1
 
-== D. openkal-llvm-runtime 0.15.5 on x86_64-linux-musl, the reporters' arrangement ==
-ok: the lock records openkal-llvm-runtime 0.15.5 over openkal-musl 0.21.0
+== D. openkal-llvm-runtime 0.15.6 on x86_64-linux-musl, the reporters' arrangement ==
+ok: the lock records openkal-llvm-runtime 0.15.6 over openkal-musl 0.21.1
 ok: #34 through the runtime: descriptors before=7 after=7
 ok: musl#48 through the runtime: 4 MiB, 3900 levels
 ok: #48 through the runtime: byte 0x0d byte 0x0a byte 0x71 
-NOT RUN: macOS, Windows and WebAssembly: their implementations answered on their own runners (openkal-macos#28, openkal-windows#32, openkal-emscripten#7, openkal#50)
+NOT RUN: macOS, Windows and WebAssembly: their implementations answered on their own runners (openkal-macos#28 and #29, openkal-windows#32, openkal-emscripten#7, openkal#50; a program duplicated by fork starting a thread on macOS, openkal-musl#56)
 NOT RUN: a machine with firmware and no operating system: openkal-opensbi 0.8.3 moves a pin and provides none of the three interfaces
 
 0 assertion(s) failed
 not run:
-  - macOS, Windows and WebAssembly: their implementations answered on their own runners (openkal-macos#28, openkal-windows#32, openkal-emscripten#7, openkal#50)
+  - macOS, Windows and WebAssembly: their implementations answered on their own runners (openkal-macos#28 and #29, openkal-windows#32, openkal-emscripten#7, openkal#50; a program duplicated by fork starting a thread on macOS, openkal-musl#56)
   - a machine with firmware and no operating system: openkal-opensbi 0.8.3 moves a pin and provides none of the three interfaces
 exit=0
 ```

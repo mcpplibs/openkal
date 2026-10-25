@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Ecosystem verification for openkal 0.16.0 and the packages that move with it
-# (openkal-linux 0.17.0, openkal-macos 0.14.0, openkal-windows 0.12.0,
-# openkal-emscripten 0.5.0, openkal-opensbi 0.8.3, openkal-musl 0.21.0,
-# openkal-llvm-runtime 0.15.5), resolved from the published index only.
+# (openkal-linux 0.17.0, openkal-macos 0.14.1, openkal-windows 0.12.0,
+# openkal-emscripten 0.5.0, openkal-opensbi 0.8.3, openkal-musl 0.21.1,
+# openkal-llvm-runtime 0.15.6), resolved from the published index only.
 #
 #   xlings subos new okl016
 #   cp <this file> ~/.xlings/subos/okl016/tmp/v.sh
@@ -173,7 +173,7 @@ fi
 grep -q '0.17.0' "$work/impl/mcpp.lock" 2>/dev/null && ok "the lock records openkal-linux 0.17.0" || fail "the lock does not record openkal-linux 0.17.0"
 
 # -- C. the C library above it: the reporters' programs -----------------------
-section "C. openkal-musl 0.21.0: the reporters' three programs"
+section "C. openkal-musl 0.21.1: the reporters' three programs"
 mkdir -p "$work/musl/src"
 cat > "$work/musl/mcpp.toml" <<'TOML'
 [package]
@@ -181,7 +181,7 @@ name = "muslprobe"
 version = "0.1.0"
 
 [dependencies]
-openkal-musl = "0.21.0"
+openkal-musl = "0.21.1"
 
 [targets.muslprobe]
 kind = "bin"
@@ -249,7 +249,19 @@ static int icrnl(void) {
     return 0;
 }
 
+/* mcpplibs/openkal-musl#55: a program duplicated by fork starts a thread. */
+#include <sys/wait.h>
+static void* nothing(void* p) { return p; }
+static int forkthread(void) {
+    const pid_t c = fork();
+    if (c == 0) { pthread_t t; if (pthread_create(&t, 0, nothing, 0) != 0) _exit(4); pthread_join(t, 0); _exit(3); }
+    int st = 0; waitpid(c, &st, 0);
+    printf("fork then thread: status=%d\n", WIFEXITED(st) ? WEXITSTATUS(st) : -1);
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    if (argc > 1 && !strcmp(argv[1], "forkthread")) return forkthread();
     if (argc > 1 && !strcmp(argv[1], "dirleak")) return dirleak();
     if (argc > 3 && !strcmp(argv[1], "stack")) return stack(atol(argv[2]), atol(argv[3]));
     if (argc > 1 && !strcmp(argv[1], "icrnl")) return icrnl();
@@ -272,6 +284,8 @@ else
         printf '%s\n' "$r" | grep -q "^pthread_create with a supplied stack -> 22$" \
             && ok "musl#48: a supplied stack is refused with EINVAL" || fail "musl#48: a supplied stack was not refused"
     done
+    l=$(timeout 60 "$bin" forkthread 2>&1 | grep '^fork then thread')
+    [ "$l" = "fork then thread: status=3" ] && ok "musl#55: a program duplicated by fork starts a thread" || fail "musl#55: $l"
     if command -v python3 >/dev/null 2>&1; then
         t=$(python3 "$work/keys.py" 0d0a71 "$bin" icrnl 2>&1 | tr -d '\r')
         printf '%s\n' "$t" | grep -q 'readback=0' && ok "#48: ICRNL reads back cleared after cfmakeraw" || fail "#48: readback: $(printf '%s\n' "$t" | grep ICRNL)"
@@ -281,10 +295,10 @@ else
         skip "#48: no python3 in this sandbox to drive a pseudo terminal"
     fi
 fi
-grep -q '0.21.0' "$work/musl/mcpp.lock" 2>/dev/null && ok "the lock records openkal-musl 0.21.0" || fail "the lock does not record openkal-musl 0.21.0"
+grep -q '0.21.1' "$work/musl/mcpp.lock" 2>/dev/null && ok "the lock records openkal-musl 0.21.1" || fail "the lock does not record openkal-musl 0.21.1"
 
 # -- D. the runtime the reporters build against -------------------------------
-section "D. openkal-llvm-runtime 0.15.5 on x86_64-linux-musl, the reporters' arrangement"
+section "D. openkal-llvm-runtime 0.15.6 on x86_64-linux-musl, the reporters' arrangement"
 mkdir -p "$work/rt/src"
 cat > "$work/rt/mcpp.toml" <<'TOML'
 [package]
@@ -300,7 +314,7 @@ kind = "bin"
 main = "src/main.c"
 
 [target.'cfg(all(os = "linux", env = "musl"))'.dependencies]
-openkal-llvm-runtime = "0.15.5"
+openkal-llvm-runtime = "0.15.6"
 TOML
 cp "$work/musl/src/main.c" "$work/rt/src/main.c"
 out=$(cd "$work/rt" && "$STORE" build --target x86_64-linux-musl 2>&1); rc=$?
@@ -308,8 +322,8 @@ rbin=$(find "$work/rt/target" -type f -name rtprobe 2>/dev/null | head -1)
 if [ $rc -ne 0 ] || [ -z "$rbin" ]; then
     fail "the runtime probe did not build"; printf '%s\n' "$out" | tail -8
 else
-    grep -q 'openkal-musl' "$work/rt/mcpp.lock" && grep -q '0.21.0' "$work/rt/mcpp.lock" \
-        && ok "the lock records openkal-llvm-runtime 0.15.5 over openkal-musl 0.21.0" || fail "the runtime lock does not reach openkal-musl 0.21.0"
+    grep -q 'openkal-musl' "$work/rt/mcpp.lock" && grep -q '0.21.1' "$work/rt/mcpp.lock" \
+        && ok "the lock records openkal-llvm-runtime 0.15.6 over openkal-musl 0.21.1" || fail "the runtime lock does not reach openkal-musl 0.21.1"
     l=$(cd "$work" && timeout 60 "$rbin" dirleak 2>&1 | grep '^descriptors')
     b=$(printf '%s\n' "$l" | sed -n 's/.*before=\([0-9-]*\).*/\1/p'); a=$(printf '%s\n' "$l" | sed -n 's/.*after=\([0-9-]*\).*/\1/p')
     [ -n "$b" ] && [ "$b" = "$a" ] && ok "#34 through the runtime: $l" || fail "#34 through the runtime: $l"
@@ -322,7 +336,7 @@ else
 fi
 
 # -- E. what this sandbox cannot observe --------------------------------------
-skip "macOS, Windows and WebAssembly: their implementations answered on their own runners (openkal-macos#28, openkal-windows#32, openkal-emscripten#7, openkal#50)"
+skip "macOS, Windows and WebAssembly: their implementations answered on their own runners (openkal-macos#28 and #29, openkal-windows#32, openkal-emscripten#7, openkal#50; a program duplicated by fork starting a thread on macOS, openkal-musl#56)"
 skip "a machine with firmware and no operating system: openkal-opensbi 0.8.3 moves a pin and provides none of the three interfaces"
 
 printf '\n%s assertion(s) failed\n' "$fails"
