@@ -31,6 +31,26 @@ void run() {
     char buf[room];
     const kal_uintptr count = kal_env_arg_count();
 
+    // The image and the system (version 0.17): a name, or not found; and the
+    // length the value has, as every enquiry here reports it.
+    {
+        const kal_intptr n = kal_env_image(buf, room);
+        observe(kind::behaviour, n > 0 || n == -kal_err_not_found,
+                "the image a program was started from is named, or not found");
+        observe(kind::behaviour, kal_env_image(nullptr, 0) == n,
+                "a capacity of zero reports the image's length without writing");
+    }
+    {
+        const kal_intptr n = kal_env_system(buf, room);
+        bool lower = n > 0 && n < static_cast<kal_intptr>(room);
+        for (kal_intptr i = 0; lower && i < n; ++i)
+            lower = (buf[i] >= 'a' && buf[i] <= 'z') || (buf[i] >= '0' && buf[i] <= '9');
+        observe(kind::behaviour, lower || n == -kal_err_not_found,
+                "the system is a lower-case name, or not found");
+        observe(kind::behaviour, kal_env_system(nullptr, 0) == n,
+                "a capacity of zero reports the system's length without writing");
+    }
+
     // Position zero is the name by which the program was started, and an
     // environment that has no such name reports an empty string rather than
     // omitting it --- so the count is at least one on every environment.

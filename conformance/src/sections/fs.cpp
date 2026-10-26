@@ -329,6 +329,41 @@ void run() {
         kal_fs_remove(here(), kOther, length(kOther));
     }
 
+    // A rename that does not replace (version 0.17): refused with
+    // kal_err_exists and changing nothing when the name is there; a rename
+    // when it is not. Asked of the volume first, as clause 6.2 says.
+    if ((kal_fs_props(here()) & KAL_FS_PROP_RENAME_NO_REPLACE) != 0) {
+        put_file(kName, "first");
+        put_file(kOther, "second");
+        observe(kind::behaviour,
+                kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
+                                    KAL_RENAME_NO_REPLACE) == kal_err_exists,
+                "a rename that does not replace is refused when the name is there");
+        char buf[16] = {};
+        observe(kind::behaviour,
+                read_file(kOther, buf, sizeof buf) == 6 && buf[0] == 's'
+                    && read_file(kName, buf, sizeof buf) == 5,
+                "and changes neither name");
+        kal_fs_remove(here(), kOther, length(kOther));
+        observe(kind::behaviour,
+                kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
+                                    KAL_RENAME_NO_REPLACE) == kal_ok,
+                "a rename that does not replace renames when the name is free");
+        kal_fs_remove(here(), kOther, length(kOther));
+    } else {
+        unobserved(kind::behaviour, "a rename that does not replace",
+                   "the volume does not claim KAL_FS_PROP_RENAME_NO_REPLACE");
+    }
+    {
+        put_file(kName, "x");
+        observe(kind::behaviour,
+                kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
+                                    (kal_uintptr)1u << 30) == kal_err_invalid,
+                "a rename flag the specification has not assigned is refused");
+        kal_fs_remove(here(), kName, length(kName));
+        kal_fs_remove(here(), kOther, length(kOther));
+    }
+
     // --- what an enquiry answers, and what it does not --------------------
     //
     // THREE MECHANISMS, THREE OBSERVATIONS. The size the caller states, the

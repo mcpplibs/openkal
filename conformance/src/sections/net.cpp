@@ -5,6 +5,7 @@ import openkal.stream;
 import openkal.net;
 import openkal.task;
 import openkal.time;
+import openkal.fs;     // a rendezvous at a name is in a directory (0.17)
 import okc.report;
 import okc.spec;
 
@@ -211,6 +212,51 @@ void run() {
                 "an endpoint of unknown length is refused, not misread");
         if (rc == kal_ok) kal_net_close(c);
     }
+
+    // A RENDEZVOUS AT A NAME (version 0.17), where the working directory's
+    // volume claims it. The listener does not remove its name, so the name is
+    // removed before and after.
+#ifdef MCPP_FEATURE_FS
+    {
+        const kal_dir here = kal::fs::working();
+        const char name[] = "okc-rendezvous";
+        const kal_uintptr len = sizeof name - 1;
+        if ((kal_fs_props(here) & KAL_FS_PROP_LOCAL_ENDPOINT) != 0) {
+            kal_fs_remove(here, name, len);
+            kal_net_listener l{};
+            const int lr = kal_net_listen_at(here, name, len, &l);
+            observe(kind::behaviour, lr == kal_ok, "a listener is opened at a name");
+            if (lr == kal_ok) {
+                kal_net_listener second{};
+                observe(kind::behaviour, kal_net_listen_at(here, name, len, &second) == kal_err_exists,
+                        "a second listener at the same name is refused with kal_err_exists");
+                kal_net_conn c{}, s{};
+                const int cr = kal_net_connect_at(here, name, len, &c);
+                observe(kind::behaviour, cr == kal_ok, "a connection is made at the name");
+                if (cr == kal_ok && kal_net_accept(l, &s) == kal_ok) {
+                    const kal_stream cs = kal_net_stream(c), sst = kal_net_stream(s);
+                    char b[4] = {};
+                    const bool moved = kal_stream_write(cs, "okc", 3) == 3
+                                       && kal_stream_read(sst, b, 3) == 3 && b[0] == 'o' && b[2] == 'c';
+                    observe(kind::behaviour, moved, "bytes cross a connection made at a name");
+                    kal_endpoint ep{};
+                    observe(kind::behaviour, kal_net_peer(s, &ep) == kal_err_not_supported,
+                            "a connection made at a name has no address to report");
+                    kal_net_close(s);
+                }
+                if (cr == kal_ok) kal_net_close(c);
+                kal_net_close_listener(l);
+            }
+            kal_fs_remove(here, name, len);
+            kal_net_conn none{};
+            observe(kind::behaviour, kal_net_connect_at(here, name, len, &none) == kal_err_not_found,
+                    "a connection at a name nothing listens at is kal_err_not_found");
+        } else {
+            unobserved(kind::behaviour, "a rendezvous at a name",
+                       "the working directory does not claim KAL_FS_PROP_LOCAL_ENDPOINT");
+        }
+    }
+#endif
 #endif
 }
 

@@ -145,6 +145,42 @@ void run() {
         unobserved(kind::behaviour, "openkal.exec",
                    "the implementation does not report republishing");
     }
+
+    // PART OF A REGION (version 0.17). Two granules: the first published and
+    // executed, the second written AFTER the first was published --- which is
+    // what a loader does with an image's data beside its instructions.
+    const kal_uintptr g = kal_exec_granularity();
+    observe(kind::behaviour, g != 0 && (g & (g - 1)) == 0,
+            "the protection granularity is a power of two");
+    if (g != 0) {
+        observe(kind::behaviour, kal_exec_publish_part(nullptr, 0, g) != kal_ok,
+                "publishing part of no region is refused");
+        void* r = kal_exec_alloc(2 * g);
+        observe(kind::behaviour, r != nullptr, "a region of two granules is reserved");
+        if (r != nullptr) {
+            auto* c = static_cast<unsigned char*>(r);
+            for (unsigned long i = 0; i < kReturns42Size; ++i) c[i] = kReturns42[i];
+            observe(kind::behaviour, kal_exec_publish_part(r, 0, g / 2 == 0 ? 1 : g / 2) == kal_err_invalid,
+                    "a part that is not a multiple of the granularity is refused");
+            observe(kind::behaviour, kal_exec_publish_part(r, 0, g) == kal_ok,
+                    "the first granule is published");
+#if defined(__GNUC__) || defined(__clang__)
+            __builtin___clear_cache(static_cast<char*>(r), static_cast<char*>(r) + kReturns42Size);
+#endif
+            c[g] = 7;
+            c[g + 1] = static_cast<unsigned char>(c[g] + 1);
+            observe(kind::behaviour, c[g + 1] == 8,
+                    "the part not published is still writable");
+            fn h = nullptr;
+            {
+                auto* d = reinterpret_cast<unsigned char*>(&h);
+                const auto* b = reinterpret_cast<const unsigned char*>(&r);
+                for (unsigned long i = 0; i < sizeof h; ++i) d[i] = b[i];
+            }
+            observe(kind::behaviour, h() == 42, "the published part is executed");
+            kal_exec_free(r, 2 * g);
+        }
+    }
 #endif
 }
 
