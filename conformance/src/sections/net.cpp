@@ -49,13 +49,15 @@ void releases_the_reader(void*) {
 // The context of the observation that ending the read direction ends a read
 // waiting in it: it reads once, and records what the read answered.
 kal_stream g_waiting_stream{};
-kal_intptr g_waiting_answer = -1;
-volatile int g_waiting_done = 0;
+volatile kal_intptr g_waiting_answer = -1;
+volatile kal_u32 g_waiting_done = 0;
 
 void waits_for_the_end(void*) {
     char b[8];
     g_waiting_answer = kal_stream_read(g_waiting_stream, b, sizeof b);
-    __atomic_store_n(&g_waiting_done, 1, __ATOMIC_RELEASE);
+    g_waiting_done = 1;
+    kal_uintptr woken = 0;
+    kal_task_wake(const_cast<const kal_u32*>(&g_waiting_done), 1, &woken);
 }
 #endif
 
@@ -221,10 +223,9 @@ void run() {
             kal_time_sleep(200ull * 1000ull * 1000ull);
             const kal_duration t0 = kal_time_monotonic();
             const int rc = kal::net::shutdown(server, kal::net::shut::read);
-            while (__atomic_load_n(&g_waiting_done, __ATOMIC_ACQUIRE) == 0
-                   && kal_time_monotonic() - t0 < kReleaseAfterNs)
-                kal_time_sleep(10ull * 1000ull * 1000ull);
-            const bool ended = __atomic_load_n(&g_waiting_done, __ATOMIC_ACQUIRE) != 0;
+            while (g_waiting_done == 0 && kal_time_monotonic() - t0 < kReleaseAfterNs)
+                kal_task_wait(const_cast<const kal_u32*>(&g_waiting_done), 0, 50ull * 1000ull * 1000ull);
+            const bool ended = g_waiting_done != 0;
             if (!ended) kal::net::shutdown(server, kal::net::shut::both);
             kal_task_join(waiter);
             observe(kind::behaviour, rc == kal_ok && ended && g_waiting_answer == 0,
