@@ -72,6 +72,15 @@ inline constexpr props job           {KAL_PROCESS_PROP_JOB};
 inline constexpr props stop_requested{KAL_PROCESS_PROP_STOP_REQUESTED};
 inline constexpr props open_id       {KAL_PROCESS_PROP_OPEN_ID};
 
+// The fields of kal_program_info, for `wanted' and `present' (0.17).
+namespace info {
+inline constexpr kal_u32 id      = KAL_PINFO_ID;
+inline constexpr kal_u32 started = KAL_PINFO_STARTED;
+inline constexpr kal_u32 cpu     = KAL_PINFO_CPU;
+inline constexpr kal_u32 ended   = KAL_PINFO_ENDED;
+inline constexpr kal_u32 all     = KAL_PINFO_ALL;
+}
+
 // WHAT A CALLER ASKS FOR, WHICH IS A DIFFERENT WORD FROM WHAT AN
 // IMPLEMENTATION CAN DO. `props' above answers the second; these set the first.
 // A module consumer sees neither unless both are named here --- the C spellings

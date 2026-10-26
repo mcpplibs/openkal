@@ -221,7 +221,7 @@ void run() {
         const kal_dir here = kal::fs::working();
         const char name[] = "okc-rendezvous";
         const kal_uintptr len = sizeof name - 1;
-        if ((kal_fs_props(here) & KAL_FS_PROP_LOCAL_ENDPOINT) != 0) {
+        if ((kal_fs_props(here) & kal::fs::local_endpoint.bits) != 0) {
             kal_fs_remove(here, name, len);
             kal_net_listener l{};
             const int lr = kal_net_listen_at(here, name, len, &l);

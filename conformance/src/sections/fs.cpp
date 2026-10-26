@@ -332,12 +332,12 @@ void run() {
     // A rename that does not replace (version 0.17): refused with
     // kal_err_exists and changing nothing when the name is there; a rename
     // when it is not. Asked of the volume first, as clause 6.2 says.
-    if ((kal_fs_props(here()) & KAL_FS_PROP_RENAME_NO_REPLACE) != 0) {
+    if ((kal_fs_props(here()) & kal::fs::rename_no_replace.bits) != 0) {
         put_file(kName, "first");
         put_file(kOther, "second");
         observe(kind::behaviour,
                 kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
-                                    KAL_RENAME_NO_REPLACE) == kal_err_exists,
+                                    kal::fs::no_replace.bits) == kal_err_exists,
                 "a rename that does not replace is refused when the name is there");
         char buf[16] = {};
         observe(kind::behaviour,
@@ -347,7 +347,7 @@ void run() {
         kal_fs_remove(here(), kOther, length(kOther));
         observe(kind::behaviour,
                 kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
-                                    KAL_RENAME_NO_REPLACE) == kal_ok,
+                                    kal::fs::no_replace.bits) == kal_ok,
                 "a rename that does not replace renames when the name is free");
         kal_fs_remove(here(), kOther, length(kOther));
     } else {
@@ -693,7 +693,8 @@ void run() {
                                     | kal::fs::modified_time | kal::fs::atomic_rename
                                     | kal::fs::make_links
                                     | kal::fs::locks | kal::fs::capacity
-                                    | kal::fs::executable).bits;
+                                    | kal::fs::executable | kal::fs::rename_no_replace
+                                    | kal::fs::local_endpoint).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 

@@ -122,29 +122,29 @@ void run() {
         if (e == kal_ok) {
             kal_program_info info{};
             info.self_size = sizeof info;
-            observe(kind::behaviour, kal_process_info(self, KAL_PINFO_ALL, &info) == kal_ok,
+            observe(kind::behaviour, kal_process_info(self, kal::process::info::all, &info) == kal_ok,
                     "a program is asked about itself");
-            observe(kind::behaviour, (info.present & ~KAL_PINFO_ALL) == 0,
+            observe(kind::behaviour, (info.present & ~kal::process::info::all) == 0,
                     "no field the specification has not assigned is reported");
-            observe(kind::behaviour, (info.present & KAL_PINFO_ENDED) == 0 || info.ended == 0,
+            observe(kind::behaviour, (info.present & kal::process::info::ended) == 0 || info.ended == 0,
                     "a program asking about itself has not ended");
             int status = 0, terminated = 0;
             observe(kind::behaviour, kal_process_wait(self, &status, &terminated) == kal_err_invalid,
                     "a program does not wait for itself");
             kal_program_info tiny{};
             tiny.self_size = 4;
-            observe(kind::behaviour, kal_process_info(self, KAL_PINFO_ALL, &tiny) == kal_err_invalid,
+            observe(kind::behaviour, kal_process_info(self, kal::process::info::all, &tiny) == kal_err_invalid,
                     "a structure too small for its fields is refused");
-            if (kal::process::has(kal::process::open_id) && (info.present & KAL_PINFO_ID) != 0) {
+            if (kal::process::has(kal::process::open_id) && (info.present & kal::process::info::id) != 0) {
                 kal_process again{};
                 const int o = kal_process_open_id(info.id, &again);
                 observe(kind::behaviour, o == kal_ok, "a program is found by its identifier");
                 if (o == kal_ok) {
                     kal_program_info other{};
                     other.self_size = sizeof other;
-                    kal_process_info(again, KAL_PINFO_ALL, &other);
+                    kal_process_info(again, kal::process::info::all, &other);
                     observe(kind::behaviour, other.id == info.id
-                            && ((info.present & other.present & KAL_PINFO_STARTED) == 0
+                            && ((info.present & other.present & kal::process::info::started) == 0
                                 || other.started_ns == info.started_ns),
                             "and is the same program, started at the same moment");
                     observe(kind::behaviour, kal_process_terminate(again) == kal_err_not_supported,
@@ -166,8 +166,8 @@ void run() {
             kal_process_wait(child, &status, &terminated);
             kal_program_info info{};
             info.self_size = sizeof info;
-            const int e = kal_process_info(child, KAL_PINFO_ENDED, &info);
-            observe(kind::behaviour, e == kal_ok && ((info.present & KAL_PINFO_ENDED) == 0 || info.ended != 0),
+            const int e = kal_process_info(child, kal::process::info::ended, &info);
+            observe(kind::behaviour, e == kal_ok && ((info.present & kal::process::info::ended) == 0 || info.ended != 0),
                     "a started program that was awaited is reported as ended");
             kal_process_close(child);
         }
@@ -296,7 +296,8 @@ void run() {
                                     | kal::process::grant_dir
                                     | kal::process::bound_lifetime
                                     | kal::process::job
-                                    | kal::process::stop_requested).bits;
+                                    | kal::process::stop_requested
+                                    | kal::process::open_id).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),
