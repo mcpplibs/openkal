@@ -197,6 +197,14 @@ extern "C" {
  * names are the environment's; this specification requires only that they be
  * distinct.
  *
+ * A DIRECTORY MAY BE APPENDED WHILE THE PROGRAM RUNS, AND A POSITION ONCE
+ * GIVEN KEEPS ITS DIRECTORY AND ITS NAME. Version 0.17. An environment that
+ * gains a directory it would have supplied at inception --- a volume mounted
+ * since --- appends it, so a program that asks again finds it, and a program
+ * that holds a position is not moved. Before 0.17 the set was fixed at
+ * inception, and a name on a volume mounted after the program started could
+ * not be reached at all.
+ *
  * THE NAME IS COPIED, AND `name_len' REPORTS THE LENGTH IT HAS. An operation
  * that produces a RESOURCE returns `int' and writes the resource; the length of
  * a name it also produces goes in an out-parameter, because the return is
