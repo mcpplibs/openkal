@@ -45,6 +45,18 @@ void releases_the_reader(void*) {
     const char x = 'r';
     kal_stream_write(g_releaser_stream, &x, 1);
 }
+
+// The context of the observation that ending the read direction ends a read
+// waiting in it: it reads once, and records what the read answered.
+kal_stream g_waiting_stream{};
+kal_intptr g_waiting_answer = -1;
+volatile int g_waiting_done = 0;
+
+void waits_for_the_end(void*) {
+    char b[8];
+    g_waiting_answer = kal_stream_read(g_waiting_stream, b, sizeof b);
+    __atomic_store_n(&g_waiting_done, 1, __ATOMIC_RELEASE);
+}
 #endif
 
 }  // namespace
@@ -193,6 +205,39 @@ void run() {
                     "an unclaimed half-closure is refused rather than ignored");
         }
     }
+
+    // ENDING THE READ DIRECTION ENDS A READ WAITING IN IT (0.17). A program ends
+    // a connection that another of its contexts reads from by ending the
+    // direction; the waiting read reports the end of input, as every later
+    // read does. One system left the read pending, and a program waited two
+    // minutes for its reader there alone. Bounded: the server end is closed
+    // after two seconds, which releases the reader whatever the
+    // implementation did, and the observation is then that it took that long.
+#if defined(MCPP_FEATURE_TASK) && defined(MCPP_FEATURE_TIME)
+    if (kal::net::has(kal::net::halfclose)) {
+        g_waiting_stream = ss;
+        kal_task waiter{};
+        if (kal_task_start(waits_for_the_end, nullptr, &waiter) == kal_ok) {
+            kal_time_sleep(200ull * 1000ull * 1000ull);
+            const kal_duration t0 = kal_time_monotonic();
+            const int rc = kal::net::shutdown(server, kal::net::shut::read);
+            while (__atomic_load_n(&g_waiting_done, __ATOMIC_ACQUIRE) == 0
+                   && kal_time_monotonic() - t0 < kReleaseAfterNs)
+                kal_time_sleep(10ull * 1000ull * 1000ull);
+            const bool ended = __atomic_load_n(&g_waiting_done, __ATOMIC_ACQUIRE) != 0;
+            if (!ended) kal::net::shutdown(server, kal::net::shut::both);
+            kal_task_join(waiter);
+            observe(kind::behaviour, rc == kal_ok && ended && g_waiting_answer == 0,
+                    "ending the read direction ends a read waiting in it with the end of input");
+            char b[4];
+            observe(kind::behaviour, kal_stream_read(ss, b, sizeof b) == 0,
+                    "and a later read reports the end of input too");
+        } else {
+            unobserved(kind::behaviour, "ending the read direction ends a read waiting in it",
+                       "an execution context could not be started");
+        }
+    }
+#endif
 
     kal_net_close(server);
     kal_net_close(client);

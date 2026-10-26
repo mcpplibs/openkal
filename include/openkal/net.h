@@ -125,6 +125,14 @@ int kal_net_listener_local(struct kal_net_listener l, struct kal_endpoint* out);
 
 /* Ends transfer in one direction while the other continues.
  *
+ * ENDING THE READ DIRECTION ENDS A READ WAITING IN IT. Version 0.17. The read
+ * reports the end of input --- zero --- as every later read in that direction
+ * does, whichever context it waits in. It is how a program ends a connection
+ * that another of its contexts reads from, and the release of the connection
+ * cannot be: the handle is not to be released while an operation uses it
+ * (clause 7.2). Measured: one implementation left the read pending, and a
+ * program waited two minutes for its reader on that system alone.
+ *
  * This is the operation that distinguishes a connection from a file, and it is
  * why the two are separate interfaces. An implementation that cannot express it
  * reports kal_err_not_supported and withholds KAL_NET_PROP_HALFCLOSE; a caller

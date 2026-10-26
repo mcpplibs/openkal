@@ -1667,6 +1667,12 @@ The following are recorded so that they are not mistaken for oversights.
     file was removable on two of them. The immediate form is native on every
     volume that records it, so it is a statement of what was already the
     common behaviour, and a volume without it is answered before the call.
+38. **Ending a read that waits.** **Stated in 0.17**, at `kal_net_shutdown`.
+    Ending the read direction of a connection ends a read waiting in it, with
+    the end of input. Two environments did so and the third left the read
+    pending, so a program that ended a connection from another context waited
+    for its reader there alone; the release of the connection is not the
+    remedy, since a handle in use is not to be released (clause 7.2).
 
 ## 12. Images
 
