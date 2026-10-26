@@ -1585,7 +1585,9 @@ The following are recorded so that they are not mistaken for oversights.
     waited for or ended: the second would end a program by a number that may
     since name another.
 30. **The image a program was started from, and the system it runs upon.**
-    **Settled in 0.17.** `kal_env_image` and `kal_env_system`. The first is a
+    **Settled in 0.17.** `kal_env_image` and `kal_env_system`, and
+    `kal_env_loader` for an image (clause 12): what starts the same program
+    again is a loader and an image there, and the loader is named nowhere else. The first is a
     fact every environment that starts named images tells the program and that
     the program cannot recover otherwise; argument zero is the starter's choice
     (clause 7.6). The second exists for clause 12: a program built once and run
@@ -1702,7 +1704,9 @@ runs the image's initialisers and transfers control to its entry; when the entry
 returns, the loader runs the image's finalisers and ends with the status the entry
 returned (`kal_exit`). The image's
 `kal_env_*` operations answer for the image: arguments as the loader received
-them after its own, and `kal_env_image` the image's name.
+them after its own, `kal_env_image` the image's name, and `kal_env_loader` the
+loader's own, so that the program can be started again (a loader, then an
+image).
 
 Where an environment's own convention differs from the image's --- on x86-64,
 one environment passes arguments in other registers --- the loader presents each

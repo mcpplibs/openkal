@@ -38,6 +38,7 @@ kal_memory_granularity
 kal_env_arg
 kal_env_arg_count
 kal_env_image
+kal_env_loader
 kal_env_system
 kal_env_var
 kal_env_var_at

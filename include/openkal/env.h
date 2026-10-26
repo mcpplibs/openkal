@@ -75,6 +75,16 @@ kal_intptr  kal_env_var_at(kal_uintptr index, char* out, kal_uintptr cap);
  * name, not its own. */
 kal_intptr kal_env_image(char* out, kal_uintptr cap);
 
+/* The name of the program that loaded this image and runs it, where this
+ * program is an image (clause 12): the loader's own image, in the environment's
+ * spelling. With the image's name (kal_env_image) it is what starts the same
+ * program again --- a loader, then an image --- as a program's own image name
+ * alone does when it is built for its environment. Version 0.17.
+ *
+ * A program built for its environment was loaded by nothing this interface
+ * names, and its implementation reports kal_err_not_found, negated. */
+kal_intptr kal_env_loader(char* out, kal_uintptr cap);
+
 /* The name of the environment's system: `linux', `macos', `windows', and
  * further names as implementations are written, lower case, from an open set.
  * Version 0.17.

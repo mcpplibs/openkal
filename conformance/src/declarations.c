@@ -38,6 +38,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_env_arg);
     (void)sizeof(&kal_env_arg_count);
     (void)sizeof(&kal_env_image);
+    (void)sizeof(&kal_env_loader);
     (void)sizeof(&kal_env_system);
     (void)sizeof(&kal_env_var);
     (void)sizeof(&kal_env_var_at);

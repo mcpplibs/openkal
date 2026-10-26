@@ -41,6 +41,15 @@ void run() {
                 "a capacity of zero reports the image's length without writing");
     }
     {
+        // Built for its environment, a program has no loader to name; an image
+        // is told the program that runs it.
+        const kal_intptr n = kal_env_loader(buf, room);
+        observe(kind::behaviour, n > 0 || n == -kal_err_not_found,
+                "the loader of an image is named, and a program built for its environment has none");
+        observe(kind::behaviour, kal_env_loader(nullptr, 0) == n,
+                "a capacity of zero reports the loader's length without writing");
+    }
+    {
         const kal_intptr n = kal_env_system(buf, room);
         bool lower = n > 0 && n < static_cast<kal_intptr>(room);
         for (kal_intptr i = 0; lower && i < n; ++i)
