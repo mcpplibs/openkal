@@ -1628,6 +1628,15 @@ The following are recorded so that they are not mistaken for oversights.
     root of a network's names, which that environment now supplies as a
     directory of its own (`//`).
 
+36. **An image's entry, and an import it can do without.** **Stated in 0.17**,
+    clause 12.2 and 12.4. An image's entry takes nothing and returns its status,
+    and the loader ends with that status after the finalisers: the arguments
+    are `kal_env_arg`'s, as in every other arrangement. A weak import is bound
+    when it is provided and is zero otherwise, and it does not enter the
+    requirements note --- so a C library can keep a table of operations it uses
+    when present (a `dlopen` beside the image, an interface a later version
+    adds) without making every image refuse to load where they are absent.
+
 ## 12. Images
 
 A program written against this specification is built for an environment: its
@@ -1667,7 +1676,8 @@ three operations a loader needs and a program could not otherwise reach
 | container | ELF, position-independent (`ET_DYN`), little-endian, of the architecture's class; no text relocation |
 | alignment | every loadable segment aligned to at least 65536 bytes, which is the largest protection or reservation granularity among the environments this specification targets; a loader publishes each executable segment with `kal_exec_publish_part` |
 | relocations | only the architecture's relative, absolute, global-data and procedure-linkage relocations, and the packed relative form; a loader refuses any other |
-| imports | only names this specification declares, and names other images export; a name of a C library or of an environment is refused |
+| imports | only names this specification declares, and names other images export; a name of a C library or of an environment is refused. A weak import is optional: it is bound when the implementation or an image the image needs provides it, and is zero otherwise |
+| entry | an executable image's ELF entry is a function of no parameters returning `int`, in the image's convention; its value is the image's status. An image that another loads has no entry |
 | calling convention | the architecture's, fixed for every environment: the System V convention on x86-64, the procedure call standard on AArch64; an implementation whose environment uses another presents entries in this one to the image (12.3) |
 | platform register | an AArch64 image does not use `x18`, which two environments reserve |
 | thread-local storage | through the emulated form, in which a variable is found by a function the image itself supplies; an image does not address the thread pointer, which one environment does not let a program set and another does not let it change |
@@ -1688,7 +1698,9 @@ its environment.
 A loader holds the process's one implementation (clause 10.1). It maps the image
 into a region from `kal_exec_alloc`, applies the relocations, binds each imported
 name to that implementation's entry for it, publishes the executable segments,
-runs the image's initialisers and transfers control to its entry. The image's
+runs the image's initialisers and transfers control to its entry; when the entry
+returns, the loader runs the image's finalisers and ends with the status the entry
+returned (`kal_exit`). The image's
 `kal_env_*` operations answer for the image: arguments as the loader received
 them after its own, and `kal_env_image` the image's name.
 
@@ -1708,7 +1720,7 @@ An image carries notes whose owner is `OPENKAL`, in a section `.note.openkal`:
 
 | type | descriptor |
 | --- | --- |
-| 1, requirements | `kal_u32` major and `kal_u32` minor version of this clause (1 and 0), then a `kal_u64` of `KAL_IFACE_*` positions: **the interfaces the image requires**, derived from the names it imports |
+| 1, requirements | `kal_u32` major and `kal_u32` minor version of this clause (1 and 0), then a `kal_u64` of `KAL_IFACE_*` positions: **the interfaces the image requires**, derived from the names it imports other than weakly |
 | 2, signature | 32 bytes of an Ed25519 public key, then 64 bytes of the signature, over the whole file with these 96 bytes read as zero |
 
 The first is required and the second is not. A loader compares the required interfaces with `kal_interfaces` and
