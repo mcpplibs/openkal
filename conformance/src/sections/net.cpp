@@ -8,6 +8,7 @@ import openkal.time;
 import openkal.fs;     // a rendezvous at a name is in a directory (0.17)
 import okc.report;
 import okc.spec;
+import okc.atomic;
 
 namespace okc::net {
 
@@ -55,7 +56,7 @@ volatile kal_u32 g_waiting_done = 0;
 void waits_for_the_end(void*) {
     char b[8];
     g_waiting_answer = kal_stream_read(g_waiting_stream, b, sizeof b);
-    g_waiting_done = 1;
+    okc::store_release(&g_waiting_done, 1u);
     kal_uintptr woken = 0;
     kal_task_wake(const_cast<const kal_u32*>(&g_waiting_done), 1, &woken);
 }
@@ -223,13 +224,22 @@ void run() {
             kal_time_sleep(200ull * 1000ull * 1000ull);
             const kal_duration t0 = kal_time_monotonic();
             const int rc = kal::net::shutdown(server, kal::net::shut::read);
-            while (g_waiting_done == 0 && kal_time_monotonic() - t0 < kReleaseAfterNs)
+            while (okc::load_acquire(&g_waiting_done) == 0 && kal_time_monotonic() - t0 < kReleaseAfterNs)
                 kal_task_wait(const_cast<const kal_u32*>(&g_waiting_done), 0, 50ull * 1000ull * 1000ull);
-            const bool ended = g_waiting_done != 0;
+            const bool ended = okc::load_acquire(&g_waiting_done) != 0;
+            const kal_duration took = kal_time_monotonic() - t0;
             if (!ended) kal::net::shutdown(server, kal::net::shut::both);
             kal_task_join(waiter);
-            observe(kind::behaviour, rc == kal_ok && ended && g_waiting_answer == 0,
+            const bool held = rc == kal_ok && ended && g_waiting_answer == 0;
+            observe(kind::behaviour, held,
                     "ending the read direction ends a read waiting in it with the end of input");
+            if (!held) {
+                put("  the shutdown answered "); put_signed(rc);
+                put(ended ? ", the read ended after " : ", the read was still waiting after ");
+                put_signed(static_cast<long long>(took / 1000000ull)); put(" ms");
+                if (ended) { put(" and answered "); put_signed(static_cast<long long>(g_waiting_answer)); }
+                put("\n");
+            }
             char b[4];
             observe(kind::behaviour, kal_stream_read(ss, b, sizeof b) == 0,
                     "and a later read reports the end of input too");
