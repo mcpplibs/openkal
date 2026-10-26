@@ -90,6 +90,90 @@ void run() {
                    "the implementation does not claim prop_terminate");
     }
 
+    // ENDING AS THE REQUEST WOULD HAVE (version 0.17). With no request there is
+    // nothing to reproduce, and the operation returns.
+    observe(kind::behaviour, kal_process_end_as_requested() == kal_err_invalid,
+            "ending as requested, with no request, returns kal_err_invalid");
+#ifdef MCPP_FEATURE_TIME
+    if (kal::process::has(kal::process::stop_requested) && kal::process::has(kal::process::terminate)) {
+        kal_process child{};
+        if (start_copy_running("openkal-conformance-child",
+                               argument_for(errand::end_as_requested), child)) {
+            kal_time_sleep(300u * 1000u * 1000u);
+            kal_process_terminate(child);
+            int status = 0, terminated = 0;
+            kal_process_wait(child, &status, &terminated);
+            if (terminated == 0 && status == 98)
+                unobserved(kind::behaviour, "a program ends as the request would have ended it",
+                           "a request to terminate did not arrive as a request on this environment");
+            else
+                observe(kind::behaviour, terminated != 0 && status != 99,
+                        "a program that took the request over ends as the request would have ended it");
+            kal_process_close(child);
+        }
+    }
+#endif
+
+    // WHAT IS KNOWN OF A RUNNING PROGRAM (version 0.17).
+    {
+        kal_process self{};
+        const int e = kal_process_self(&self);
+        observe(kind::behaviour, e == kal_ok, "a program has a handle to itself");
+        if (e == kal_ok) {
+            kal_program_info info{};
+            info.self_size = sizeof info;
+            observe(kind::behaviour, kal_process_info(self, kal::process::info::all, &info) == kal_ok,
+                    "a program is asked about itself");
+            observe(kind::behaviour, (info.present & ~kal::process::info::all) == 0,
+                    "no field the specification has not assigned is reported");
+            observe(kind::behaviour, (info.present & kal::process::info::ended) == 0 || info.ended == 0,
+                    "a program asking about itself has not ended");
+            int status = 0, terminated = 0;
+            observe(kind::behaviour, kal_process_wait(self, &status, &terminated) == kal_err_invalid,
+                    "a program does not wait for itself");
+            kal_program_info tiny{};
+            tiny.self_size = 4;
+            observe(kind::behaviour, kal_process_info(self, kal::process::info::all, &tiny) == kal_err_invalid,
+                    "a structure too small for its fields is refused");
+            if (kal::process::has(kal::process::open_id) && (info.present & kal::process::info::id) != 0) {
+                kal_process again{};
+                const int o = kal_process_open_id(info.id, &again);
+                observe(kind::behaviour, o == kal_ok, "a program is found by its identifier");
+                if (o == kal_ok) {
+                    kal_program_info other{};
+                    other.self_size = sizeof other;
+                    kal_process_info(again, kal::process::info::all, &other);
+                    observe(kind::behaviour, other.id == info.id
+                            && ((info.present & other.present & kal::process::info::started) == 0
+                                || other.started_ns == info.started_ns),
+                            "and is the same program, started at the same moment");
+                    observe(kind::behaviour, kal_process_terminate(again) == kal_err_not_supported,
+                            "a program found by its identifier is not the caller's to end");
+                    kal_process_close(again);
+                }
+            } else {
+                unobserved(kind::behaviour, "a program is found by its identifier",
+                           "the implementation does not claim KAL_PROCESS_PROP_OPEN_ID");
+            }
+            kal_process_close(self);
+        }
+    }
+    {
+        int status = 0, terminated = 0;
+        kal_process child{};
+#ifdef MCPP_FEATURE_TIME
+        if (start_copy_running("openkal-conformance-child", argument_for(errand::exit_with_33), child)) {
+            kal_process_wait(child, &status, &terminated);
+            kal_program_info info{};
+            info.self_size = sizeof info;
+            const int e = kal_process_info(child, kal::process::info::ended, &info);
+            observe(kind::behaviour, e == kal_ok && ((info.present & kal::process::info::ended) == 0 || info.ended != 0),
+                    "a started program that was awaited is reported as ended");
+            kal_process_close(child);
+        }
+#endif
+    }
+
     // A START THAT DID NOT HAPPEN IS REPORTED, AND BY ITS REASON. Version 0.13.
     //
     // A name that does not exist needs no file to be created, so this is
@@ -212,7 +296,8 @@ void run() {
                                     | kal::process::grant_dir
                                     | kal::process::bound_lifetime
                                     | kal::process::job
-                                    | kal::process::stop_requested).bits;
+                                    | kal::process::stop_requested
+                                    | kal::process::open_id).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),

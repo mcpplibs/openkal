@@ -1,4 +1,4 @@
-# The C surface of openkal 0.16, one name per line.
+# The C surface of openkal 0.17, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -37,6 +37,9 @@ kal_memory_granularity
 # openkal.env
 kal_env_arg
 kal_env_arg_count
+kal_env_image
+kal_env_loader
+kal_env_system
 kal_env_var
 kal_env_var_at
 kal_env_var_count
@@ -69,6 +72,7 @@ kal_fs_preopen_count
 kal_fs_props
 kal_fs_remove
 kal_fs_rename
+kal_fs_rename_flags
 kal_fs_seek
 kal_fs_set_executable_at
 kal_fs_set_modified
@@ -80,12 +84,16 @@ kal_fs_unlock
 kal_process_channel
 kal_process_channel_close
 kal_process_close
+kal_process_end_as_requested
+kal_process_info
 kal_process_job_close
 kal_process_job_enter
 kal_process_job_terminate
+kal_process_open_id
 kal_process_props
-kal_process_stop_requested
+kal_process_self
 kal_process_spawn
+kal_process_stop_requested
 kal_process_terminate
 kal_process_wait
 # openkal.task
@@ -102,8 +110,10 @@ kal_task_yield
 # openkal.exec
 kal_exec_alloc
 kal_exec_free
+kal_exec_granularity
 kal_exec_props
 kal_exec_publish
+kal_exec_publish_part
 # openkal.terminal
 kal_terminal_get_mode
 kal_terminal_props
@@ -114,7 +124,9 @@ kal_net_accept
 kal_net_close
 kal_net_close_listener
 kal_net_connect
+kal_net_connect_at
 kal_net_listen
+kal_net_listen_at
 kal_net_listener_local
 kal_net_local
 kal_net_peer

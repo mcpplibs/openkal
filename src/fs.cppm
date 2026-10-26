@@ -54,6 +54,7 @@ export using ::kal_fs_capacity;
 export using ::kal_fs_mkdir;
 export using ::kal_fs_remove;
 export using ::kal_fs_rename;
+export using ::kal_fs_rename_flags;
 export using ::kal_fs_list_begin;
 export using ::kal_fs_list_next;
 export using ::kal_fs_props;
@@ -113,6 +114,19 @@ inline constexpr props make_links    {KAL_FS_PROP_MAKE_LINKS};
 inline constexpr props locks         {KAL_FS_PROP_LOCKS};
 inline constexpr props capacity      {KAL_FS_PROP_CAPACITY};
 inline constexpr props executable    {KAL_FS_PROP_EXECUTABLE};
+// A rename that fails rather than replaces (KAL_RENAME_NO_REPLACE) is answered
+// on this volume. Version 0.17.
+inline constexpr props rename_no_replace{KAL_FS_PROP_RENAME_NO_REPLACE};
+// A name in this directory may be a rendezvous of openkal.net
+// (kal_net_listen_at). Version 0.17.
+inline constexpr props local_endpoint{KAL_FS_PROP_LOCAL_ENDPOINT};
+// A name is removed at once although a file of that name is open (clause
+// 7.14). Version 0.17.
+inline constexpr props remove_open{KAL_FS_PROP_REMOVE_OPEN};
+
+struct rename_flag_tag;
+using rename_flags = kal::props<rename_flag_tag>;
+inline constexpr rename_flags no_replace{KAL_RENAME_NO_REPLACE};
 
 enum : int { seek_set = KAL_SEEK_SET, seek_current = KAL_SEEK_CURRENT, seek_end = KAL_SEEK_END };
 

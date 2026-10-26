@@ -77,16 +77,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.16.0"
+openkal = "0.17.0"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.15.1"
+openkal-linux = "0.18.0"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.12.1"
+openkal-macos = "0.15.0"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.10.2"
+openkal-windows = "0.13.0"
 ```
 
 The program imports the interface and names no implementation.
@@ -115,6 +115,7 @@ its own. The layer names are those of the build tool (`mcpp`, *The Target Side*)
 | `c-abi = musl` | `openkal-musl` | a POSIX-shaped C environment built on `kal_*`; what it cannot provide it refuses and lists | the platform's own C runtime headers (`io.h`, `TargetConditionals.h`); facilities openkal does not define (`epoll`, signal handlers) |
 | `c++-abi = libc++` | `openkal-llvm-runtime` | a C++ runtime configured for that C library | |
 | build tool | `mcpp` | a layer supplied by the dependency graph is supplied wholly by it: the host's headers and libraries are not searched | whether a package's source compiles against that C library |
+| image (`<arch>-openkal`, clause 12) | `openkal-image`'s loader, holding one implementation | the same bytes run in every environment of the architecture that has a loader; a required interface the implementation lacks is refused at load and named | a platform format, signature or installer (a program carrying the image as a native executable provides those) |
 
 Four rules follow, and they bind packages rather than this specification.
 

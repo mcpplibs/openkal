@@ -35,6 +35,7 @@ const char* argument_for(errand e) {
         case errand::wait_to_be_terminated: return "--child-wait";
         case errand::report_grants:      return "--child-grants";
         case errand::report_no_preopens: return "--child-no-preopens";
+        case errand::end_as_requested:   return "--child-end-as-requested";
         case errand::none:               break;
     }
     return "";
@@ -54,6 +55,7 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::wait_to_be_terminated))) return errand::wait_to_be_terminated;
         if (same(a, len, argument_for(errand::report_grants)))      return errand::report_grants;
         if (same(a, len, argument_for(errand::report_no_preopens))) return errand::report_no_preopens;
+        if (same(a, len, argument_for(errand::end_as_requested)))   return errand::end_as_requested;
     }
 #endif
     return errand::none;
@@ -132,6 +134,21 @@ after g_after;
             kal_exit(34);
         case errand::abort_with_message:
             kal_abort("openkal-conformance: the message kal_abort was given\n", 52);
+        case errand::end_as_requested:
+            // The word is taken over, awaited for two seconds, and the copy then
+            // ends as the request would have. 98: no request arrived as one ---
+            // the environment ended this copy outright, or never asked. 99: the
+            // operation returned although a request had arrived.
+#if defined(MCPP_FEATURE_PROCESS) && defined(MCPP_FEATURE_TIME)
+            if (const kal_u32* word = kal_process_stop_requested()) {
+                kal_stream_write(kal_stdout(), "ARMED\n", 6);
+                for (int i = 0; i < 400 && *word == 0; ++i) kal_time_sleep(5u * 1000u * 1000u);
+                if (*word == 0) kal_exit(98);
+                kal_process_end_as_requested();
+                kal_exit(99);
+            }
+#endif
+            kal_exit(98);
         case errand::wait_to_be_terminated:
 #ifdef MCPP_FEATURE_TIME
             for (;;) kal_time_sleep(5u * 1000u * 1000u);

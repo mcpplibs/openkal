@@ -25,6 +25,7 @@ enum class errand {
     wait_to_be_terminated,   // so that a request to terminate has something to reach
     report_grants,       // the directories a starter granted are its preopens
     report_no_preopens,  // ... and a count of zero leaves it none (clause 7.13)
+    end_as_requested,    // takes the request over, then ends as it would have (0.17)
 };
 
 // The names the starter grants and the copy expects, in order, and the marker

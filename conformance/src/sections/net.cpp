@@ -5,8 +5,10 @@ import openkal.stream;
 import openkal.net;
 import openkal.task;
 import openkal.time;
+import openkal.fs;     // a rendezvous at a name is in a directory (0.17)
 import okc.report;
 import okc.spec;
+import okc.atomic;
 
 namespace okc::net {
 
@@ -43,6 +45,20 @@ void releases_the_reader(void*) {
     kal_time_sleep(kReleaseAfterNs);
     const char x = 'r';
     kal_stream_write(g_releaser_stream, &x, 1);
+}
+
+// The context of the observation that ending the read direction ends a read
+// waiting in it: it reads once, and records what the read answered.
+kal_stream g_waiting_stream{};
+volatile kal_intptr g_waiting_answer = -1;
+volatile kal_u32 g_waiting_done = 0;
+
+void waits_for_the_end(void*) {
+    char b[8];
+    g_waiting_answer = kal_stream_read(g_waiting_stream, b, sizeof b);
+    okc::store_release(&g_waiting_done, 1u);
+    kal_uintptr woken = 0;
+    kal_task_wake(const_cast<const kal_u32*>(&g_waiting_done), 1, &woken);
 }
 #endif
 
@@ -193,6 +209,57 @@ void run() {
         }
     }
 
+    // ENDING THE READ DIRECTION ENDS A READ WAITING IN IT (0.17). A program ends
+    // a connection that another of its contexts reads from by ending the
+    // direction; the waiting read reports the end of input, as every later
+    // read does. One system left the read pending, and a program waited two
+    // minutes for its reader there alone. On a connection of its own, whose
+    // peer has sent nothing and ended nothing, so the read does wait; bounded:
+    // after two seconds both ends are released whatever the implementation did.
+#if defined(MCPP_FEATURE_TASK) && defined(MCPP_FEATURE_TIME)
+    if (kal::net::has(kal::net::halfclose)) {
+        kal_net_conn near{}, far{};
+        if (kal_net_connect(&to, &near) == kal_ok && kal_net_accept(listener, &far) == kal_ok) {
+            g_waiting_stream = kal_net_stream(far);
+            kal_task waiter{};
+            if (kal_task_start(waits_for_the_end, nullptr, &waiter) == kal_ok) {
+                kal_time_sleep(200ull * 1000ull * 1000ull);
+                const bool waited = okc::load_acquire(&g_waiting_done) == 0;
+                const kal_duration t0 = kal_time_monotonic();
+                const int rc = kal::net::shutdown(far, kal::net::shut::read);
+                while (okc::load_acquire(&g_waiting_done) == 0 && kal_time_monotonic() - t0 < kReleaseAfterNs)
+                    kal_task_wait(const_cast<const kal_u32*>(&g_waiting_done), 0, 50ull * 1000ull * 1000ull);
+                const bool ended = okc::load_acquire(&g_waiting_done) != 0;
+                const kal_duration took = kal_time_monotonic() - t0;
+                if (!ended) kal::net::shutdown(near, kal::net::shut::both);   // the peer's end releases it
+                kal_task_join(waiter);
+                const bool held = waited && rc == kal_ok && ended && g_waiting_answer == 0;
+                observe(kind::behaviour, held,
+                        "ending the read direction ends a read waiting in it with the end of input");
+                if (!held) {
+                    put(waited ? "  the read waited; " : "  the read did not wait; ");
+                    put("the shutdown answered "); put_signed(rc);
+                    put(ended ? ", the read ended after " : ", the read was still waiting after ");
+                    put_signed(static_cast<long long>(took / 1000000ull)); put(" ms");
+                    if (ended) { put(" and answered "); put_signed(static_cast<long long>(g_waiting_answer)); }
+                    put("\n");
+                }
+                char b[4];
+                observe(kind::behaviour, kal_stream_read(kal_net_stream(far), b, sizeof b) == 0,
+                        "and a later read reports the end of input too");
+            } else {
+                unobserved(kind::behaviour, "ending the read direction ends a read waiting in it",
+                           "an execution context could not be started");
+            }
+        } else {
+            unobserved(kind::behaviour, "ending the read direction ends a read waiting in it",
+                       "a second connection could not be made");
+        }
+        if (near.h) kal_net_close(near);
+        if (far.h) kal_net_close(far);
+    }
+#endif
+
     kal_net_close(server);
     kal_net_close(client);
     kal_net_close_listener(listener);
@@ -211,6 +278,51 @@ void run() {
                 "an endpoint of unknown length is refused, not misread");
         if (rc == kal_ok) kal_net_close(c);
     }
+
+    // A RENDEZVOUS AT A NAME (version 0.17), where the working directory's
+    // volume claims it. The listener does not remove its name, so the name is
+    // removed before and after.
+#ifdef MCPP_FEATURE_FS
+    {
+        const kal_dir here = kal::fs::working();
+        const char name[] = "okc-rendezvous";
+        const kal_uintptr len = sizeof name - 1;
+        if ((kal_fs_props(here) & kal::fs::local_endpoint.bits) != 0) {
+            kal_fs_remove(here, name, len);
+            kal_net_listener l{};
+            const int lr = kal_net_listen_at(here, name, len, &l);
+            observe(kind::behaviour, lr == kal_ok, "a listener is opened at a name");
+            if (lr == kal_ok) {
+                kal_net_listener second{};
+                observe(kind::behaviour, kal_net_listen_at(here, name, len, &second) == kal_err_exists,
+                        "a second listener at the same name is refused with kal_err_exists");
+                kal_net_conn c{}, s{};
+                const int cr = kal_net_connect_at(here, name, len, &c);
+                observe(kind::behaviour, cr == kal_ok, "a connection is made at the name");
+                if (cr == kal_ok && kal_net_accept(l, &s) == kal_ok) {
+                    const kal_stream cs = kal_net_stream(c), sst = kal_net_stream(s);
+                    char b[4] = {};
+                    const bool moved = kal_stream_write(cs, "okc", 3) == 3
+                                       && kal_stream_read(sst, b, 3) == 3 && b[0] == 'o' && b[2] == 'c';
+                    observe(kind::behaviour, moved, "bytes cross a connection made at a name");
+                    kal_endpoint ep{};
+                    observe(kind::behaviour, kal_net_peer(s, &ep) == kal_err_not_supported,
+                            "a connection made at a name has no address to report");
+                    kal_net_close(s);
+                }
+                if (cr == kal_ok) kal_net_close(c);
+                kal_net_close_listener(l);
+            }
+            kal_fs_remove(here, name, len);
+            kal_net_conn none{};
+            observe(kind::behaviour, kal_net_connect_at(here, name, len, &none) == kal_err_not_found,
+                    "a connection at a name nothing listens at is kal_err_not_found");
+        } else {
+            unobserved(kind::behaviour, "a rendezvous at a name",
+                       "the working directory does not claim KAL_FS_PROP_LOCAL_ENDPOINT");
+        }
+    }
+#endif
 #endif
 }
 

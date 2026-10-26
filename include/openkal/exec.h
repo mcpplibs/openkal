@@ -42,11 +42,37 @@ void* kal_exec_alloc(kal_uintptr size);
 /* Makes a region obtained from kal_exec_alloc executable and no longer
  * writable. Returns kal_ok, or an error if the environment refuses.
  *
- * The whole of the region is published; there is no partial form. An
- * implementation that had to publish in parts would be reporting its page
- * granularity through the shape of the interface, and a caller cannot act upon
- * that. */
+ * The whole of the region is published. Version 0.17 adds the partial form
+ * below, and clause 11 entry 28 records why the reason this paragraph used to
+ * give against it --- that a partial form reports the environment's granularity
+ * through the shape of the interface --- did not survive a loader. */
 int kal_exec_publish(void* p, kal_uintptr size);
+
+/* Makes PART of a region obtained from kal_exec_alloc executable and no longer
+ * writable, and leaves the rest as it was. Version 0.17.
+ *
+ * A loader needs it, and this header has said since the interface was added
+ * that a loader belongs above openkal and needs only this interface. An image's
+ * instructions and its data lie at fixed distances from each other in one
+ * region --- the instructions address the data relative to themselves --- so
+ * the instructions must become executable while the data stays writable, and a
+ * whole-region publication cannot express that.
+ *
+ * `offset' and `size' are measured from the start of the region and are
+ * multiples of kal_exec_granularity; a part that is not is kal_err_invalid, and
+ * nothing is published. A part may be published once; parts that do not
+ * overlap may be published in any order. */
+int kal_exec_publish_part(void* region, kal_uintptr offset, kal_uintptr size);
+
+/* The quantum in which kal_exec_publish_part publishes: the environment's
+ * protection granularity. Version 0.17.
+ *
+ * It is not kal_memory_granularity, which is the quantum of reservation: on one
+ * environment that is sixty-four kibibytes while protection is per four, and an
+ * image laid out for the second would be refused by the first. An image that
+ * aligns its parts to the largest granularity among the environments it will
+ * run upon (clause 12) is published unchanged on each. */
+kal_uintptr kal_exec_granularity(void);
 
 /* Releases a region obtained from kal_exec_alloc, published or not. The size is
  * the one passed to the reservation. */

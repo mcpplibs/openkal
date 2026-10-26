@@ -1,4 +1,4 @@
-# openkal Specification, version 0.16
+# openkal Specification, version 0.17
 
 ## 1. Scope
 
@@ -955,6 +955,28 @@ system from inside a confinement. Each implementation observes the first
 paragraph in its own tests, since positions and handle tables are not portable;
 the conformance suite observes the third.
 
+### 7.14 Removing a name that is held open
+
+`kal_fs_remove` of a file another handle holds open removes the name when the
+call returns, on a volume for which the implementation claims
+`KAL_FS_PROP_REMOVE_OPEN`. The open file remains usable through its handles
+until the last of them is closed; the directory that held the name is then
+empty and may be removed, and the name may be created again.
+
+The behaviour is the one a C library's `unlink` states, and a program relies on
+it without naming it: a lock file held for the program's lifetime, a temporary
+file kept open after its name is removed, a tree removed while one of its files
+is still open. One environment defers the removal by default --- the name
+remains, refusing every open, until the last handle is closed --- and offers
+the immediate form on the volumes that record it. Measured above an
+implementation that used the deferred form: a C++ program's `remove_all` of a
+directory holding its own lock file failed with "directory not empty" on that
+environment alone, while the same program built for the environment removed it.
+
+A volume that cannot remove a held name at once is answered before the call
+(clause 6.2): the position is not claimed, and a caller that needs the
+directory gone closes what it holds first.
+
 ## 8. Evolution
 
 Each interface is versioned independently. A revision may add declarations and
@@ -1037,6 +1059,36 @@ immaterial, and one implementation per interface suffices.
 A device supplied through openhal may serve as the implementation of an openkal
 interface. The relationship is one of connection rather than of layering, and
 the connection is made by the package that describes the board.
+
+### 10.1 One implementation in one process
+
+**A process holds one implementation of openkal.** The table above says one per
+interface; this states the unit it is counted in. An implementation keeps state
+that belongs to the process and not to a caller --- the word of
+`kal_process_stop_requested`, the table its owned handles index (clause 6.7), the
+treatment it installed for the environment's requests --- and two
+implementations in one process would each believe they own it. A handle issued
+by one is not a handle of the other (clause 7.2), so two parts of one program
+that each linked an implementation of their own cannot pass a file between them,
+and two treatments of one request to end leave it delivered to whichever was
+installed last.
+
+A program linked as one artifact satisfies this by construction. A program
+composed of several --- a program and the libraries it loads, a loader and the
+images it starts (clause 12) --- satisfies it when the implementation is in one
+of them and the others reach it, which is the **shared form** of an
+implementation: an artifact the others load, whose exported names are exactly
+`SURFACE.txt` (clause 9's second half applies to it unchanged), and whose name
+carries the major version of the specification it implements, so that two
+artifacts written against incompatible versions do not bind to one. An
+implementation that offers a shared form states it in its package; it is not
+required to offer one, and a program that is one artifact needs none.
+
+What a program cannot do is load a second implementation beside the first and
+use both. Nothing in this specification detects it, because nothing can: the two
+are each conforming, and the defect is in the composition. It is recorded here
+so that a composition is examined for it rather than discovering it as a handle
+that one half of a program refuses.
 
 ## 11. Matters this version does not settle
 
@@ -1487,3 +1539,241 @@ The following are recorded so that they are not mistaken for oversights.
     has released. Each implementation observes the release in its own tests,
     because a count of open handles is not portable — clause 7.13 observes its
     first paragraph the same way, for the same reason.
+
+25. **A rename that does not replace.** **Settled in 0.17.**
+    `kal_fs_rename_flags` with `KAL_RENAME_NO_REPLACE`, answered per volume by
+    `KAL_FS_PROP_RENAME_NO_REPLACE`. Three consumers above this interface
+    publish a file under a name only if nobody else has --- a package store, a
+    build cache several programs fill, an installer --- and each composed it
+    from an enquiry and a rename, which loses the name to a second publisher
+    between the two. The composition through `KAL_OPEN_EXCLUSIVE` does not
+    help: it creates the name and the rename then replaces what was created.
+    Every environment this specification targets performs the operation
+    natively where the volume can, so it is a word that was missing (entry
+    10's criterion), and a volume that cannot is answered before the call
+    (clause 6.2). A second declaration rather than a flags argument added to
+    `kal_fs_rename`, because clause 8 forbids altering the first.
+26. **Ending as the request to end would have.** **Settled in 0.17.**
+    `kal_process_end_as_requested`. A program that takes the request over with
+    `kal_process_stop_requested` and finishes its work had no way to end as the
+    request would have ended it: `kal_exit` with any status reports a program
+    that chose to end, a shell running a loop then starts the next program, and
+    a starter that waits cannot tell a cancelled build from a failed one. The
+    report it wanted is the environment's own report of an end the environment
+    caused, which nothing above this interface can produce. Measured by the
+    consumer that met it: a build tool's cancelled run was reported to its
+    shell as an exit status, and the shell's loop continued.
+
+    **The take-over is stated with it**, in `process.h`: from the first call of
+    `kal_process_stop_requested`, a request reaches the program only through the
+    word, and a request its starter arranged not to deliver stays undelivered.
+    Two implementations restored the delivery of a request their starter had
+    declined, which ended background programs that were meant to survive it.
+27. **A rendezvous at a name.** **Settled in 0.17.** `kal_net_listen_at` and
+    `kal_net_connect_at`, answered per directory by `KAL_FS_PROP_LOCAL_ENDPOINT`.
+    Two programs on one machine --- an editor and the server it starts, two
+    instances of one program deciding which is the first --- met at an address
+    on the loopback, which every program on the machine can reach, so each
+    protocol carried its own access control. A name in a directory is reached by
+    a program that holds the directory, which is the confinement of clause 7.13
+    applied to a connection. Every environment this specification targets binds
+    such a connection to a name natively. It is admitted as two operations of
+    `openkal.net` rather than an interface of its own because the resources are
+    the ones the interface already has --- a listener and a connection --- and
+    only where they meet is new. Passing a handle across such a connection is
+    not admitted, for the reason entry 9 gives.
+28. **Publishing part of a region.** **Settled in 0.17.**
+    `kal_exec_publish_part` and `kal_exec_granularity`. `exec.h` declined a
+    partial form on the ground that it would report the environment's
+    granularity through the shape of the interface, and said in the same header
+    that a loader belongs above openkal and needs only this interface. The two
+    statements could not both hold: an image's instructions and data lie at
+    fixed distances in one region, so a loader must make the first executable
+    and leave the second writable. Measured by writing the loader (a C library's
+    `dlopen` above three implementations). The granularity is reported by its own
+    operation because it is not `kal_memory_granularity`: one environment
+    reserves in sixty-four kibibytes and protects in four.
+29. **What is known of a running program.** **Settled in 0.17.**
+    `kal_process_self`, `kal_process_open_id` and `kal_process_info`, with
+    `kal_program_info` in the shape of `kal_node_info`. A language server is
+    told its client's identifier and must notice when the client is gone; a
+    lease names the program that holds it; a bound on the processor time a
+    program may use is checked against what it has used. None could be
+    answered above this interface, and the consumer that needed all three kept
+    seven declarations of one environment's functions and read another's
+    process table by name. The identifier is opaque and is given again, so it is
+    reported with the moment the program started, and the pair is what names
+    one program. A program the caller did not start can be asked about and not
+    waited for or ended: the second would end a program by a number that may
+    since name another.
+30. **The image a program was started from, and the system it runs upon.**
+    **Settled in 0.17.** `kal_env_image` and `kal_env_system`, and
+    `kal_env_loader` for an image (clause 12): what starts the same program
+    again is a loader and an image there, and the loader is named nowhere else. The first is a
+    fact every environment that starts named images tells the program and that
+    the program cannot recover otherwise; argument zero is the starter's choice
+    (clause 7.6). The second exists for clause 12: a program built once and run
+    upon several systems must still follow each system's conventions --- where
+    a user's configuration is kept, the suffix of a program, the separator of a
+    list of directories --- and those are the system's decisions rather than
+    resources of this interface. **It is restricted to conventions in its
+    declaration**, because a name of a class of environment used to decide what
+    an implementation can do is the error clause 3.3 records; capability words
+    answer that, about the implementation in front of the program.
+31. **Whether written control sequences are obeyed.** **Settled in 0.17.**
+    `KAL_TERM_SEQUENCES`, a mode position of the stream a program writes. A
+    program that colours its output could not tell an environment that obeys
+    ECMA-48 from one that prints it, and one implementation wrote bytes to its
+    console that the console then displayed. ECMA-48 is a standard of its own
+    and not the shape of an environment; one environment of the three obeys it
+    only once asked, and the position is how a program asks.
+32. **The direction of a channel, and the form of an environment entry.**
+    **Stated in 0.17.** `kal_process_channel` named no direction and both
+    implementations made `mine` the reading end; an environment entry with no
+    `=` was refused by one implementation and passed on by another. Both are
+    now stated in `process.h`, and the second is refused by all.
+33. **One implementation in one process.** **Stated in 0.17**, clause 10.1,
+    with the shared form that lets a program of several artifacts satisfy it.
+    It was assumed rather than stated, and became a question when a loader above
+    this interface began starting images that themselves call `kal_*`
+    (clause 12).
+34. **Images.** **Specified in 0.17**, clause 12. Until this version a program
+    above openkal was portable in its source: the same source, built once per
+    environment. The clause that follows makes it portable in its bytes for one
+    architecture, and states why that needed no operation that did not already
+    exist except the three of entries 28 and 30.
+
+35. **A directory supplied after inception.** **Stated in 0.17**, at
+    `kal_fs_preopen`. The set of supplied directories was fixed when the program
+    started, and on the environment whose volumes are separate roots a volume
+    mounted later could not be reached by any name. An environment may now
+    append such a directory; a position once given keeps its directory and its
+    name, so nothing a program holds changes meaning. The same entry records the
+    root of a network's names, which that environment now supplies as a
+    directory of its own (`//`).
+
+36. **An image's entry, and an import it can do without.** **Stated in 0.17**,
+    clause 12.2 and 12.4. An image's entry takes nothing and returns its status,
+    and the loader ends with that status after the finalisers: the arguments
+    are `kal_env_arg`'s, as in every other arrangement. A weak import is bound
+    when it is provided and is zero otherwise, and it does not enter the
+    requirements note --- so a C library can keep a table of operations it uses
+    when present (a `dlopen` beside the image, an interface a later version
+    adds) without making every image refuse to load where they are absent.
+37. **Removing a name that is held open.** **Stated in 0.17**, clause 7.14,
+    answered per volume by `KAL_FS_PROP_REMOVE_OPEN`. The specification said
+    what a removal removes and not when; two environments removed the name at
+    once and the third when the last handle closed, and a tree holding an open
+    file was removable on two of them. The immediate form is native on every
+    volume that records it, so it is a statement of what was already the
+    common behaviour, and a volume without it is answered before the call.
+38. **Ending a read that waits.** **Stated in 0.17**, at `kal_net_shutdown`.
+    Ending the read direction of a connection ends a read waiting in it, with
+    the end of input. Two environments did so and the third left the read
+    pending, so a program that ended a connection from another context waited
+    for its reader there alone; the release of the connection is not the
+    remedy, since a handle in use is not to be released (clause 7.2).
+
+## 12. Images
+
+A program written against this specification is built for an environment: its
+implementation is linked into it (clause 4.4, **S**), or loaded beside it
+(**L**). This clause specifies a third arrangement, in which the program is an
+**image** --- one artifact per processor architecture --- and a **loader**
+running in the environment holds the implementation, maps the image, binds the
+names it imports to that implementation, and transfers control to it. The same
+bytes then run in every environment of that architecture for which a loader
+exists.
+
+It is an arrangement and not a requirement: an implementation is not required to
+be reachable from an image, and a program built for its environment is
+unaffected by this clause. The format is called the **ok format** (openkal
+image format); an executable image is conventionally named `*.oke`, and an image
+that is loaded by another `*.okso`.
+
+### 12.1 What makes it possible, and what does not
+
+**An environment's kernel executes only its own format** --- each recognises a
+different header at the start of the file --- **and a file cannot be all of
+them.** What is above the kernel is a loader in every environment, and a loader
+can be written for any format. An image is therefore never started by the
+environment directly. It is started by a loader that is itself a program of the
+environment, or by a program of the environment that carries the image within
+it and starts it the same way.
+
+Nothing else is environment-specific. An image calls only `kal_*`, so it needs
+from the loader only what this specification already declares, together with
+three operations a loader needs and a program could not otherwise reach
+(clause 11, entries 28 and 30).
+
+### 12.2 The image
+
+| Item | Requirement |
+| --- | --- |
+| container | ELF, position-independent (`ET_DYN`), little-endian, of the architecture's class; no text relocation |
+| alignment | every loadable segment aligned to at least 65536 bytes, which is the largest protection or reservation granularity among the environments this specification targets; a loader publishes each executable segment with `kal_exec_publish_part` |
+| relocations | only the architecture's relative, absolute, global-data and procedure-linkage relocations, and the packed relative form; a loader refuses any other |
+| imports | only names this specification declares, and names other images export; a name of a C library or of an environment is refused. A weak import is optional: it is bound when the implementation or an image the image needs provides it, and is zero otherwise |
+| entry | an executable image's ELF entry is a function of no parameters returning `int`, in the image's convention; its value is the image's status. An image that another loads has no entry |
+| calling convention | the architecture's, fixed for every environment: the System V convention on x86-64, the procedure call standard on AArch64; an implementation whose environment uses another presents entries in this one to the image (12.3) |
+| platform register | an AArch64 image does not use `x18`, which two environments reserve |
+| stack | a frame larger than a page is touched page by page, in order: one environment commits a context's stack as its guard page is touched, and a frame that steps over the guard ends the program |
+| thread-local storage | through the emulated form, in which a variable is found by a function the image itself supplies; an image does not address the thread pointer, which one environment does not let a program set and another does not let it change |
+| unwinding | exceptions and unwinding do not cross from an image into a `kal_*` operation; the interface is a C interface (clause 1) |
+| note | an `OPENKAL` note (12.4) |
+
+The thread-local storage of an image is kept by the image's own C library,
+above `kal_task_current`. `kal_task_current` names a context only while it runs,
+so the library releases what it kept for a context when a context it started
+ends; a context the library did not start --- the first, and any an embedding
+program started --- keeps its storage for the life of the image. No operation is
+added for it. The cost is a function call where a register would have been read;
+it is stated rather than hidden, and a program for which it matters is built for
+its environment.
+
+### 12.3 The loader's side
+
+A loader holds the process's one implementation (clause 10.1). It maps the image
+into a region from `kal_exec_alloc`, applies the relocations, binds each imported
+name to that implementation's entry for it, publishes the executable segments,
+runs the image's initialisers and transfers control to its entry; when the entry
+returns, the loader runs the image's finalisers and ends with the status the entry
+returned (`kal_exit`). The image's
+`kal_env_*` operations answer for the image: arguments as the loader received
+them after its own, `kal_env_image` the image's name, and `kal_env_loader` the
+loader's own, so that the program can be started again (a loader, then an
+image).
+
+Where an environment's own convention differs from the image's --- on x86-64,
+one environment passes arguments in other registers --- the loader presents each
+entry in the image's convention, and a function the image passes to the
+implementation (`kal_task_start`'s entry, `kal_space_start`'s) is entered in the
+image's convention. The presentation is mechanical and is generated from
+`SURFACE.txt` and the declarations, so that it cannot omit a name. It is the
+loader's and not the implementation's: an implementation is written in its
+environment's convention, as every program of that environment is, and a
+convention of images is a fact about images.
+
+### 12.4 The note
+
+An image carries notes whose owner is `OPENKAL`, in a section `.note.openkal`:
+
+| type | descriptor |
+| --- | --- |
+| 1, requirements | `kal_u32` major and `kal_u32` minor version of this clause (1 and 0), then a `kal_u64` of `KAL_IFACE_*` positions: **the interfaces the image requires**, derived from the names it imports other than weakly |
+| 2, signature | 32 bytes of an Ed25519 public key, then 64 bytes of the signature, over the whole file with these 96 bytes read as zero |
+
+The first is required and the second is not. A loader compares the required interfaces with `kal_interfaces` and
+refuses to load an image that requires one the implementation does not provide,
+naming the interface. That is clause 6.1 in this arrangement: the loader binds
+at load what a linker binds at link, so it reports at load what a linker reports
+at link, and no operation that reports a lack of support at run time is
+introduced. A loader refuses an image of a higher major version of this clause.
+Whether a signature is required, and whose, is the loader's policy.
+
+### 12.5 What is not specified
+
+The loader, the format's tools, and the C library and C++ run-time inside an
+image are not specified: they are programs above this interface, and an image may
+carry any of them, or none. The reference loader and tools are published beside
+this specification (`mcpplibs/openkal-image`) and are not normative.

@@ -314,6 +314,41 @@ void run() {
                 "the directory is removed");
     }
 
+    // A name held open is removed at once (clause 7.14, version 0.17), where
+    // the volume claims it: the name is absent, the file stays usable, and the
+    // directory that held it is empty. An implementation that deferred the
+    // removal to the close left a C++ program's `remove_all' unable to remove
+    // a tree holding its own lock file.
+    if ((kal_fs_props(here()) & kal::fs::remove_open.bits) != 0) {
+        const char* kHeld = "okc-conformance-held.tmp";
+        kal_fs_remove(here(), kHeld, length(kHeld));
+        kal_fs_mkdir(here(), kHeld, length(kHeld));
+        kal_dir d{};
+        if (kal_fs_open_dir(here(), kHeld, length(kHeld), &d) == kal_ok) {
+            kal_file f{};
+            const auto flags = kal::fs::open::read | kal::fs::open::write | kal::fs::open::create;
+            if (kal::fs::open_file(d, "h", 1, flags, &f) == kal_ok) {
+                const int removed = kal_fs_remove(d, "h", 1);
+                kal_node_info gone = fresh();
+                const int ge = kal_fs_info(d, "h", 1, kal::fs::no_resolve, kal::fs::field::all, &gone);
+                observe(kind::behaviour, removed == kal_ok && ge == kal_ok && gone.kind == kal_node_absent,
+                        "a file removed while it is open loses its name at once");
+                observe(kind::behaviour, write_bytes(f, "held", 4),
+                        "and stays usable through the handle that holds it");
+                kal_fs_close_dir(d);
+                d = {};
+                observe(kind::behaviour, kal_fs_remove(here(), kHeld, length(kHeld)) == kal_ok,
+                        "and the directory that held it is removed");
+                kal_fs_close_file(f);
+            }
+            if (d.h) kal_fs_close_dir(d);
+        }
+        kal_fs_remove(here(), kHeld, length(kHeld));
+    } else {
+        unobserved(kind::behaviour, "a name held open is removed at once",
+                   "the volume does not claim KAL_FS_PROP_REMOVE_OPEN");
+    }
+
     // Renaming, and that the old name is then absent.
     {
         put_file(kName, "x");
@@ -326,6 +361,41 @@ void run() {
                 kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &info) == kal_ok
                     && info.kind == kal_node_absent,
                 "the name it was renamed from is then absent");
+        kal_fs_remove(here(), kOther, length(kOther));
+    }
+
+    // A rename that does not replace (version 0.17): refused with
+    // kal_err_exists and changing nothing when the name is there; a rename
+    // when it is not. Asked of the volume first, as clause 6.2 says.
+    if ((kal_fs_props(here()) & kal::fs::rename_no_replace.bits) != 0) {
+        put_file(kName, "first");
+        put_file(kOther, "second");
+        observe(kind::behaviour,
+                kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
+                                    kal::fs::no_replace.bits) == kal_err_exists,
+                "a rename that does not replace is refused when the name is there");
+        char buf[16] = {};
+        observe(kind::behaviour,
+                read_file(kOther, buf, sizeof buf) == 6 && buf[0] == 's'
+                    && read_file(kName, buf, sizeof buf) == 5,
+                "and changes neither name");
+        kal_fs_remove(here(), kOther, length(kOther));
+        observe(kind::behaviour,
+                kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
+                                    kal::fs::no_replace.bits) == kal_ok,
+                "a rename that does not replace renames when the name is free");
+        kal_fs_remove(here(), kOther, length(kOther));
+    } else {
+        unobserved(kind::behaviour, "a rename that does not replace",
+                   "the volume does not claim KAL_FS_PROP_RENAME_NO_REPLACE");
+    }
+    {
+        put_file(kName, "x");
+        observe(kind::behaviour,
+                kal_fs_rename_flags(here(), kName, length(kName), here(), kOther, length(kOther),
+                                    (kal_uintptr)1u << 30) == kal_err_invalid,
+                "a rename flag the specification has not assigned is refused");
+        kal_fs_remove(here(), kName, length(kName));
         kal_fs_remove(here(), kOther, length(kOther));
     }
 
@@ -462,7 +532,42 @@ void run() {
             observe(kind::behaviour, sized == static_cast<kal_intptr>(length(kName)),
                     "a capacity of zero reports the content's length without writing");
 
-            kal_fs_remove(here(), kLink, length(kLink));
+            // THE NAME IS RENAMED AND REMOVED, NOT WHAT IT LEADS TO. An
+            // implementation that followed the link removed the file it named
+            // and left the link, and could not remove a link to a directory
+            // at all; a C++ program's `remove_all' then failed on the one
+            // environment that did so.
+            const char* kMoved = "okc-conformance-link-moved.tmp";
+            kal_fs_remove(here(), kMoved, length(kMoved));
+            const int moved = kal_fs_rename(here(), kLink, length(kLink), here(), kMoved, length(kMoved));
+            kal_node_info after = fresh();
+            kal_fs_info(here(), kMoved, length(kMoved), kal::fs::no_resolve, kal::fs::field::all, &after);
+            observe(kind::behaviour, moved == kal_ok && after.kind == kal_node_link,
+                    "renaming a link renames the link");
+            const int removed = kal_fs_remove(here(), kMoved, length(kMoved));
+            kal_node_info target_after = fresh();
+            const int te = kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &target_after);
+            observe(kind::behaviour, removed == kal_ok && te == kal_ok && target_after.kind == kal_node_file,
+                    "removing a link removes the link and leaves the file it named");
+
+            // And a link to a directory, which one environment makes as a
+            // different kind of node and which is removed as its name too.
+            const char* kDir     = "okc-conformance-linked-dir.tmp";
+            const char* kDirLink = "okc-conformance-dir-link.tmp";
+            kal_fs_remove(here(), kDirLink, length(kDirLink));
+            kal_fs_mkdir(here(), kDir, length(kDir));
+            {
+                if (kal_fs_link_create(here(), kDirLink, length(kDirLink), kDir, length(kDir),
+                                       kal::fs::link_directory) == kal_ok) {
+                    const int gone = kal_fs_remove(here(), kDirLink, length(kDirLink));
+                    kal_node_info dir_after = fresh();
+                    const int de = kal_fs_info(here(), kDir, length(kDir), 0, kal::fs::field::all, &dir_after);
+                    observe(kind::behaviour, gone == kal_ok && de == kal_ok && dir_after.kind == kal_node_directory,
+                            "removing a link to a directory removes the link and leaves the directory");
+                }
+                kal_fs_remove(here(), kDir, length(kDir));
+            }
+
             kal_fs_remove(here(), kName, length(kName));
         } else {
             unobserved(kind::behaviour,
@@ -658,7 +763,8 @@ void run() {
                                     | kal::fs::modified_time | kal::fs::atomic_rename
                                     | kal::fs::make_links
                                     | kal::fs::locks | kal::fs::capacity
-                                    | kal::fs::executable).bits;
+                                    | kal::fs::executable | kal::fs::rename_no_replace
+                                    | kal::fs::local_endpoint | kal::fs::remove_open).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 

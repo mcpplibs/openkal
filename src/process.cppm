@@ -37,10 +37,22 @@ export using ::kal_process_job_terminate;
 export using ::kal_process_job_close;
 export using ::kal_process_stop_requested;
 export using ::kal_process_props;
+export using ::kal_process_end_as_requested;
+export using ::kal_program_info;
+export using ::kal_process_self;
+export using ::kal_process_open_id;
+export using ::kal_process_info;
 
 static_assert(sizeof(kal_process) == sizeof(kal_uintptr), "clause 7.2");
 static_assert(sizeof(kal_spawn_streams) == 3 * sizeof(kal_uintptr), "clause 5.3");
 static_assert(sizeof(kal_preopen) == 3 * sizeof(kal_uintptr), "clause 5.3");
+// kal_program_info grows by appending, as kal_node_info does; the offsets of
+// the fields that exist are what is frozen.
+static_assert(__builtin_offsetof(kal_program_info, id) == 8, "clause 5.3");
+static_assert(__builtin_offsetof(kal_program_info, started_ns) == 16, "clause 5.3");
+static_assert(__builtin_offsetof(kal_program_info, cpu_ns) == 24, "clause 5.3");
+static_assert(__builtin_offsetof(kal_program_info, ended) == 32, "clause 5.3");
+static_assert(sizeof(kal_program_info) == 40, "clause 5.3");
 
 export namespace kal::process {
 
@@ -58,6 +70,16 @@ inline constexpr props grant_dir     {KAL_PROCESS_PROP_GRANT_DIR};
 inline constexpr props bound_lifetime{KAL_PROCESS_PROP_BOUND_LIFETIME};
 inline constexpr props job           {KAL_PROCESS_PROP_JOB};
 inline constexpr props stop_requested{KAL_PROCESS_PROP_STOP_REQUESTED};
+inline constexpr props open_id       {KAL_PROCESS_PROP_OPEN_ID};
+
+// The fields of kal_program_info, for `wanted' and `present' (0.17).
+namespace info {
+inline constexpr kal_u32 id      = KAL_PINFO_ID;
+inline constexpr kal_u32 started = KAL_PINFO_STARTED;
+inline constexpr kal_u32 cpu     = KAL_PINFO_CPU;
+inline constexpr kal_u32 ended   = KAL_PINFO_ENDED;
+inline constexpr kal_u32 all     = KAL_PINFO_ALL;
+}
 
 // WHAT A CALLER ASKS FOR, WHICH IS A DIFFERENT WORD FROM WHAT AN
 // IMPLEMENTATION CAN DO. `props' above answers the second; these set the first.

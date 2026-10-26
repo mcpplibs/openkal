@@ -36,6 +36,24 @@
 #define KAL_TERM_ECHO         ((kal_uintptr)1u << 1)  /* the environment shows what is typed   */
 #define KAL_TERM_PASS_CONTROL ((kal_uintptr)1u << 2)  /* the environment reserves no keystroke */
 #define KAL_TERM_PASS_INPUT   ((kal_uintptr)1u << 3)  /* the environment alters nothing typed  */
+#define KAL_TERM_SEQUENCES    ((kal_uintptr)1u << 4)  /* control sequences written are obeyed  */
+
+/* KAL_TERM_SEQUENCES, VERSION 0.17, IS A POSITION OF WHAT IS WRITTEN AND NOT OF
+ * WHAT IS TYPED, AND IT IS READ AND ESTABLISHED ON THE STREAM A PROGRAM WRITES.
+ * Set, the environment interprets the control sequences of ECMA-48 written to
+ * the stream --- colour, emphasis, the position of the cursor, erasure --- and
+ * does not display them. Clear, it may display them as the bytes they are.
+ *
+ * ECMA-48 is an international standard, and not the shape of any one
+ * environment: every terminal this specification has been implemented on
+ * interprets it, one of the three only once a program has asked its console to.
+ * Before this position a program could not tell an environment that obeys the
+ * sequences from one that prints them, and asked the environment's own switch
+ * outside this interface or printed escape characters into a log. Zero is the
+ * weaker claim (clause 6.2): an implementation released before this position
+ * reports it clear and has thereby said nothing false. An environment whose
+ * terminals always interpret the sequences reports the position set and ignores
+ * a request to clear it, which kal_terminal_get_mode then reports. */
 
 /* KAL_TERM_PASS_CONTROL IS A GUARANTEE IN ONE DIRECTION AND A PERMISSION IN THE
  * OTHER. Set, every keystroke reaches the program, including the ones an

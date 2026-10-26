@@ -17,6 +17,7 @@ module;
 export module openkal.net;
 export import openkal.types;
 export import openkal.stream;
+export import openkal.fs;
 
 export using ::kal_net_conn;
 export using ::kal_net_listener;
@@ -24,6 +25,8 @@ export using ::kal_net_listener;
 export using ::kal_net_connect;
 export using ::kal_net_listen;
 export using ::kal_net_accept;
+export using ::kal_net_listen_at;
+export using ::kal_net_connect_at;
 export using ::kal_net_stream;
 export using ::kal_net_peer;
 export using ::kal_net_local;
