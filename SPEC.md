@@ -1619,6 +1619,15 @@ The following are recorded so that they are not mistaken for oversights.
     architecture, and states why that needed no operation that did not already
     exist except the three of entries 28 and 30.
 
+35. **A directory supplied after inception.** **Stated in 0.17**, at
+    `kal_fs_preopen`. The set of supplied directories was fixed when the program
+    started, and on the environment whose volumes are separate roots a volume
+    mounted later could not be reached by any name. An environment may now
+    append such a directory; a position once given keeps its directory and its
+    name, so nothing a program holds changes meaning. The same entry records the
+    root of a network's names, which that environment now supplies as a
+    directory of its own (`//`).
+
 ## 12. Images
 
 A program written against this specification is built for an environment: its
@@ -1716,11 +1725,3 @@ The loader, the format's tools, and the C library and C++ run-time inside an
 image are not specified: they are programs above this interface, and an image may
 carry any of them, or none. The reference loader and tools are published beside
 this specification (`mcpplibs/openkal-image`) and are not normative.
-35. **A directory supplied after inception.** **Stated in 0.17**, at
-    `kal_fs_preopen`. The set of supplied directories was fixed when the program
-    started, and on the environment whose volumes are separate roots a volume
-    mounted later could not be reached by any name. An environment may now
-    append such a directory; a position once given keeps its directory and its
-    name, so nothing a program holds changes meaning. The same entry records the
-    root of a network's names, which that environment now supplies as a
-    directory of its own (`//`).
