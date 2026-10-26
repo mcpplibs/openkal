@@ -1682,6 +1682,7 @@ three operations a loader needs and a program could not otherwise reach
 | entry | an executable image's ELF entry is a function of no parameters returning `int`, in the image's convention; its value is the image's status. An image that another loads has no entry |
 | calling convention | the architecture's, fixed for every environment: the System V convention on x86-64, the procedure call standard on AArch64; an implementation whose environment uses another presents entries in this one to the image (12.3) |
 | platform register | an AArch64 image does not use `x18`, which two environments reserve |
+| stack | a frame larger than a page is touched page by page, in order: one environment commits a context's stack as its guard page is touched, and a frame that steps over the guard ends the program |
 | thread-local storage | through the emulated form, in which a variable is found by a function the image itself supplies; an image does not address the thread pointer, which one environment does not let a program set and another does not let it change |
 | unwinding | exceptions and unwinding do not cross from an image into a `kal_*` operation; the interface is a C interface (clause 1) |
 | note | an `OPENKAL` note (12.4) |
