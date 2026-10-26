@@ -54,6 +54,45 @@ kal_intptr kal_env_var(const char* name, kal_uintptr name_len,
 kal_uintptr kal_env_var_count(void);
 kal_intptr  kal_env_var_at(kal_uintptr index, char* out, kal_uintptr cap);
 
+/* The name of the image this program was started from, as the environment
+ * states it to the program: the name the environment resolved when it started
+ * the program, not the name in argument zero, which the starter chooses (clause
+ * 7.6). Version 0.17.
+ *
+ * Every environment that starts programs from named images states it --- the
+ * name the kernel resolved, the path the loader was given, the name recorded in
+ * the process's own parameters --- and a program cannot recover it otherwise:
+ * argument zero is whatever its starter wrote, and a search of the directories
+ * a starter searched is a guess about a decision already made. A program that
+ * finds its own data beside itself needs it.
+ *
+ * The name is in the environment's own spelling and is meaningful to the
+ * environment rather than to this interface: it is not resolved against a
+ * preopen, and a program uses it as it uses any name it was given from outside.
+ * An environment that starts programs from no named image reports
+ * kal_err_not_found, negated. Where a program is an image started by a loader
+ * above openkal (clause 12), the loader's implementation states the image's
+ * name, not its own. */
+kal_intptr kal_env_image(char* out, kal_uintptr cap);
+
+/* The name of the environment's system: `linux', `macos', `windows', and
+ * further names as implementations are written, lower case, from an open set.
+ * Version 0.17.
+ *
+ * IT EXISTS FOR CONVENTIONS AND FOR NOTHING ELSE. The conventions of a system
+ * --- where it keeps a user's configuration, how it separates the entries of a
+ * list of directories, the suffix of a program it starts --- are decided by the
+ * system and are not resources of this interface, and a program built once and
+ * run upon several systems (clause 12) learns which system's conventions to
+ * follow here. A program shall not use the name to change how it calls an
+ * operation of this specification, or to infer what an operation can do: what
+ * an implementation can do is answered by its capability words (clause 6.2),
+ * which are true of the implementation in front of the program, and a name is
+ * true of a class of environment, which is the thing clause 3.3 records a name
+ * cannot be. An implementation whose environment has no such name reports
+ * kal_err_not_found, negated. */
+kal_intptr kal_env_system(char* out, kal_uintptr cap);
+
 #ifdef __cplusplus
 }
 #endif

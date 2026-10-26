@@ -81,6 +81,8 @@ struct kal_preopen {
 #define KAL_PROCESS_PROP_JOB            ((kal_uintptr)1u << 6)
 /* kal_process_stop_requested answers a word rather than null. Version 0.11. */
 #define KAL_PROCESS_PROP_STOP_REQUESTED ((kal_uintptr)1u << 7)
+/* kal_process_open_id finds a program by its identifier. Version 0.17. */
+#define KAL_PROCESS_PROP_OPEN_ID        ((kal_uintptr)1u << 8)
 
 /* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -233,6 +235,13 @@ extern "C" {
  * Everything that varies between one start and another is in `kal_spawn', which
  * is why this is one declaration and not a family --- see the comment there.
  *
+ * EACH ENVIRONMENT ENTRY IS `NAME=value', and an entry that holds no `=', or
+ * whose name is empty, is kal_err_invalid and starts nothing. Version 0.17
+ * states it: one implementation refused such an entry and another passed it to
+ * the started program, so a caller could not know which program it was
+ * starting. `kal_env_var_at' answers a NAME, so a caller copying its own
+ * environment composes the entry from `kal_env_var_at' and `kal_env_var'.
+ *
  * An implementation reports kal_err_not_supported, and starts nothing, when the
  * request names something it cannot do: a flag whose position it does not claim
  * in `kal_process_props', or a non-empty `grants' without
@@ -266,6 +275,16 @@ int kal_process_spawn(const struct kal_spawn* how,
  * the pair is the mechanism a parent uses to speak to a child it started ---
  * which openkal otherwise has no way to express, because the standard streams
  * are borrowed and cannot be manufactured.
+ *
+ * THE PAIR HAS ONE DIRECTION, AND IT IS STATED BECAUSE IT WAS NOT. Version
+ * 0.17. `mine' is the end that READS and `theirs' the end that WRITES: placed
+ * as a started program's `out' or `err', `theirs' carries what the program
+ * writes to `mine'. A caller that writes to a started program's input asks for
+ * a second pair and uses it the other way about --- places `mine' at `in' and
+ * writes to `theirs'. Before 0.17 the text named no direction, both
+ * implementations of the time made `mine' the reading end, and a caller that
+ * guessed the other way wrote into an end that refused (measured: a consumer's
+ * first program to feed a child's input read nothing).
  *
  * BOTH ENDS ARE OWNED, AND THE RELEASE IS HERE. A parent that does not release
  * `theirs' after the spawn never observes the end of input on `mine' --- the
@@ -329,12 +348,110 @@ void kal_process_close(struct kal_process);
  * distinguish causes may add an enquiry later; this one does not need altering
  * for that.
  *
+ * ONE OWNER FROM THE FIRST CALL. Version 0.17. From the first call of this
+ * operation in a program, a request to end that reaches the program is
+ * delivered through the word and through nothing else: the implementation
+ * replaces whatever its environment would have done upon the request,
+ * including an arrangement the program itself made earlier by means outside
+ * this interface. A request that the party which STARTED the program arranged
+ * not to be delivered at all --- an environment lets a starter say so, and a
+ * program started in the background is commonly started that way --- remains
+ * undelivered: taking it over would end a program its starter meant to be
+ * immune, and the word would read zero for ever, which is true. Before 0.17
+ * the text said neither, and two implementations restored delivery of a
+ * request their starter had declined.
+ *
  * AND IT SAYS NOTHING ABOUT AN END THAT CANNOT BE OBSERVED. Where a program is
  * ended outright --- the un-declinable signal here, the abrupt termination there,
  * `kal_process_job_terminate' through this interface --- nothing is set, because
  * nothing anywhere gets to notice. That symmetry is the reason this is
  * implementable on both kinds of system rather than on one. */
 const kal_u32* kal_process_stop_requested(void);
+
+/* ENDS THIS PROGRAM AS THE REQUEST TO END WOULD HAVE ENDED IT, had the program
+ * not taken the request over. Version 0.17.
+ *
+ * A program that has been asked to end, and has finished what it does before
+ * ending, should end in the way that tells its starter it was asked to: a
+ * starter that waits observes `terminated' from `kal_process_wait', and a shell
+ * running a loop stops the loop rather than starting the next program. Ending
+ * through `kal_exit' with any status tells the starter something else ---
+ * that the program chose to end --- and nothing above this interface can
+ * produce the other report, because it is the environment's own report of an
+ * end it caused.
+ *
+ * Returns only if the program has not been asked to end, with
+ * kal_err_invalid: there is no request whose manner could be reproduced. Where
+ * the program has been asked to end, it does not return. Every environment that
+ * provides `kal_process_stop_requested' can do it --- restoring the request's
+ * default treatment and delivering it again, or ending with the status the
+ * environment records for such a request. Clause 11 entry 26. */
+int kal_process_end_as_requested(void);
+
+/* WHAT IS KNOWN OF A PROGRAM THAT HAS BEEN STARTED. Version 0.17.
+ *
+ * The shape is `kal_node_info's (clause 5.3): the caller sets `self_size' and
+ * names in `wanted' the fields it needs; the implementation fills what it can
+ * and reports in `present' which, and writes no more of the structure than
+ * `self_size' states. Fields may be appended.
+ *
+ * `id' is the identifier the environment gives the program, an opaque value
+ * that MAY BE GIVEN AGAIN to another program once this one has ended and been
+ * waited for. `started_ns' is when the program started, on a clock of the
+ * environment's choosing that does not repeat, so the pair (id, started_ns)
+ * names one program for as long as the environment runs; a caller that keeps an
+ * identifier keeps the pair, and compares both. `cpu_ns' is the processor time
+ * the program has used, in every context it ran. `ended' is non-zero once the
+ * program has ended. */
+struct kal_program_info {
+    kal_u32 self_size;
+    kal_u32 present;
+    kal_u64 id;
+    kal_u64 started_ns;
+    kal_u64 cpu_ns;
+    kal_u32 ended;
+    kal_u32 reserved;
+};
+
+/* Positions in `wanted' and `present'. */
+#define KAL_PINFO_ID      ((kal_u32)1u << 0)
+#define KAL_PINFO_STARTED ((kal_u32)1u << 1)
+#define KAL_PINFO_CPU     ((kal_u32)1u << 2)
+#define KAL_PINFO_ENDED   ((kal_u32)1u << 3)
+#define KAL_PINFO_ALL     (KAL_PINFO_ID | KAL_PINFO_STARTED | KAL_PINFO_CPU | KAL_PINFO_ENDED)
+
+/* A handle to THIS program, owned and released by kal_process_close. It may be
+ * asked about with kal_process_info, and is refused by kal_process_wait and by
+ * kal_process_terminate with kal_err_invalid: a program does not wait for
+ * itself, and ending itself is kal_exit. Version 0.17. */
+int kal_process_self(struct kal_process* out);
+
+/* A handle to the program whose identifier is `id', owned and released by
+ * kal_process_close. Version 0.17.
+ *
+ * A program learns another's identifier from outside this interface --- a
+ * client states its own in a message, a file names the program that holds it
+ * --- and wants to know whether that program is still there and what it has
+ * used. The handle may be asked about with kal_process_info, and is refused by
+ * kal_process_wait and kal_process_terminate with kal_err_not_supported: a
+ * program the caller did not start is not the caller's to wait for or to end,
+ * and on environments where it could be, the caller would be ending a program
+ * by a number that may since name another (the reason `started_ns' exists).
+ *
+ * No such program is kal_err_not_found; one the caller may not ask about is
+ * kal_err_permission. An implementation that does not claim
+ * KAL_PROCESS_PROP_OPEN_ID reports kal_err_not_supported. Where the environment
+ * can hold the program itself --- a handle that keeps its identifier from being
+ * given again --- the handle does; where it cannot, the implementation records
+ * `started_ns' at the open and reports `ended' set once the identifier names a
+ * program that started at another time. */
+int kal_process_open_id(kal_u64 id, struct kal_process* out);
+
+/* Fills what is known of a program. Any handle this interface issued may be
+ * asked about: one from kal_process_spawn, kal_process_self, or
+ * kal_process_open_id. `out->self_size' shall be set by the caller; a size
+ * smaller than the fields that precede `id' is kal_err_invalid. */
+int kal_process_info(struct kal_process p, kal_u32 wanted, struct kal_program_info* out);
 
 /* Puts THE CALLING program into a unit, on the same terms as `kal_spawn.job':
  * a word of zero forms a new unit and receives its identity, and a word that

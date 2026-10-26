@@ -43,6 +43,9 @@ inline constexpr mode pass_control{KAL_TERM_PASS_CONTROL};
 // carriage return and is not rewritten into a line feed. Independent of
 // pass_control, which says whether a keystroke is kept rather than altered.
 inline constexpr mode pass_input  {KAL_TERM_PASS_INPUT};
+// Control sequences of ECMA-48 written to the stream are obeyed rather than
+// shown. A position of the stream a program writes. Version 0.17.
+inline constexpr mode sequences   {KAL_TERM_SEQUENCES};
 
 struct props_tag;
 using props = kal::props<props_tag>;

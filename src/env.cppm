@@ -22,6 +22,8 @@ export using ::kal_env_arg;
 export using ::kal_env_var;
 export using ::kal_env_var_count;
 export using ::kal_env_var_at;
+export using ::kal_env_image;
+export using ::kal_env_system;
 
 export namespace kal::env {
 

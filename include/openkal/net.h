@@ -19,6 +19,8 @@
 #ifndef OPENKAL_NET_H
 #define OPENKAL_NET_H
 #include "types.h"
+/* For `kal_dir', which names where a local endpoint is (version 0.17). */
+#include "fs.h"
 #include "stream.h"
 
 /* Opaque handles occupying one machine word, per clause 7.2.
@@ -55,6 +57,44 @@ extern "C" {
 int kal_net_connect(const struct kal_endpoint* to,    struct kal_net_conn* out);
 int kal_net_listen (const struct kal_endpoint* local, struct kal_net_listener* out);
 int kal_net_accept (struct kal_net_listener l,        struct kal_net_conn* out);
+
+/* A listener and a connection that meet at a NAME in a directory rather than
+ * at an address and a port. Version 0.17.
+ *
+ * Two programs on one machine that speak to each other need a rendezvous that
+ * only they can reach. An address on the loopback is reachable by every program
+ * on the machine, and access to it is then a matter for each protocol; a name in
+ * a directory is reachable by a program that holds the directory, which is the
+ * confinement this interface already has (clause 7.13) applied to a connection.
+ * Every environment this specification targets provides it: a socket bound to
+ * a name in the file system, resolved relative to a directory where the
+ * environment can and through the directory's own name where it cannot.
+ *
+ * The name is one component, as `kal_fs_open' takes. `kal_net_listen_at'
+ * creates it and fails with kal_err_exists, negated nothing, when the name is
+ * there --- including a name a listener that has ended left behind, which a
+ * caller removes with `kal_fs_remove' if it knows the listener has ended; a
+ * listener does not remove its name when it is closed, because no environment
+ * does so for a program that ends without closing it and an interface that did
+ * it sometimes would be one a caller could not rely upon. `kal_net_connect_at'
+ * reports kal_err_not_found when nothing is listening at the name.
+ *
+ * The connection and the listener are the ones this interface already has:
+ * accepted by `kal_net_accept', read and written through `kal_net_stream',
+ * half-closed, bounded by `openkal.timeout', released by `kal_net_close'.
+ * `kal_net_peer' and `kal_net_local' report kal_err_not_supported for them,
+ * because an endpoint is an address and a port.
+ *
+ * Whether a directory can hold such a name is a property of the volume and of
+ * the environment together, answered by KAL_FS_PROP_LOCAL_ENDPOINT on the
+ * directory; a call upon one that does not claim it is kal_err_not_supported.
+ * A name the environment cannot place --- every environment bounds the length of
+ * such a name, more tightly than the length of a file's --- is kal_err_invalid.
+ * Clause 11 entry 27. */
+int kal_net_listen_at (struct kal_dir base, const char* name, kal_uintptr len,
+                       struct kal_net_listener* out);
+int kal_net_connect_at(struct kal_dir base, const char* name, kal_uintptr len,
+                       struct kal_net_conn* out);
 
 /* A connection is read and written through openkal.stream. The stream remains
  * valid while the connection is open and is not separately released; the

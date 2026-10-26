@@ -164,6 +164,11 @@ struct kal_node_info {
                                                             * be started, and
                                                             * kal_fs_set_executable_at
                                                             * is answered here. 0.13 */
+#define KAL_FS_PROP_RENAME_NO_REPLACE ((kal_uintptr)1u << 8)  /* KAL_RENAME_NO_REPLACE
+                                                            * is answered here. 0.17 */
+#define KAL_FS_PROP_LOCAL_ENDPOINT ((kal_uintptr)1u << 9)  /* a name here may be a
+                                                            * rendezvous of
+                                                            * openkal.net. 0.17 */
 
 /* Positions in the flags word of kal_fs_open. */
 #define KAL_OPEN_READ      ((kal_uintptr)1u << 0)
@@ -308,6 +313,31 @@ int kal_fs_mkdir (struct kal_dir base, const char* name, kal_uintptr len);
 int kal_fs_remove(struct kal_dir base, const char* name, kal_uintptr len);
 int kal_fs_rename(struct kal_dir from, const char* a, kal_uintptr alen,
                   struct kal_dir to,   const char* b, kal_uintptr blen);
+
+/* Positions in the flags of kal_fs_rename_flags. */
+#define KAL_RENAME_NO_REPLACE ((kal_uintptr)1u << 0)
+
+/* kal_fs_rename with a flags word. Version 0.17.
+ *
+ * KAL_RENAME_NO_REPLACE: the rename fails with kal_err_exists, and changes
+ * nothing, when `b' already names a node; the test and the rename are one act.
+ * It cannot be composed above the interface: asking whether `b' exists and then
+ * renaming leaves a moment in which another program creates `b' and loses it,
+ * and opening `b' exclusively and then renaming over it replaces what was just
+ * created. A program that publishes a file under a name only if nobody else has
+ * --- an installer, a cache that several programs fill --- needs exactly this.
+ *
+ * Whether a volume can do it is a property of its format, so kal_fs_props
+ * answers it with KAL_FS_PROP_RENAME_NO_REPLACE on the directory `to'; a
+ * request upon a volume that does not claim it is kal_err_not_supported and
+ * renames nothing. Every environment this specification targets has the
+ * operation natively where the volume does (`renameat2(RENAME_NOREPLACE)',
+ * `renamex_np(RENAME_EXCL)', a rename that does not replace). A flag this
+ * version has not assigned is kal_err_invalid. A flags word of zero is
+ * kal_fs_rename. Clause 11 entry 25. */
+int kal_fs_rename_flags(struct kal_dir from, const char* a, kal_uintptr alen,
+                        struct kal_dir to,   const char* b, kal_uintptr blen,
+                        kal_uintptr flags);
 
 /* Enquiry about an open file. It is not expressible through kal_fs_info: the
  * name a file was opened by may since have been removed or reused, and a C
