@@ -213,40 +213,50 @@ void run() {
     // a connection that another of its contexts reads from by ending the
     // direction; the waiting read reports the end of input, as every later
     // read does. One system left the read pending, and a program waited two
-    // minutes for its reader there alone. Bounded: the server end is closed
-    // after two seconds, which releases the reader whatever the
-    // implementation did, and the observation is then that it took that long.
+    // minutes for its reader there alone. On a connection of its own, whose
+    // peer has sent nothing and ended nothing, so the read does wait; bounded:
+    // after two seconds both ends are released whatever the implementation did.
 #if defined(MCPP_FEATURE_TASK) && defined(MCPP_FEATURE_TIME)
     if (kal::net::has(kal::net::halfclose)) {
-        g_waiting_stream = ss;
-        kal_task waiter{};
-        if (kal_task_start(waits_for_the_end, nullptr, &waiter) == kal_ok) {
-            kal_time_sleep(200ull * 1000ull * 1000ull);
-            const kal_duration t0 = kal_time_monotonic();
-            const int rc = kal::net::shutdown(server, kal::net::shut::read);
-            while (okc::load_acquire(&g_waiting_done) == 0 && kal_time_monotonic() - t0 < kReleaseAfterNs)
-                kal_task_wait(const_cast<const kal_u32*>(&g_waiting_done), 0, 50ull * 1000ull * 1000ull);
-            const bool ended = okc::load_acquire(&g_waiting_done) != 0;
-            const kal_duration took = kal_time_monotonic() - t0;
-            if (!ended) kal::net::shutdown(server, kal::net::shut::both);
-            kal_task_join(waiter);
-            const bool held = rc == kal_ok && ended && g_waiting_answer == 0;
-            observe(kind::behaviour, held,
-                    "ending the read direction ends a read waiting in it with the end of input");
-            if (!held) {
-                put("  the shutdown answered "); put_signed(rc);
-                put(ended ? ", the read ended after " : ", the read was still waiting after ");
-                put_signed(static_cast<long long>(took / 1000000ull)); put(" ms");
-                if (ended) { put(" and answered "); put_signed(static_cast<long long>(g_waiting_answer)); }
-                put("\n");
+        kal_net_conn near{}, far{};
+        if (kal_net_connect(&to, &near) == kal_ok && kal_net_accept(listener, &far) == kal_ok) {
+            g_waiting_stream = kal_net_stream(far);
+            kal_task waiter{};
+            if (kal_task_start(waits_for_the_end, nullptr, &waiter) == kal_ok) {
+                kal_time_sleep(200ull * 1000ull * 1000ull);
+                const bool waited = okc::load_acquire(&g_waiting_done) == 0;
+                const kal_duration t0 = kal_time_monotonic();
+                const int rc = kal::net::shutdown(far, kal::net::shut::read);
+                while (okc::load_acquire(&g_waiting_done) == 0 && kal_time_monotonic() - t0 < kReleaseAfterNs)
+                    kal_task_wait(const_cast<const kal_u32*>(&g_waiting_done), 0, 50ull * 1000ull * 1000ull);
+                const bool ended = okc::load_acquire(&g_waiting_done) != 0;
+                const kal_duration took = kal_time_monotonic() - t0;
+                if (!ended) kal::net::shutdown(near, kal::net::shut::both);   // the peer's end releases it
+                kal_task_join(waiter);
+                const bool held = waited && rc == kal_ok && ended && g_waiting_answer == 0;
+                observe(kind::behaviour, held,
+                        "ending the read direction ends a read waiting in it with the end of input");
+                if (!held) {
+                    put(waited ? "  the read waited; " : "  the read did not wait; ");
+                    put("the shutdown answered "); put_signed(rc);
+                    put(ended ? ", the read ended after " : ", the read was still waiting after ");
+                    put_signed(static_cast<long long>(took / 1000000ull)); put(" ms");
+                    if (ended) { put(" and answered "); put_signed(static_cast<long long>(g_waiting_answer)); }
+                    put("\n");
+                }
+                char b[4];
+                observe(kind::behaviour, kal_stream_read(kal_net_stream(far), b, sizeof b) == 0,
+                        "and a later read reports the end of input too");
+            } else {
+                unobserved(kind::behaviour, "ending the read direction ends a read waiting in it",
+                           "an execution context could not be started");
             }
-            char b[4];
-            observe(kind::behaviour, kal_stream_read(ss, b, sizeof b) == 0,
-                    "and a later read reports the end of input too");
         } else {
             unobserved(kind::behaviour, "ending the read direction ends a read waiting in it",
-                       "an execution context could not be started");
+                       "a second connection could not be made");
         }
+        if (near.h) kal_net_close(near);
+        if (far.h) kal_net_close(far);
     }
 #endif
 
