@@ -83,6 +83,8 @@ struct kal_preopen {
 #define KAL_PROCESS_PROP_STOP_REQUESTED ((kal_uintptr)1u << 7)
 /* kal_process_open_id finds a program by its identifier. Version 0.17. */
 #define KAL_PROCESS_PROP_OPEN_ID        ((kal_uintptr)1u << 8)
+/* KAL_SPAWN_ONE_STRING is answered here. Version 0.17.1. */
+#define KAL_PROCESS_PROP_ONE_STRING     ((kal_uintptr)1u << 9)
 
 /* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -218,6 +220,20 @@ struct kal_spawn {
  * outcomes --- the caller is told the program died on the signal it sent while the
  * program runs to completion, unsupervised. openkal-linux#13. */
 #define KAL_SPAWN_BOUND_LIFETIME ((kal_uintptr)1u << 0)
+
+/* THE VECTOR JOINED AS IT IS, WHERE A PROGRAM RECEIVES ONE STRING. Version
+ * 0.17.1, clause 7.6.
+ *
+ * An environment that gives a started program one string, which the program
+ * splits by rules of its own, ordinarily quotes each element so that the
+ * conventional splitting recovers the vector. A program whose rules are not the
+ * convention cannot be given every argument through that quoting: the command
+ * interpreter takes the rest of the string after `/c' as a command line of its
+ * own grammar, and a quoted element arrives with the quoting's escapes in it.
+ * With this flag the first element is quoted as usual and the others are joined
+ * after it by single spaces, as they are. An environment that gives a program a
+ * vector answers kal_err_not_supported: the request means nothing there. */
+#define KAL_SPAWN_ONE_STRING ((kal_uintptr)1u << 1)
 
 /* A set of started programs that end together --- see `kal_spawn.job'. One
  * machine word, as every handle here is. */

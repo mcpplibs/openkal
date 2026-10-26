@@ -356,6 +356,24 @@ void run() {
                        "the implementation claims prop_bound_lifetime");
         }
 
+        // KAL_SPAWN_ONE_STRING (0.17.1): an environment that gives a program a
+        // vector, and so does not claim the position, refuses the request.
+        if ((kal_process_props() & kal::process::one_string.bits) == 0) {
+            kal_process p{};
+            const char* argv[1] = { "x" };
+            const kal_uintptr lens[1] = { 1 };
+            const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr,
+                                 nullptr, 0, kal::process::one_string_flag.bits };
+            const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
+                                            nullptr, nullptr, 0, nullptr, &p);
+            observe(kind::behaviour, e == kal_err_not_supported,
+                    "a joined command line where programs receive vectors is refused");
+        } else {
+            unobserved(kind::behaviour,
+                       "a joined command line where programs receive vectors is refused",
+                       "the implementation claims prop_one_string");
+        }
+
         // THE UNIT IS ASKED FOR BY A POINTER AND NOT BY A FLAG, so an
         // implementation that cannot form one refuses a NON-NULL `job' --- there
         // is no bit to set and none to test.
