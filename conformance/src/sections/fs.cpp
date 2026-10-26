@@ -497,7 +497,42 @@ void run() {
             observe(kind::behaviour, sized == static_cast<kal_intptr>(length(kName)),
                     "a capacity of zero reports the content's length without writing");
 
-            kal_fs_remove(here(), kLink, length(kLink));
+            // THE NAME IS RENAMED AND REMOVED, NOT WHAT IT LEADS TO. An
+            // implementation that followed the link removed the file it named
+            // and left the link, and could not remove a link to a directory
+            // at all; a C++ program's `remove_all' then failed on the one
+            // environment that did so.
+            const char* kMoved = "okc-conformance-link-moved.tmp";
+            kal_fs_remove(here(), kMoved, length(kMoved));
+            const int moved = kal_fs_rename(here(), kLink, length(kLink), here(), kMoved, length(kMoved));
+            kal_node_info after = fresh();
+            kal_fs_info(here(), kMoved, length(kMoved), kal::fs::no_resolve, kal::fs::field::all, &after);
+            observe(kind::behaviour, moved == kal_ok && after.kind == kal_node_link,
+                    "renaming a link renames the link");
+            const int removed = kal_fs_remove(here(), kMoved, length(kMoved));
+            kal_node_info target_after = fresh();
+            const int te = kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &target_after);
+            observe(kind::behaviour, removed == kal_ok && te == kal_ok && target_after.kind == kal_node_file,
+                    "removing a link removes the link and leaves the file it named");
+
+            // And a link to a directory, which one environment makes as a
+            // different kind of node and which is removed as its name too.
+            const char* kDir     = "okc-conformance-linked-dir.tmp";
+            const char* kDirLink = "okc-conformance-dir-link.tmp";
+            kal_fs_remove(here(), kDirLink, length(kDirLink));
+            kal_fs_mkdir(here(), kDir, length(kDir));
+            {
+                if (kal_fs_link_create(here(), kDirLink, length(kDirLink), kDir, length(kDir),
+                                       kal::fs::link_directory) == kal_ok) {
+                    const int gone = kal_fs_remove(here(), kDirLink, length(kDirLink));
+                    kal_node_info dir_after = fresh();
+                    const int de = kal_fs_info(here(), kDir, length(kDir), 0, kal::fs::field::all, &dir_after);
+                    observe(kind::behaviour, gone == kal_ok && de == kal_ok && dir_after.kind == kal_node_directory,
+                            "removing a link to a directory removes the link and leaves the directory");
+                }
+                kal_fs_remove(here(), kDir, length(kDir));
+            }
+
             kal_fs_remove(here(), kName, length(kName));
         } else {
             unobserved(kind::behaviour,
