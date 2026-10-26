@@ -955,6 +955,28 @@ system from inside a confinement. Each implementation observes the first
 paragraph in its own tests, since positions and handle tables are not portable;
 the conformance suite observes the third.
 
+### 7.14 Removing a name that is held open
+
+`kal_fs_remove` of a file another handle holds open removes the name when the
+call returns, on a volume for which the implementation claims
+`KAL_FS_PROP_REMOVE_OPEN`. The open file remains usable through its handles
+until the last of them is closed; the directory that held the name is then
+empty and may be removed, and the name may be created again.
+
+The behaviour is the one a C library's `unlink` states, and a program relies on
+it without naming it: a lock file held for the program's lifetime, a temporary
+file kept open after its name is removed, a tree removed while one of its files
+is still open. One environment defers the removal by default --- the name
+remains, refusing every open, until the last handle is closed --- and offers
+the immediate form on the volumes that record it. Measured above an
+implementation that used the deferred form: a C++ program's `remove_all` of a
+directory holding its own lock file failed with "directory not empty" on that
+environment alone, while the same program built for the environment removed it.
+
+A volume that cannot remove a held name at once is answered before the call
+(clause 6.2): the position is not claimed, and a caller that needs the
+directory gone closes what it holds first.
+
 ## 8. Evolution
 
 Each interface is versioned independently. A revision may add declarations and
@@ -1638,6 +1660,13 @@ The following are recorded so that they are not mistaken for oversights.
     requirements note --- so a C library can keep a table of operations it uses
     when present (a `dlopen` beside the image, an interface a later version
     adds) without making every image refuse to load where they are absent.
+37. **Removing a name that is held open.** **Stated in 0.17**, clause 7.14,
+    answered per volume by `KAL_FS_PROP_REMOVE_OPEN`. The specification said
+    what a removal removes and not when; two environments removed the name at
+    once and the third when the last handle closed, and a tree holding an open
+    file was removable on two of them. The immediate form is native on every
+    volume that records it, so it is a statement of what was already the
+    common behaviour, and a volume without it is answered before the call.
 
 ## 12. Images
 

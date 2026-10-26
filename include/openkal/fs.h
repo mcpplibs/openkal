@@ -169,6 +169,10 @@ struct kal_node_info {
 #define KAL_FS_PROP_LOCAL_ENDPOINT ((kal_uintptr)1u << 9)  /* a name here may be a
                                                             * rendezvous of
                                                             * openkal.net. 0.17 */
+#define KAL_FS_PROP_REMOVE_OPEN    ((kal_uintptr)1u << 10) /* a name is removed at
+                                                            * once although a file
+                                                            * of that name is open.
+                                                            * 0.17 */
 
 /* Positions in the flags word of kal_fs_open. */
 #define KAL_OPEN_READ      ((kal_uintptr)1u << 0)
@@ -318,6 +322,14 @@ int kal_fs_info(struct kal_dir base, const char* name, kal_uintptr len,
  * private is one whose PREOPEN was not handed to anybody else, and that is the
  * decision of the party that starts a program rather than of the program. */
 int kal_fs_mkdir (struct kal_dir base, const char* name, kal_uintptr len);
+/* Removing a name: a file, an empty directory, or a link, which is removed
+ * itself and not what it leads to.
+ *
+ * AT ONCE, WHERE THE VOLUME CLAIMS KAL_FS_PROP_REMOVE_OPEN, although a file of
+ * that name is open: the name is absent when the call returns, the open file
+ * stays usable until it is closed, and the directory that held it may be
+ * removed. Clause 7.14. On a volume that does not claim the position a held
+ * file's name may remain until its last handle is closed. */
 int kal_fs_remove(struct kal_dir base, const char* name, kal_uintptr len);
 int kal_fs_rename(struct kal_dir from, const char* a, kal_uintptr alen,
                   struct kal_dir to,   const char* b, kal_uintptr blen);

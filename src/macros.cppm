@@ -46,6 +46,7 @@ inline constexpr kal_uintptr KAL_FS_PROP_LOCAL_ENDPOINT_M       = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_FS_PROP_LOCKS_M                = (kal_uintptr)(KAL_FS_PROP_LOCKS);
 inline constexpr kal_uintptr KAL_FS_PROP_MAKE_LINKS_M           = (kal_uintptr)(KAL_FS_PROP_MAKE_LINKS);
 inline constexpr kal_uintptr KAL_FS_PROP_MODIFIED_TIME_M        = (kal_uintptr)(KAL_FS_PROP_MODIFIED_TIME);
+inline constexpr kal_uintptr KAL_FS_PROP_REMOVE_OPEN_M          = (kal_uintptr)(KAL_FS_PROP_REMOVE_OPEN);
 inline constexpr kal_uintptr KAL_FS_PROP_RENAME_NO_REPLACE_M    = (kal_uintptr)(KAL_FS_PROP_RENAME_NO_REPLACE);
 inline constexpr kal_uintptr KAL_IFACE_ABORT_M                  = (kal_uintptr)(KAL_IFACE_ABORT);
 inline constexpr kal_uintptr KAL_IFACE_DATAGRAM_M               = (kal_uintptr)(KAL_IFACE_DATAGRAM);

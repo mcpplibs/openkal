@@ -314,6 +314,41 @@ void run() {
                 "the directory is removed");
     }
 
+    // A name held open is removed at once (clause 7.14, version 0.17), where
+    // the volume claims it: the name is absent, the file stays usable, and the
+    // directory that held it is empty. An implementation that deferred the
+    // removal to the close left a C++ program's `remove_all' unable to remove
+    // a tree holding its own lock file.
+    if ((kal_fs_props(here()) & kal::fs::remove_open.bits) != 0) {
+        const char* kHeld = "okc-conformance-held.tmp";
+        kal_fs_remove(here(), kHeld, length(kHeld));
+        kal_fs_mkdir(here(), kHeld, length(kHeld));
+        kal_dir d{};
+        if (kal_fs_open_dir(here(), kHeld, length(kHeld), &d) == kal_ok) {
+            kal_file f{};
+            const auto flags = kal::fs::open::read | kal::fs::open::write | kal::fs::open::create;
+            if (kal::fs::open_file(d, "h", 1, flags, &f) == kal_ok) {
+                const int removed = kal_fs_remove(d, "h", 1);
+                kal_node_info gone = fresh();
+                const int ge = kal_fs_info(d, "h", 1, kal::fs::no_resolve, kal::fs::field::all, &gone);
+                observe(kind::behaviour, removed == kal_ok && ge == kal_ok && gone.kind == kal_node_absent,
+                        "a file removed while it is open loses its name at once");
+                observe(kind::behaviour, write_bytes(f, "held", 4),
+                        "and stays usable through the handle that holds it");
+                kal_fs_close_dir(d);
+                d = {};
+                observe(kind::behaviour, kal_fs_remove(here(), kHeld, length(kHeld)) == kal_ok,
+                        "and the directory that held it is removed");
+                kal_fs_close_file(f);
+            }
+            if (d.h) kal_fs_close_dir(d);
+        }
+        kal_fs_remove(here(), kHeld, length(kHeld));
+    } else {
+        unobserved(kind::behaviour, "a name held open is removed at once",
+                   "the volume does not claim KAL_FS_PROP_REMOVE_OPEN");
+    }
+
     // Renaming, and that the old name is then absent.
     {
         put_file(kName, "x");
@@ -729,7 +764,7 @@ void run() {
                                     | kal::fs::make_links
                                     | kal::fs::locks | kal::fs::capacity
                                     | kal::fs::executable | kal::fs::rename_no_replace
-                                    | kal::fs::local_endpoint).bits;
+                                    | kal::fs::local_endpoint | kal::fs::remove_open).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 

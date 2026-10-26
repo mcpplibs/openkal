@@ -120,6 +120,9 @@ inline constexpr props rename_no_replace{KAL_FS_PROP_RENAME_NO_REPLACE};
 // A name in this directory may be a rendezvous of openkal.net
 // (kal_net_listen_at). Version 0.17.
 inline constexpr props local_endpoint{KAL_FS_PROP_LOCAL_ENDPOINT};
+// A name is removed at once although a file of that name is open (clause
+// 7.14). Version 0.17.
+inline constexpr props remove_open{KAL_FS_PROP_REMOVE_OPEN};
 
 struct rename_flag_tag;
 using rename_flags = kal::props<rename_flag_tag>;
