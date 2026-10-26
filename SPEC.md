@@ -1684,11 +1684,14 @@ runs the image's initialisers and transfers control to its entry. The image's
 them after its own, and `kal_env_image` the image's name.
 
 Where an environment's own convention differs from the image's --- on x86-64,
-one environment passes arguments in other registers --- the implementation
-presents each entry in the image's convention, and a function the image passes
-to the implementation (`kal_task_start`'s entry, `kal_space_start`'s) is entered
-in the image's convention. The presentation is mechanical and is generated from
-`SURFACE.txt` and the declarations, so that it cannot omit a name.
+one environment passes arguments in other registers --- the loader presents each
+entry in the image's convention, and a function the image passes to the
+implementation (`kal_task_start`'s entry, `kal_space_start`'s) is entered in the
+image's convention. The presentation is mechanical and is generated from
+`SURFACE.txt` and the declarations, so that it cannot omit a name. It is the
+loader's and not the implementation's: an implementation is written in its
+environment's convention, as every program of that environment is, and a
+convention of images is a fact about images.
 
 ### 12.4 The note
 
