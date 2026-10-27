@@ -71,6 +71,7 @@ inline constexpr props bound_lifetime{KAL_PROCESS_PROP_BOUND_LIFETIME};
 inline constexpr props job           {KAL_PROCESS_PROP_JOB};
 inline constexpr props stop_requested{KAL_PROCESS_PROP_STOP_REQUESTED};
 inline constexpr props open_id       {KAL_PROCESS_PROP_OPEN_ID};
+inline constexpr props one_string    {KAL_PROCESS_PROP_ONE_STRING};   // 0.17.1
 
 // The fields of kal_program_info, for `wanted' and `present' (0.17).
 namespace info {
@@ -89,6 +90,7 @@ struct spawn_flag_tag;
 using spawn_flags = kal::props<spawn_flag_tag>;
 
 inline constexpr spawn_flags bound_lifetime_flag{KAL_SPAWN_BOUND_LIFETIME};
+inline constexpr spawn_flags one_string_flag{KAL_SPAWN_ONE_STRING};   // 0.17.1
 
 using how = kal_spawn;
 using job_handle = kal_job;

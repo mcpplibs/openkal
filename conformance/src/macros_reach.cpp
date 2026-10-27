@@ -39,5 +39,7 @@ static_assert(kal::macros::KAL_PROCESS_PROP_STOP_REQUESTED_M == 128u);
 // One from another interface, so that a generator which emitted only the last
 // header it read would be caught.
 static_assert(kal::macros::KAL_SPAWN_BOUND_LIFETIME_M == 1u);
+static_assert(kal::macros::KAL_SPAWN_ONE_STRING_M == 2u);
+static_assert(kal::macros::KAL_PROCESS_PROP_ONE_STRING_M == 512u);
 
 }  // namespace

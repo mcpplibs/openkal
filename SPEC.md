@@ -1,4 +1,4 @@
-# openkal Specification, version 0.17
+# openkal Specification, version 0.17.1
 
 ## 1. Scope
 
@@ -798,6 +798,16 @@ belongs to the caller rather than to the implementation.
 
 An implementation whose environment has no argument vector shall report
 `kal_err_unsupported` from `kal_process_spawn` rather than discard the vector.
+
+An environment that gives a started program one string, which the program splits
+by rules of its own, passes the vector by quoting each element so that the
+conventional splitting recovers it. A program whose rules are not the
+convention --- the command interpreter, whose `/c` takes the rest of the string
+as a command line of its own grammar --- cannot be given every argument through
+that quoting. `KAL_SPAWN_ONE_STRING` asks for the first element quoted as usual
+and the others joined after it by single spaces, unaltered; an implementation
+claims it with `KAL_PROCESS_PROP_ONE_STRING`, and one whose environment gives a
+program a vector reports `kal_err_not_supported` (version 0.17.1).
 
 This rule was absent from version 0.3, and both implementations existing at the
 time prepended the path. They agreed only because they shared an author; a third
@@ -1673,6 +1683,12 @@ The following are recorded so that they are not mistaken for oversights.
     pending, so a program that ended a connection from another context waited
     for its reader there alone; the release of the connection is not the
     remedy, since a handle in use is not to be released (clause 7.2).
+39. **A command interpreter's command line.** **Stated in 0.17.1**, clause 7.6,
+    with `KAL_SPAWN_ONE_STRING`. A program that ran a person's command through
+    the command interpreter of an environment that passes one string had no way
+    to give it the command: the quoting that recovers a vector put escapes the
+    interpreter does not read into every command that held a quotation mark,
+    which a path with a space in it does.
 
 ## 12. Images
 
