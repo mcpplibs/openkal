@@ -167,8 +167,10 @@ void run() {
                        status, terminated)) {
             claim("the copy that read beyond a shortened file: status", static_cast<kal_uintptr>(status));
             claim("the copy that read beyond a shortened file: terminated", static_cast<kal_uintptr>(terminated));
-            observe(kind::behaviour, terminated != 0 || status == 50,
-                    "a page beyond a shortened file's end is a fault, or the shortening is refused");
+            observe(kind::behaviour, terminated != 0 || status == 50 || status == 52,
+                    "a file shortened beneath a region refuses, or a page beyond its new end faults or reads zero");
+            observe(kind::behaviour, !(terminated == 0 && status == 55),
+                    "no access reads the bytes a shortening removed");
             observe(kind::behaviour, !(terminated == 0 && status == 51),
                     "the bytes after a shortened file's new end in its page are zero");
         } else {

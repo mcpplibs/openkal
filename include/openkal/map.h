@@ -104,13 +104,17 @@ extern "C" {
  * has not written is not specified.
  *
  * A FILE SHORTENED BENEATH A REGION. While a region exists, shortening its file
- * below the region's end is either refused by `kal_fs_truncate' with
- * kal_err_permission, or succeeds; after it succeeds, an access to a page that
- * lies wholly beyond the new end is a fault, and the program ends with it. The
- * bytes of the page that holds the new end, after it, are zero. An
- * implementation does not supply zero pages in place of what was removed. An
- * access is a load or a store and not a call, so a fault is the only report it
- * can have; a portable program does not shorten a file it maps. */
+ * below the region's end has one of three outcomes, and which is the
+ * environment's: `kal_fs_truncate' refuses with kal_err_permission; or it
+ * succeeds and an access to a page wholly beyond the new end is a fault that
+ * ends the program; or it succeeds and such a page reads as zero. In none of
+ * them does an access read the bytes that were removed, and the bytes of the
+ * page that holds the new end, after it, are zero. Measured: one environment
+ * refuses, one faults, and one reads zero for a private region. No outcome is
+ * reported in advance (clause 6.2): a portable program does not shorten a file
+ * it maps, and a program that does acts on none of them differently. Requiring
+ * one outcome everywhere would oblige an implementation to keep a registry of
+ * mapped files to refuse the shortening, which clause 7.1 excludes. */
 int kal_map_file(struct kal_file file, kal_u64 offset, kal_uintptr length,
                  kal_uintptr how, void** out);
 
