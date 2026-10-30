@@ -50,7 +50,7 @@ jobs:
         include:
           - { os: ubuntu-24.04, toolchain: 'gcc@16.1.0'  }
           - { os: ubuntu-24.04, toolchain: 'llvm@22.1.8' }
-          - { os: macos-14,     toolchain: 'llvm@20.1.7' }
+          - { os: macos-15,     toolchain: 'llvm@20.1.7' }
           - { os: windows-2022, toolchain: 'llvm@20.1.7' }
           - { os: windows-2022, toolchain: 'msvc@system' }
     defaults:
@@ -661,7 +661,7 @@ jobs:
           # says there is nothing to report.
           - { os: ubuntu-24.04, toolchain: 'gcc@16.1.0',  implementation: openkal-linux,   features: 'full,optional' }
           - { os: ubuntu-24.04, toolchain: 'llvm@22.1.8', implementation: openkal-linux,   features: 'full,optional' }
-          - { os: macos-14,     toolchain: 'llvm@20.1.7', implementation: openkal-macos,   features: 'full' }
+          - { os: macos-15,     toolchain: 'llvm@20.1.7', implementation: openkal-macos,   features: 'full' }
           - { os: windows-2022, toolchain: 'llvm@20.1.7', implementation: openkal-windows, features: 'full' }
           - { os: windows-2022, toolchain: 'msvc@system', implementation: openkal-windows, features: 'full' }
     defaults:
