@@ -165,6 +165,8 @@ void run() {
         int status = 0, terminated = 0;
         if (start_copy("openkal-conformance-child", argument_for(errand::map_beyond_shortened),
                        status, terminated)) {
+            claim("the copy that read beyond a shortened file: status", static_cast<kal_uintptr>(status));
+            claim("the copy that read beyond a shortened file: terminated", static_cast<kal_uintptr>(terminated));
             observe(kind::behaviour, terminated != 0 || status == 50,
                     "a page beyond a shortened file's end is a fault, or the shortening is refused");
             observe(kind::behaviour, !(terminated == 0 && status == 51),
