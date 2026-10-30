@@ -1,4 +1,4 @@
-# openkal Specification, version 0.17.1
+# openkal Specification, version 0.18
 
 ## 1. Scope
 
@@ -48,10 +48,12 @@ provides an interface in whole or not at all.
 | `openkal.datagram` | a message with a boundary, sent without a connection | optional | ✓ | ✓ | ✓ |
 | `openkal.space` | an address space, and a context executing in one | optional | ✓ | ✓ | ✓ |
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
+| `openkal.map` | a part of a file's contents in the address space | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.15 specifies the core and optional interfaces. The reserved row is not
-specified, and its name shall not be used for other purposes.
+Version 0.15 specifies the core and optional interfaces, and version 0.18 adds
+`openkal.map` (clause 11, entry 40). The reserved row is not specified, and its
+name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
 cross. They are defined in clause 4.4 and are a statement about the shape of the
@@ -206,6 +208,7 @@ implementation provides neither.
 | `openkal.task` | `openkal.task` | `openkal/task.h` |
 | `openkal.random` | `openkal.random` | `openkal/random.h` |
 | `openkal.exec` | `openkal.exec` | `openkal/exec.h` |
+| `openkal.map` | `openkal.map` | `openkal/map.h` |
 
 `openkal.h` includes every header, for a consumer that uses several.
 
@@ -1689,6 +1692,27 @@ The following are recorded so that they are not mistaken for oversights.
     to give it the command: the quoting that recovers a vector put escapes the
     interpreter does not read into every command that held a quotation mark,
     which a path with a space in it does.
+40. **A part of a file in the address space.** **Specified in 0.18**, as the
+    optional interface `openkal.map` (`map.h`). Three consumers needed it and
+    none could compose it: a compiler run as an image read every file it opened
+    into memory because its C library's `mmap` of a file answered `ENOSYS`, and
+    kept a private copy of pages a native program shares; the reference loader
+    read each image whole into a buffer it never released; and two programs
+    that share a region of data (a message bus, a model's weights) had no means
+    at all, since reading is copying. Every environment this specification
+    targets maps a file in one call, so it meets the admission criterion of
+    version 0.8. It is an interface of its own rather than operations of
+    `openkal.fs` because an environment can keep files and be unable to map
+    them (clause 6.2); the region is an address and a length, as an allocation
+    is, because a handle would oblige an implementation to keep a table (clause
+    7.1); an offset is a multiple of a constant rather than of an enquired
+    granularity, because a file is laid out for mapping by a program that does
+    not know where it will be mapped (clause 6.5's second paragraph); and no
+    region of a file is executable, because instructions run only from memory
+    `openkal.exec` published. A file shortened beneath a shared region refuses
+    the shortening, or faults or reads zero beyond its new end, whichever the
+    environment does, and no access reads the bytes that were removed; a private
+    region may go on showing what it showed, as for any change to its file.
 
 ## 12. Images
 

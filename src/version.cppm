@@ -55,6 +55,7 @@ inline constexpr interfaces_set net      {KAL_IFACE_NET};
 inline constexpr interfaces_set datagram {KAL_IFACE_DATAGRAM};
 inline constexpr interfaces_set space    {KAL_IFACE_SPACE};
 inline constexpr interfaces_set timeout  {KAL_IFACE_TIMEOUT};
+inline constexpr interfaces_set map      {KAL_IFACE_MAP};
 }
 
 inline interfaces_set interfaces() {

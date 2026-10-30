@@ -15,6 +15,7 @@ module;
 #include <openkal/env.h>
 #include <openkal/exec.h>
 #include <openkal/fs.h>
+#include <openkal/map.h>
 #include <openkal/memory.h>
 #include <openkal/net.h>
 #include <openkal/process.h>
@@ -53,6 +54,7 @@ inline constexpr kal_uintptr KAL_IFACE_DATAGRAM_M               = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_IFACE_ENV_M                    = (kal_uintptr)(KAL_IFACE_ENV);
 inline constexpr kal_uintptr KAL_IFACE_EXEC_M                   = (kal_uintptr)(KAL_IFACE_EXEC);
 inline constexpr kal_uintptr KAL_IFACE_FS_M                     = (kal_uintptr)(KAL_IFACE_FS);
+inline constexpr kal_uintptr KAL_IFACE_MAP_M                    = (kal_uintptr)(KAL_IFACE_MAP);
 inline constexpr kal_uintptr KAL_IFACE_MEMORY_M                 = (kal_uintptr)(KAL_IFACE_MEMORY);
 inline constexpr kal_uintptr KAL_IFACE_NET_M                    = (kal_uintptr)(KAL_IFACE_NET);
 inline constexpr kal_uintptr KAL_IFACE_PROCESS_M                = (kal_uintptr)(KAL_IFACE_PROCESS);
@@ -73,6 +75,9 @@ inline constexpr kal_uintptr KAL_INFO_WRITABLE_M                = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_LOCK_EXCLUSIVE_M               = (kal_uintptr)(KAL_LOCK_EXCLUSIVE);
 inline constexpr kal_uintptr KAL_LOCK_SHARED_M                  = (kal_uintptr)(KAL_LOCK_SHARED);
 inline constexpr kal_uintptr KAL_LOCK_WAIT_M                    = (kal_uintptr)(KAL_LOCK_WAIT);
+inline constexpr kal_uintptr KAL_MAP_ALIGNMENT_M                = (kal_uintptr)(KAL_MAP_ALIGNMENT);
+inline constexpr kal_uintptr KAL_MAP_SHARED_M                   = (kal_uintptr)(KAL_MAP_SHARED);
+inline constexpr kal_uintptr KAL_MAP_WRITE_M                    = (kal_uintptr)(KAL_MAP_WRITE);
 inline constexpr kal_uintptr KAL_NET_PROP_HALFCLOSE_M           = (kal_uintptr)(KAL_NET_PROP_HALFCLOSE);
 inline constexpr kal_uintptr KAL_NET_PROP_IPV6_M                = (kal_uintptr)(KAL_NET_PROP_IPV6);
 inline constexpr kal_uintptr KAL_OPEN_APPEND_M                  = (kal_uintptr)(KAL_OPEN_APPEND);

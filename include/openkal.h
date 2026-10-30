@@ -29,6 +29,7 @@
 #include "openkal/net.h"
 #include "openkal/datagram.h"
 #include "openkal/space.h"
+#include "openkal/map.h"
 /* Last, because its declarations are the operations of the interfaces above
  * with one argument added, and it includes each of them. */
 #include "openkal/timeout.h"

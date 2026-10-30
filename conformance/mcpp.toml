@@ -72,6 +72,7 @@ net      = []
 datagram = []
 space    = ["process"]   # a started context is waited for as a process
 timeout  = []
+map      = ["fs"]        # a region is of an open file (version 0.18)
 
 # `hosted' AND `standard' WERE HERE AND ARE GONE, BECAUSE THE SPECIFICATION'S
 # OWN NAME FOR THAT SET IS GONE.
@@ -110,7 +111,7 @@ timeout  = []
 # bare-metal one provides it only if its board has a source, and neither is a
 # deviation. The caller names this set for an implementation that provides
 # these interfaces and omits it for one that does not.
-optional = ["exec", "random", "terminal", "net", "datagram", "space", "timeout"]
+optional = ["exec", "random", "terminal", "net", "datagram", "space", "timeout", "map"]
 
 # The kinds of examination. Behaviour is always performed; the other three are
 # selected, because each costs time that a reader running the suite to answer

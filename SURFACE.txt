@@ -1,4 +1,4 @@
-# The C surface of openkal 0.17.1, one name per line.
+# The C surface of openkal 0.18.0, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -150,3 +150,7 @@ kal_timeout_read
 kal_timeout_recv_from
 kal_timeout_wait_process
 kal_timeout_write
+# openkal.map
+kal_map_file
+kal_map_release
+kal_map_sync

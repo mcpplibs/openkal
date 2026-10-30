@@ -14,6 +14,7 @@ import openkal.stream;
 import openkal.time;
 import openkal.fs;
 import openkal.process;
+import openkal.map;
 
 namespace okc {
 namespace {
@@ -36,6 +37,7 @@ const char* argument_for(errand e) {
         case errand::report_grants:      return "--child-grants";
         case errand::report_no_preopens: return "--child-no-preopens";
         case errand::end_as_requested:   return "--child-end-as-requested";
+        case errand::map_beyond_shortened: return "--child-map-beyond-shortened";
         case errand::none:               break;
     }
     return "";
@@ -56,6 +58,7 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::report_grants)))      return errand::report_grants;
         if (same(a, len, argument_for(errand::report_no_preopens))) return errand::report_no_preopens;
         if (same(a, len, argument_for(errand::end_as_requested)))   return errand::end_as_requested;
+        if (same(a, len, argument_for(errand::map_beyond_shortened))) return errand::map_beyond_shortened;
     }
 #endif
     return errand::none;
@@ -176,6 +179,46 @@ after g_after;
             }
 #endif
             kal_exit(45);
+        case errand::map_beyond_shortened:
+            // A file of three alignments, every byte 0xA5, is mapped whole as a
+            // SHARED region and shortened to 100 bytes (a private region may keep
+            // what it showed, as it may for any change to its file). 50: the
+            // shortening was refused. Otherwise the bytes after the new end in its
+            // page are read (51 if one is not zero) and then a page wholly beyond
+            // it: the copy ends with a fault, or reads zero (52), or reads what was
+            // removed (55, which the specification forbids). 100 + the error: the
+            // file could not be made (56: written; 57: mapped).
+#if defined(MCPP_FEATURE_MAP) && defined(MCPP_FEATURE_FS)
+            {
+                const char name[] = "okc-conformance-map-short.tmp";
+                kal_file f{};
+                const auto flags = kal::fs::open::read | kal::fs::open::write
+                                 | kal::fs::open::create | kal::fs::open::truncate;
+                if (const int oe = kal_fs_open(kal::fs::working(), name, sizeof name - 1, flags.bits, &f); oe != kal_ok) kal_exit(100 + oe);
+                const kal_uintptr size = 3 * static_cast<kal_uintptr>(kal::map::alignment);
+                unsigned char block[4096];
+                for (unsigned char& b : block) b = 0xA5;
+                for (kal_uintptr at = 0; at < size; at += sizeof block)
+                    if (kal_stream_write(kal_fs_stream(f), block, sizeof block) != static_cast<kal_intptr>(sizeof block)) kal_exit(56);
+                void* region = nullptr;
+                if (kal_map_file(f, 0, size, kal::map::shared.bits, &region) != kal_ok) kal_exit(57);
+                // The region is released and the file closed before the copy
+                // ends, so that the file the suite removes afterwards is held
+                // by nothing.
+                const auto finish = [&](int status) {
+                    kal_map_release(region, size);
+                    kal_fs_close_file(f);
+                    kal_exit(status);
+                };
+                const int e = kal_fs_truncate(f, 100);
+                if (e != kal_ok) finish(e == kal_err_permission ? 50 : 54);
+                volatile const unsigned char* bytes = static_cast<const unsigned char*>(region);
+                for (kal_uintptr i = 100; i < 4096; ++i) if (bytes[i] != 0) finish(51);
+                const unsigned char beyond = bytes[2 * static_cast<kal_uintptr>(kal::map::alignment)];
+                finish(beyond == 0 ? 52 : 55);
+            }
+#endif
+            kal_exit(45);
         case errand::report_no_preopens:
 #ifdef MCPP_FEATURE_FS
             kal_exit(kal_fs_preopen_count() == 0 ? 0 : 46);
@@ -264,8 +307,13 @@ bool start_copy_running(const char* first_element, const char* errand_argument,
     kal_uintptr lens[2];
     for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
 
+    // The copy runs where the suite runs, not where the suite's program is: a
+    // copy that writes a file writes it beside the suite's own, and the
+    // directory a name resolves against may be a volume's root, which the
+    // suite's user need not be able to write (a program named by its full path
+    // resolves against the volume that holds it).
     const kal_spawn_streams streams{ 0, 0, 0 };
-    const kal_spawn         how{ base, base, nullptr, nullptr, 0, 0 };
+    const kal_spawn         how{ base, kal::fs::working(), nullptr, nullptr, 0, 0 };
     return kal_process_spawn(&how, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
                              &streams, &out) == kal_ok;
 }
