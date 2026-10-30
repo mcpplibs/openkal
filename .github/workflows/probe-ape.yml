@@ -1,0 +1,242 @@
+# PROBE (mcpp#849), temporary, not merged: an APE built with Cosmopolitan's
+# cosmocc, run on every system and architecture a runner exists for. It
+# measures what an openkal implementation over Cosmopolitan (openkal-cosmo)
+# and an APE carrier would rest on: the libc primitives of each openkal area
+# (probe/ape/probe.c), the first-run behaviour of the APE prelude, startup
+# latency, signing, gatekeeping and an MZ binfmt handler on Linux.
+name: probe-ape
+
+on:
+  push:
+    branches: [probe/ape-cosmopolitan]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: probe-ape-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COSMOCC_VERSION: 4.0.2
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/cosmocc
+          key: cosmocc-${{ env.COSMOCC_VERSION }}
+      - name: cosmocc
+        run: |
+          set -euo pipefail
+          if [ ! -x ~/cosmocc/bin/cosmocc ]; then
+            gh release download "$COSMOCC_VERSION" -R jart/cosmopolitan -p "cosmocc-$COSMOCC_VERSION.zip" -D "$RUNNER_TEMP"
+            mkdir -p ~/cosmocc && unzip -q "$RUNNER_TEMP/cosmocc-$COSMOCC_VERSION.zip" -d ~/cosmocc
+          fi
+          ~/cosmocc/bin/cosmocc --version | head -1
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Build the APE
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          ~/cosmocc/bin/cosmocc -O2 -o out/probe.com probe/ape/probe.c
+          ls -l out
+          python3 - out/probe.com <<'PY'
+          import sys
+          d = open(sys.argv[1], 'rb').read()
+          elf, i = [], 0
+          while (i := d.find(b'\x7fELF', i)) >= 0:
+              elf.append(int.from_bytes(d[i+18:i+20], 'little')); i += 4
+          print("size", len(d), "head", d[:8], "ELF machines", elf, "Mach-O at", hex(d.find(b'\xcf\xfa\xed\xfe')))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ape
+          path: out/probe.com
+
+  run:
+    needs: build
+    name: run (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x64,   os: ubuntu-24.04 }
+          - { platform: linux-arm64, os: ubuntu-24.04-arm }
+          - { platform: macos-arm64, os: macos-14 }
+          - { platform: macos-x64,   os: macos-15-intel }
+          - { platform: macos-x64-13, os: macos-13 }
+          - { platform: win-x64,     os: windows-2022 }
+          - { platform: win-arm64,   os: windows-11-arm }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ape
+      - name: First run, from a fresh home and temporary directory
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/home" "$RUNNER_TEMP/tmp" results
+          if [ "$RUNNER_OS" = Windows ]; then cp probe.com probe.exe; P=./probe.exe; else chmod +x probe.com; P=./probe.com; fi
+          echo "P=$P" >> "$GITHUB_ENV"
+          before=$(cd "$RUNNER_TEMP" && find home tmp | sort)
+          python3 - "$P" > results/first-run.txt 2>&1 <<'PY'
+          import os, subprocess, sys, time
+          env = dict(os.environ, HOME=os.path.join(os.environ["RUNNER_TEMP"], "home"),
+                     TMPDIR=os.path.join(os.environ["RUNNER_TEMP"], "tmp"))
+          for n in ("first", "second"):
+              t = time.perf_counter()
+              r = subprocess.run([sys.argv[1], "--hello"], env=env, capture_output=True, text=True)
+              print(n, "run: exit", r.returncode, "in %.1f ms" % ((time.perf_counter() - t) * 1e3),
+                    "stdout", repr(r.stdout.strip()), "stderr", repr(r.stderr.strip()[:300]))
+          PY
+          after=$(cd "$RUNNER_TEMP" && find home tmp | sort)
+          echo "files the first run created:" >> results/first-run.txt
+          comm -13 <(echo "$before") <(echo "$after") >> results/first-run.txt
+          cat results/first-run.txt
+      - name: The probe
+        run: |
+          set +e
+          "$P" > results/probe.ndjson 2> results/probe.stderr; echo "exit $?" >> results/probe.stderr
+          cat results/probe.ndjson; cat results/probe.stderr
+          if [ "$RUNNER_OS" != Windows ]; then
+            sh ./probe.com --hello > results/via-sh.txt 2>&1; echo "exit $?" >> results/via-sh.txt
+            echo "--- sh ./probe.com --hello"; cat results/via-sh.txt
+          fi
+      - name: Startup latency against a native program
+        run: |
+          set +e
+          if [ "$RUNNER_OS" = Windows ]; then NATIVE='C:\Windows\System32\whoami.exe'; else NATIVE=/bin/echo; fi
+          python3 - "$P" "$NATIVE" > results/latency.txt <<'PY'
+          import statistics, subprocess, sys, time
+          def med(cmd):
+              xs = []
+              for _ in range(40):
+                  t = time.perf_counter(); subprocess.run(cmd, capture_output=True); xs.append((time.perf_counter() - t) * 1e3)
+              return statistics.median(xs)
+          print("ape --hello median %.1f ms" % med([sys.argv[1], "--hello"]))
+          print("native median %.1f ms" % med([sys.argv[2]]))
+          PY
+          cat results/latency.txt
+      - name: Linux, an MZ binfmt handler (as wine-binfmt registers)
+        if: runner.os == 'Linux'
+        run: |
+          set +e
+          ls /proc/sys/fs/binfmt_misc/ | tee results/binfmt.txt
+          if [ -w /proc/sys/fs/binfmt_misc/register ] || sudo test -w /proc/sys/fs/binfmt_misc/register; then
+            echo ':ProbeMZ:M::MZ::/usr/bin/false:' | sudo tee /proc/sys/fs/binfmt_misc/register > /dev/null
+            ./probe.com --hello > /tmp/direct.txt 2>&1; echo "direct with MZ handler: exit $? $(cat /tmp/direct.txt)" | tee -a results/binfmt.txt
+            sh ./probe.com --hello > /tmp/sh.txt 2>&1; echo "via sh with MZ handler: exit $? $(cat /tmp/sh.txt)" | tee -a results/binfmt.txt
+            echo -1 | sudo tee /proc/sys/fs/binfmt_misc/ProbeMZ > /dev/null
+          else
+            echo "binfmt_misc not writable" | tee -a results/binfmt.txt
+          fi
+      - name: macOS, quarantine and codesign
+        if: runner.os == 'macOS'
+        run: |
+          set +e
+          cp probe.com q.com
+          xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");Safari;" q.com
+          ./q.com --hello > /tmp/q.txt 2>&1; echo "quarantined: exit $? $(cat /tmp/q.txt)" | tee results/macos.txt
+          codesign -s - probe.com > /tmp/cs.txt 2>&1; echo "codesign -s - probe.com: exit $? $(cat /tmp/cs.txt)" | tee -a results/macos.txt
+          for l in "$RUNNER_TEMP"/tmp/.ape-* "$RUNNER_TEMP"/home/.ape-* ~/.ape-*; do
+            [ -e "$l" ] || continue
+            echo "loader $l: $(file "$l")" | tee -a results/macos.txt
+            codesign -dv "$l" 2>&1 | head -5 | tee -a results/macos.txt
+          done
+      - name: Windows, Defender and Authenticode
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          if (Test-Path $mp) { & $mp -Scan -ScanType 3 -File (Resolve-Path probe.exe) -DisableRemediation *>&1 | Tee-Object -FilePath results/defender.txt } else { 'no MpCmdRun' | Tee-Object -FilePath results/defender.txt }
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=probe-ape' -CertStoreLocation Cert:\CurrentUser\My
+          Copy-Item probe.exe signed.exe
+          $sig = Set-AuthenticodeSignature -FilePath signed.exe -Certificate $cert
+          "sign: $($sig.Status) $($sig.StatusMessage)" | Tee-Object -FilePath results/sign.txt
+          $out = & .\signed.exe --hello 2>&1; "signed run: exit $LASTEXITCODE $out" | Tee-Object -FilePath results/sign.txt -Append
+          "size before $((Get-Item probe.exe).Length) after $((Get-Item signed.exe).Length)" | Tee-Object -FilePath results/sign.txt -Append
+          New-Item -ItemType Directory -Force signed | Out-Null; Copy-Item signed.exe signed/signed.com
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && matrix.platform == 'win-x64'
+        with:
+          name: signed
+          path: signed/signed.com
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.platform }}
+          path: results
+
+  signed-elsewhere:
+    needs: run
+    name: the Authenticode-signed APE on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed
+      - name: Run it
+        run: |
+          set +e
+          chmod +x signed.com
+          ./signed.com --hello; echo "exit $?"
+          sh ./signed.com --hello; echo "via sh: exit $?"
+
+  summary:
+    needs: [run, signed-elsewhere]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+      - name: Table
+        run: |
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, json, os
+          rows, checks = {}, []
+          for d in sorted(glob.glob("results-*")):
+              plat = d[len("results-"):]
+              res = {}
+              try:
+                  for line in open(os.path.join(d, "probe.ndjson")):
+                      try: o = json.loads(line)
+                      except Exception: continue
+                      if "area" in o:
+                          k = o["area"] + "/" + o["check"]
+                          res[k] = o
+                          if k not in checks: checks.append(k)
+              except FileNotFoundError: pass
+              rows[plat] = res
+          plats = list(rows)
+          print("| check | " + " | ".join(plats) + " |")
+          print("|---|" + "---|" * len(plats))
+          for k in checks:
+              cells = []
+              for p in plats:
+                  o = rows[p].get(k)
+                  cells.append("—" if o is None else ("ok" if o["ok"] else "**FAIL** " + o["detail"][:60].replace("|", "/")))
+              print(f"| {k} | " + " | ".join(cells) + " |")
+          for p in plats:
+              for f in ("first-run.txt", "latency.txt", "binfmt.txt", "macos.txt", "sign.txt", "defender.txt", "via-sh.txt", "probe.stderr"):
+                  path = os.path.join("results-" + p, f)
+                  if os.path.exists(path):
+                      print(f"\n**{p} {f}**\n```\n" + open(path, errors="replace").read()[-3000:] + "\n```")
+          PY
