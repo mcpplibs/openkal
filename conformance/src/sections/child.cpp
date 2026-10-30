@@ -180,27 +180,28 @@ after g_after;
 #endif
             kal_exit(45);
         case errand::map_beyond_shortened:
-            // A file of three alignments, every byte 0xA5, is mapped whole and
-            // shortened to 100 bytes. 50: the shortening was refused. Otherwise
-            // the bytes after the new end in its page are read (51 if one is
-            // not zero) and then a page wholly beyond it: the copy ends with a
-            // fault, or reads zero (52), or reads what was removed (55, which
-            // the specification forbids). 53, 56, 57: the file could not be
-            // made or mapped.
+            // A file of three alignments, every byte 0xA5, is mapped whole as a
+            // SHARED region and shortened to 100 bytes (a private region may keep
+            // what it showed, as it may for any change to its file). 50: the
+            // shortening was refused. Otherwise the bytes after the new end in its
+            // page are read (51 if one is not zero) and then a page wholly beyond
+            // it: the copy ends with a fault, or reads zero (52), or reads what was
+            // removed (55, which the specification forbids). 100 + the error: the
+            // file could not be made (56: written; 57: mapped).
 #if defined(MCPP_FEATURE_MAP) && defined(MCPP_FEATURE_FS)
             {
                 const char name[] = "okc-conformance-map-short.tmp";
                 kal_file f{};
                 const auto flags = kal::fs::open::read | kal::fs::open::write
                                  | kal::fs::open::create | kal::fs::open::truncate;
-                if (kal_fs_open(kal::fs::working(), name, sizeof name - 1, flags.bits, &f) != kal_ok) kal_exit(53);
+                if (const int oe = kal_fs_open(kal::fs::working(), name, sizeof name - 1, flags.bits, &f); oe != kal_ok) kal_exit(100 + oe);
                 const kal_uintptr size = 3 * static_cast<kal_uintptr>(kal::map::alignment);
                 unsigned char block[4096];
                 for (unsigned char& b : block) b = 0xA5;
                 for (kal_uintptr at = 0; at < size; at += sizeof block)
                     if (kal_stream_write(kal_fs_stream(f), block, sizeof block) != static_cast<kal_intptr>(sizeof block)) kal_exit(56);
                 void* region = nullptr;
-                if (kal_map_file(f, 0, size, 0, &region) != kal_ok) kal_exit(57);
+                if (kal_map_file(f, 0, size, kal::map::shared.bits, &region) != kal_ok) kal_exit(57);
                 const int e = kal_fs_truncate(f, 100);
                 if (e != kal_ok) kal_exit(e == kal_err_permission ? 50 : 54);
                 volatile const unsigned char* bytes = static_cast<const unsigned char*>(region);

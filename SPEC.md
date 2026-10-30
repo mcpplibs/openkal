@@ -1709,9 +1709,10 @@ The following are recorded so that they are not mistaken for oversights.
     granularity, because a file is laid out for mapping by a program that does
     not know where it will be mapped (clause 6.5's second paragraph); and no
     region of a file is executable, because instructions run only from memory
-    `openkal.exec` published. A file shortened beneath a region refuses the
-    shortening, or faults or reads zero beyond its new end, whichever the
-    environment does; no access reads the bytes that were removed.
+    `openkal.exec` published. A file shortened beneath a shared region refuses
+    the shortening, or faults or reads zero beyond its new end, whichever the
+    environment does, and no access reads the bytes that were removed; a private
+    region may go on showing what it showed, as for any change to its file.
 
 ## 12. Images
 
