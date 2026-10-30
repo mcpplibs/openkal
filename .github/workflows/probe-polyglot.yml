@@ -1,0 +1,172 @@
+# PROBE (mcpp#849, route B), temporary, not merged: one file of native openkal
+# carriers. The Windows single file (a PE) leads and holds a POSIX shell
+# prelude in its DOS stub; the Linux and macOS single files follow it. The
+# carriers are mcpp 2026.10.30.1's (`mcpp pack --target openkal --pkg-format
+# single-file --systems all`, all built on one Linux machine); the file is
+# assembled by probe/polyglot/make_polyglot.py.
+name: probe-polyglot
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: probe-polyglot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: mcpp 2026.10.30.1
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/mcpp.tar.gz" https://github.com/mcpp-community/mcpp/releases/download/v2026.10.30.1/mcpp-2026.10.30.1-linux-x86_64.tar.gz
+          mkdir -p "$RUNNER_TEMP/mcpp" && tar -xzf "$RUNNER_TEMP/mcpp.tar.gz" -C "$RUNNER_TEMP/mcpp"
+          M=$(find "$RUNNER_TEMP/mcpp" -type f -name mcpp -path '*/bin/*' | head -1)
+          echo "MCPP=$M" >> "$GITHUB_ENV"; "$M" --version
+      - name: The single files of every system
+        run: |
+          set -euo pipefail
+          mkdir -p pg/src && cd pg
+          printf '[package]\nname    = "pg"\nversion = "0.1.0"\n' > mcpp.toml
+          printf 'import std;\nint main(int argc, char** argv) {\n    std::println("pg ok: {} args, first [{}]", argc, argc > 1 ? argv[1] : "");\n}\n' > src/main.cpp
+          "$MCPP" pack --target openkal --pkg-format single-file --systems all -o out/
+          ls -l out
+      - name: Assemble
+        run: |
+          set -euo pipefail
+          cd pg/out
+          python3 "$GITHUB_WORKSPACE/probe/polyglot/make_polyglot.py" ../../pg.com pg-0.1.0-windows-x86_64.exe \
+            linux-x86_64=pg-0.1.0-linux-x86_64 linux-aarch64=pg-0.1.0-linux-aarch64 macos-aarch64=pg-0.1.0-macos-aarch64
+          cd ../.. && file pg.com && mkdir -p up && cp pg.com up/ && cp pg/out/* up/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polyglot
+          path: up/
+
+  sign:
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: polyglot
+      - name: Authenticode (signtool) and Defender
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force results, signed | Out-Null
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=probe-polyglot' -CertStoreLocation Cert:\CurrentUser\My
+          $pfx = Join-Path $env:RUNNER_TEMP 'p.pfx'; $pw = ConvertTo-SecureString 'probe' -AsPlainText -Force
+          Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $pw | Out-Null
+          $st = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+          Copy-Item pg.com pg-signed.exe
+          $o = & $st.FullName sign /fd SHA256 /f $pfx /p probe pg-signed.exe 2>&1
+          "signtool sign: exit $LASTEXITCODE $o" | Tee-Object -FilePath results/sign.txt
+          $v = & $st.FullName verify /pa /v pg-signed.exe 2>&1 | Select-String 'Signing Certificate Chain|Successfully|Number of errors'
+          "signtool verify: $v" | Tee-Object -FilePath results/sign.txt -Append
+          $s = Get-AuthenticodeSignature pg-signed.exe; "Get-AuthenticodeSignature: $($s.Status) $($s.StatusMessage)" | Tee-Object -FilePath results/sign.txt -Append
+          "size $((Get-Item pg.com).Length) -> $((Get-Item pg-signed.exe).Length)" | Tee-Object -FilePath results/sign.txt -Append
+          $r = & .\pg-signed.exe signed 2>&1; "signed run: exit $LASTEXITCODE $r" | Tee-Object -FilePath results/sign.txt -Append
+          $mp = Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'
+          & $mp -Scan -ScanType 3 -File (Resolve-Path pg-signed.exe) -DisableRemediation *>&1 | Tee-Object -FilePath results/defender.txt
+          Copy-Item pg-signed.exe signed/pg-signed.com
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed
+          path: signed/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: poly-results-sign
+          path: results/
+
+  run:
+    needs: sign
+    name: run (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-x64,   os: ubuntu-24.04 }
+          - { platform: linux-arm64, os: ubuntu-24.04-arm }
+          - { platform: macos-arm64, os: macos-14 }
+          - { platform: macos-x64,   os: macos-15-intel }
+          - { platform: win-x64,     os: windows-2022 }
+          - { platform: win-arm64,   os: windows-11-arm }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: polyglot
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed
+      - name: Run, first and second, unsigned and signed
+        run: |
+          set +e
+          mkdir -p results
+          for f in pg.com pg-signed.com; do
+            if [ "$RUNNER_OS" = Windows ]; then cp "$f" "${f%.com}.exe"; P="./${f%.com}.exe"; else chmod +x "$f"; P="./$f"; fi
+            echo "== $f" >> results/run.txt
+            python3 - "$P" "$f" >> results/run.txt 2>&1 <<'PY'
+          import os, shutil, statistics, subprocess, sys, time
+          p, name = sys.argv[1], sys.argv[2]
+          posix = os.name != "nt"
+          cache = os.path.join(os.environ["RUNNER_TEMP"], "cache-" + name)
+          env = dict(os.environ, XDG_CACHE_HOME=cache)
+          try:
+              r = subprocess.run([p, "direct"], env=env, capture_output=True, text=True)
+              print("direct execve: exit", r.returncode, repr(r.stdout.strip()), repr(r.stderr.strip()[:200]))
+          except OSError as e:
+              print("direct execve:", e)
+          shutil.rmtree(cache, ignore_errors=True)
+          launch = (["sh", p] if posix else [p])
+          for n in ("first", "second"):
+              t = time.perf_counter()
+              r = subprocess.run(launch + [n], env=env, capture_output=True, text=True)
+              print(n, "run: exit", r.returncode, "in %.1f ms" % ((time.perf_counter() - t) * 1e3), repr(r.stdout.strip()), repr(r.stderr.strip()[:300]))
+          if os.path.isdir(cache):
+              for root, _, files in os.walk(cache):
+                  for fn in files:
+                      fp = os.path.join(root, fn); print("cached:", fp, os.path.getsize(fp))
+          xs = []
+          for _ in range(30):
+              t = time.perf_counter(); subprocess.run(launch + ["x"], env=env, capture_output=True); xs.append((time.perf_counter() - t) * 1e3)
+          print("median %.1f ms" % statistics.median(xs))
+          PY
+          done
+          # The native single file of this machine, for comparison.
+          case "${{ matrix.platform }}" in
+            linux-x64) N=./pg-0.1.0-linux-x86_64;; linux-arm64) N=./pg-0.1.0-linux-aarch64;;
+            macos-arm64) N=./pg-0.1.0-macos-aarch64;; win-*) N=./pg-0.1.0-windows-x86_64.exe;; *) N=;;
+          esac
+          if [ -n "$N" ]; then chmod +x "$N"; python3 -c "
+          import statistics,subprocess,sys,time
+          xs=[]
+          for _ in range(30):
+              t=time.perf_counter(); subprocess.run([sys.argv[1],'x'],capture_output=True); xs.append((time.perf_counter()-t)*1e3)
+          print('native single file median %.1f ms' % statistics.median(xs))" "$N" >> results/run.txt 2>&1; fi
+          cat results/run.txt
+      - name: macOS, a quarantined copy
+        if: runner.os == 'macOS'
+        run: |
+          set +e
+          cp pg.com q.com && chmod +x q.com
+          xattr -w com.apple.quarantine "0081;$(printf %x "$(date +%s)");Safari;" q.com
+          XDG_CACHE_HOME="$RUNNER_TEMP/qcache" sh ./q.com quarantined > /tmp/q.txt 2>&1; echo "quarantined via sh: exit $? $(cat /tmp/q.txt)" | tee -a results/run.txt
+          for f in "$RUNNER_TEMP"/qcache/openkal-polyglot/*/*; do echo "extracted $f: $(xattr -l "$f" | tr '\n' ' ')"; codesign -dv "$f" 2>&1 | head -3; done | tee -a results/run.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: poly-results-${{ matrix.platform }}
+          path: results/
