@@ -53,10 +53,11 @@ jobs:
               elf.append(int.from_bytes(d[i+18:i+20], 'little')); i += 4
           print("size", len(d), "head", d[:8], "ELF machines", elf, "Mach-O at", hex(d.find(b'\xcf\xfa\xed\xfe')))
           PY
+          cp ~/cosmocc/bin/assimilate out/assimilate
       - uses: actions/upload-artifact@v4
         with:
           name: ape
-          path: out/probe.com
+          path: out/
 
   run:
     needs: build
@@ -72,7 +73,6 @@ jobs:
           - { platform: linux-arm64, os: ubuntu-24.04-arm }
           - { platform: macos-arm64, os: macos-14 }
           - { platform: macos-x64,   os: macos-15-intel }
-          - { platform: macos-x64-13, os: macos-13 }
           - { platform: win-x64,     os: windows-2022 }
           - { platform: win-arm64,   os: windows-11-arm }
     defaults:
@@ -93,15 +93,25 @@ jobs:
           import os, subprocess, sys, time
           env = dict(os.environ, HOME=os.path.join(os.environ["RUNNER_TEMP"], "home"),
                      TMPDIR=os.path.join(os.environ["RUNNER_TEMP"], "tmp"))
+          posix = os.name != "nt"
+          try:
+              r = subprocess.run([sys.argv[1], "--hello"], env=env, capture_output=True, text=True)
+              print("direct execve: exit", r.returncode, repr(r.stdout.strip()))
+          except OSError as e:
+              print("direct execve:", e)
+          launch = (["sh", sys.argv[1]] if posix else [sys.argv[1]])
           for n in ("first", "second"):
               t = time.perf_counter()
-              r = subprocess.run([sys.argv[1], "--hello"], env=env, capture_output=True, text=True)
-              print(n, "run: exit", r.returncode, "in %.1f ms" % ((time.perf_counter() - t) * 1e3),
+              r = subprocess.run(launch + ["--hello"], env=env, capture_output=True, text=True)
+              print(n, "run" + (" via sh" if posix else "") + ": exit", r.returncode, "in %.1f ms" % ((time.perf_counter() - t) * 1e3),
                     "stdout", repr(r.stdout.strip()), "stderr", repr(r.stderr.strip()[:300]))
           PY
           after=$(cd "$RUNNER_TEMP" && find home tmp | sort)
           echo "files the first run created:" >> results/first-run.txt
           comm -13 <(echo "$before") <(echo "$after") >> results/first-run.txt
+          for f in $(comm -13 <(echo "$before") <(echo "$after")); do
+            [ -f "$RUNNER_TEMP/$f" ] && { ls -l "$RUNNER_TEMP/$f"; command -v file >/dev/null && file "$RUNNER_TEMP/$f"; } >> results/first-run.txt
+          done
           cat results/first-run.txt
       - name: The probe
         run: |
@@ -116,16 +126,32 @@ jobs:
         run: |
           set +e
           if [ "$RUNNER_OS" = Windows ]; then NATIVE='C:\Windows\System32\whoami.exe'; else NATIVE=/bin/echo; fi
-          python3 - "$P" "$NATIVE" > results/latency.txt <<'PY'
-          import statistics, subprocess, sys, time
+          A=""
+          if [ "$RUNNER_OS" != Windows ]; then
+            cp probe.com assimilated.com && chmod +x assimilate assimilated.com
+            sh ./assimilate assimilated.com > results/assimilate.txt 2>&1; echo "assimilate: exit $?" >> results/assimilate.txt
+            command -v file >/dev/null && file assimilated.com >> results/assimilate.txt
+            ls -l probe.com assimilated.com >> results/assimilate.txt
+            A=./assimilated.com
+          fi
+          python3 - "$P" "$NATIVE" "$A" > results/latency.txt <<'PY'
+          import os, statistics, subprocess, sys, time
           def med(cmd):
               xs = []
               for _ in range(40):
-                  t = time.perf_counter(); subprocess.run(cmd, capture_output=True); xs.append((time.perf_counter() - t) * 1e3)
-              return statistics.median(xs)
-          print("ape --hello median %.1f ms" % med([sys.argv[1], "--hello"]))
-          print("native median %.1f ms" % med([sys.argv[2]]))
+                  t = time.perf_counter()
+                  try: subprocess.run(cmd, capture_output=True)
+                  except OSError as e: return str(e)
+                  xs.append((time.perf_counter() - t) * 1e3)
+              return "%.1f ms" % statistics.median(xs)
+          if os.name != "nt":
+              print("ape via sh --hello median", med(["sh", sys.argv[1], "--hello"]))
+              print("assimilated, direct execve --hello median", med([sys.argv[3], "--hello"]))
+          else:
+              print("ape --hello median", med([sys.argv[1], "--hello"]))
+          print("native median", med([sys.argv[2]]))
           PY
+          cat results/assimilate.txt 2>/dev/null
           cat results/latency.txt
       - name: Linux, an MZ binfmt handler (as wine-binfmt registers)
         if: runner.os == 'Linux'
@@ -166,6 +192,17 @@ jobs:
           "sign: $($sig.Status) $($sig.StatusMessage)" | Tee-Object -FilePath results/sign.txt
           $out = & .\signed.exe --hello 2>&1; "signed run: exit $LASTEXITCODE $out" | Tee-Object -FilePath results/sign.txt -Append
           "size before $((Get-Item probe.exe).Length) after $((Get-Item signed.exe).Length)" | Tee-Object -FilePath results/sign.txt -Append
+          $st = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+          if ($st) {
+            $pfx = Join-Path $env:RUNNER_TEMP 'probe.pfx'; $pw = ConvertTo-SecureString 'probe' -AsPlainText -Force
+            Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $pw | Out-Null
+            Copy-Item probe.exe signtool.exe.target.exe
+            $o = & $st.FullName sign /fd SHA256 /f $pfx /p probe signtool.exe.target.exe 2>&1
+            "signtool: exit $LASTEXITCODE $o" | Tee-Object -FilePath results/sign.txt -Append
+            $o2 = & .\signtool.exe.target.exe --hello 2>&1; "signtool-signed run: exit $LASTEXITCODE $o2" | Tee-Object -FilePath results/sign.txt -Append
+            "size after signtool $((Get-Item signtool.exe.target.exe).Length)" | Tee-Object -FilePath results/sign.txt -Append
+            Copy-Item signtool.exe.target.exe signed.exe -Force
+          } else { 'no signtool' | Tee-Object -FilePath results/sign.txt -Append }
           New-Item -ItemType Directory -Force signed | Out-Null; Copy-Item signed.exe signed/signed.com
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows' && matrix.platform == 'win-x64'
@@ -235,7 +272,7 @@ jobs:
                   cells.append("—" if o is None else ("ok" if o["ok"] else "**FAIL** " + o["detail"][:60].replace("|", "/")))
               print(f"| {k} | " + " | ".join(cells) + " |")
           for p in plats:
-              for f in ("first-run.txt", "latency.txt", "binfmt.txt", "macos.txt", "sign.txt", "defender.txt", "via-sh.txt", "probe.stderr"):
+              for f in ("first-run.txt", "latency.txt", "binfmt.txt", "macos.txt", "sign.txt", "defender.txt", "via-sh.txt", "assimilate.txt", "probe.stderr"):
                   path = os.path.join("results-" + p, f)
                   if os.path.exists(path):
                       print(f"\n**{p} {f}**\n```\n" + open(path, errors="replace").read()[-3000:] + "\n```")
