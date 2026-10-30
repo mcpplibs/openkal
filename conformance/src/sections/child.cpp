@@ -202,12 +202,20 @@ after g_after;
                     if (kal_stream_write(kal_fs_stream(f), block, sizeof block) != static_cast<kal_intptr>(sizeof block)) kal_exit(56);
                 void* region = nullptr;
                 if (kal_map_file(f, 0, size, kal::map::shared.bits, &region) != kal_ok) kal_exit(57);
+                // The region is released and the file closed before the copy
+                // ends, so that the file the suite removes afterwards is held
+                // by nothing.
+                const auto finish = [&](int status) {
+                    kal_map_release(region, size);
+                    kal_fs_close_file(f);
+                    kal_exit(status);
+                };
                 const int e = kal_fs_truncate(f, 100);
-                if (e != kal_ok) kal_exit(e == kal_err_permission ? 50 : 54);
+                if (e != kal_ok) finish(e == kal_err_permission ? 50 : 54);
                 volatile const unsigned char* bytes = static_cast<const unsigned char*>(region);
-                for (kal_uintptr i = 100; i < 4096; ++i) if (bytes[i] != 0) kal_exit(51);
+                for (kal_uintptr i = 100; i < 4096; ++i) if (bytes[i] != 0) finish(51);
                 const unsigned char beyond = bytes[2 * static_cast<kal_uintptr>(kal::map::alignment)];
-                kal_exit(beyond == 0 ? 52 : 55);
+                finish(beyond == 0 ? 52 : 55);
             }
 #endif
             kal_exit(45);
@@ -299,8 +307,13 @@ bool start_copy_running(const char* first_element, const char* errand_argument,
     kal_uintptr lens[2];
     for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
 
+    // The copy runs where the suite runs, not where the suite's program is: a
+    // copy that writes a file writes it beside the suite's own, and the
+    // directory a name resolves against may be a volume's root, which the
+    // suite's user need not be able to write (a program named by its full path
+    // resolves against the volume that holds it).
     const kal_spawn_streams streams{ 0, 0, 0 };
-    const kal_spawn         how{ base, base, nullptr, nullptr, 0, 0 };
+    const kal_spawn         how{ base, kal::fs::working(), nullptr, nullptr, 0, 0 };
     return kal_process_spawn(&how, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
                              &streams, &out) == kal_ok;
 }
