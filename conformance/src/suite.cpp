@@ -18,6 +18,7 @@ import okc.net;
 import okc.datagram;
 import okc.space;
 import okc.timeout;
+import okc.map;
 
 namespace okc {
 
@@ -46,6 +47,7 @@ int run_all() {
     datagram::run();
     space::run();
     timeout::run();
+    map::run();
     termination::run();
 
     return summarise();

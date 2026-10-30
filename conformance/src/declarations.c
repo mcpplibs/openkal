@@ -79,6 +79,9 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_fs_truncate);
     (void)sizeof(&kal_fs_unlock);
     (void)sizeof(&kal_interfaces);
+    (void)sizeof(&kal_map_file);
+    (void)sizeof(&kal_map_release);
+    (void)sizeof(&kal_map_sync);
     (void)sizeof(&kal_memory_granularity);
     (void)sizeof(&kal_net_accept);
     (void)sizeof(&kal_net_close);

@@ -14,6 +14,7 @@ import openkal.stream;
 import openkal.time;
 import openkal.fs;
 import openkal.process;
+import openkal.map;
 
 namespace okc {
 namespace {
@@ -36,6 +37,7 @@ const char* argument_for(errand e) {
         case errand::report_grants:      return "--child-grants";
         case errand::report_no_preopens: return "--child-no-preopens";
         case errand::end_as_requested:   return "--child-end-as-requested";
+        case errand::map_beyond_shortened: return "--child-map-beyond-shortened";
         case errand::none:               break;
     }
     return "";
@@ -56,6 +58,7 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::report_grants)))      return errand::report_grants;
         if (same(a, len, argument_for(errand::report_no_preopens))) return errand::report_no_preopens;
         if (same(a, len, argument_for(errand::end_as_requested)))   return errand::end_as_requested;
+        if (same(a, len, argument_for(errand::map_beyond_shortened))) return errand::map_beyond_shortened;
     }
 #endif
     return errand::none;
@@ -173,6 +176,34 @@ after g_after;
                     if (r < 0 || !same(buf, static_cast<kal_uintptr>(r), grant_markers[i])) kal_exit(44);
                 }
                 kal_exit(0);
+            }
+#endif
+            kal_exit(45);
+        case errand::map_beyond_shortened:
+            // A file of three alignments is mapped whole and shortened to 100
+            // bytes. 50: the shortening was refused, which the specification
+            // permits. Otherwise the bytes after the new end in its page are
+            // read (51 if one is not zero) and then a page wholly beyond it,
+            // which shall end this copy with a fault; 52 is the copy surviving
+            // that access, the outcome the specification forbids.
+#if defined(MCPP_FEATURE_MAP) && defined(MCPP_FEATURE_FS)
+            {
+                const char name[] = "okc-conformance-map-short.tmp";
+                kal_file f{};
+                const auto flags = kal::fs::open::read | kal::fs::open::write
+                                 | kal::fs::open::create | kal::fs::open::truncate;
+                if (kal_fs_open(kal::fs::working(), name, sizeof name - 1, flags.bits, &f) != kal_ok) kal_exit(53);
+                const kal_uintptr size = 3 * static_cast<kal_uintptr>(kal::map::alignment);
+                if (kal_fs_truncate(f, size) != kal_ok) kal_exit(53);
+                void* region = nullptr;
+                if (kal_map_file(f, 0, size, 0, &region) != kal_ok) kal_exit(53);
+                const int e = kal_fs_truncate(f, 100);
+                if (e != kal_ok) kal_exit(e == kal_err_permission ? 50 : 54);
+                volatile const unsigned char* bytes = static_cast<const unsigned char*>(region);
+                for (kal_uintptr i = 100; i < 4096; ++i) if (bytes[i] != 0) kal_exit(51);
+                const unsigned char beyond = bytes[2 * static_cast<kal_uintptr>(kal::map::alignment)];
+                (void)beyond;
+                kal_exit(52);
             }
 #endif
             kal_exit(45);
