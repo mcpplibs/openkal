@@ -20,6 +20,42 @@ program. It describes the boundary between them, and it is written so that the
 boundary can be crossed in either direction: an implementation may be built upon
 a C library, beneath one, or without one.
 
+### 1.1 What crosses the boundary
+
+openkal is three statements at once: an interface stated in C (clause 4), an
+application binary interface at the boundaries of clause 4.4, and, for an ok
+image, the binary interface at run time between the image and the loader that
+binds it (clause 12). In each, what crosses is what this specification states,
+and nothing else.
+
+**Nothing of the environment beneath crosses upward.** A value, a layout, an
+error, a name or a behaviour a consumer observes is one this specification
+defines. An implementation translates what its environment answers into these
+terms --- an error into clause 5.2's values, a capability into clause 6.2's
+properties --- and where its environment answers something the specification
+has no term for, it reports the nearest outcome the specification states or
+declines the operation; it does not pass the environment's own answer through.
+An identifier an environment gives (a program's, a context's) crosses as an
+opaque value, and its meaning is the one stated here, not the environment's.
+
+**Implementations may differ beneath, and not above.** One calls its kernel,
+another a C library; a third composes an operation from others, or emulates it,
+and they differ in cost. They do not differ in what a consumer can observe,
+beyond what this specification leaves open, and what it leaves open it names: a
+property an implementation claims or does not (clause 6.2), one outcome among
+those an operation states (as a lowered claim on the processors may be refused
+raising, clause 11 entry 41). A consumer written against the specification runs
+on every implementation that provides what it uses, which is what the
+ecosystem above openkal is built upon.
+
+**A consumer that reaches past openkal binds itself to what it reached.** A
+program may call its environment directly --- a system library, a system call
+--- and this specification neither forbids nor observes it. Such a program is
+portable as far as the rest of it is, and what it reached for is its own to
+provide elsewhere. An ok image cannot reach past: it imports only the names this
+specification declares and those other images export (clause 12.2), which is
+what lets the same bytes run on every system a loader serves.
+
 ## 2. Conformance vocabulary
 
 The words *shall*, *shall not* and *may* carry their usual normative force. A
