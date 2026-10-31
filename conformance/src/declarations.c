@@ -125,6 +125,8 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_task_current);
     (void)sizeof(&kal_task_join);
     (void)sizeof(&kal_task_parallelism);
+    (void)sizeof(&kal_task_cores);
+    (void)sizeof(&kal_task_set_priority);
     (void)sizeof(&kal_task_props);
     (void)sizeof(&kal_task_stack);
     (void)sizeof(&kal_task_start);
