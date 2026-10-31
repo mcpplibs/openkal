@@ -165,6 +165,16 @@ void asks_for_room(void*) {
 
 #endif
 
+#ifdef MCPP_FEATURE_TASK
+int g_priority[4] = { -1, -1, -1, -1 };
+void sets_its_priority(void*) {
+    g_priority[0] = kal_task_set_priority(kal::task::claim::background);
+    g_priority[1] = kal_task_set_priority(kal::task::claim::low);
+    g_priority[2] = kal_task_set_priority(kal::task::claim::standard);
+    g_priority[3] = kal_task_set_priority(7);
+}
+#endif
+
 }  // namespace
 
 void run() {
@@ -365,7 +375,8 @@ void run() {
                 "a task handle occupies one machine word");
         const kal_uintptr assigned = (kal::task::preemptive | kal::task::parallel
                                     | kal::task::wait_timeout
-                                    | kal::task::thread_local_storage).bits;
+                                    | kal::task::thread_local_storage
+                                    | kal::task::priority).bits;
         observe(kind::abi, (kal_task_props() & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
         // ZERO IS `CANNOT SAY' AND IS DISTINCT FROM ONE, which is the whole
@@ -378,6 +389,37 @@ void run() {
                 "an implementation whose contexts do not run at once reports one");
         observe(kind::behaviour, kal_task_parallelism() == n,
                 "how many contexts can run at once is the same answer each time");
+        // PHYSICAL CORES (0.19): zero is "cannot say", and a number said is
+        // never more than the contexts that can run at once.
+        const kal_uintptr cores = kal_task_cores();
+        claim("kal_task_cores()", cores);
+        observe(kind::behaviour, n == 0 || cores <= n,
+                "the cores are no more than the contexts that can run at once");
+        observe(kind::behaviour, kal_task_cores() == cores, "the cores are the same answer each time");
+
+        // A CONTEXT'S CLAIM (0.19), lowered in a started context so that this
+        // one keeps its own: an implementation that claims the property lowers
+        // it, may refuse the raising (kal_err_permission), and refuses a claim
+        // the specification does not name; one that does not, says so.
+        {
+            kal_task t{};
+            if (kal_task_start(sets_its_priority, nullptr, &t) == kal_ok) {
+                kal_task_join(t);
+                if ((kal_task_props() & kal::task::priority.bits) != 0) {
+                    observe(kind::behaviour, g_priority[0] == kal_ok, "a context lowers its claim to background");
+                    observe(kind::behaviour, g_priority[1] == kal_ok || g_priority[1] == kal_err_permission,
+                            "it asks for low, and is granted it or refused with kal_err_permission");
+                    observe(kind::behaviour, g_priority[2] == kal_ok || g_priority[2] == kal_err_permission,
+                            "it asks for the default again, and is granted it or refused with kal_err_permission");
+                    observe(kind::behaviour, g_priority[3] == kal_err_invalid, "a claim the specification does not name is refused");
+                } else {
+                    observe(kind::behaviour, g_priority[0] == kal_err_not_supported,
+                            "an implementation without the property answers kal_err_not_supported");
+                }
+            } else {
+                unobserved(kind::behaviour, "a context's claim on the processors", "a context could not be started");
+            }
+        }
 
         observe(kind::abi, kal_task_current() == kal_task_current(),
                 "the identity of the calling context is stable within it");

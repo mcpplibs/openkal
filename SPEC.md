@@ -20,6 +20,42 @@ program. It describes the boundary between them, and it is written so that the
 boundary can be crossed in either direction: an implementation may be built upon
 a C library, beneath one, or without one.
 
+### 1.1 What crosses the boundary
+
+openkal is three statements at once: an interface stated in C (clause 4), an
+application binary interface at the boundaries of clause 4.4, and, for an ok
+image, the binary interface at run time between the image and the loader that
+binds it (clause 12). In each, what crosses is what this specification states,
+and nothing else.
+
+**Nothing of the environment beneath crosses upward.** A value, a layout, an
+error, a name or a behaviour a consumer observes is one this specification
+defines. An implementation translates what its environment answers into these
+terms --- an error into clause 5.2's values, a capability into clause 6.2's
+properties --- and where its environment answers something the specification
+has no term for, it reports the nearest outcome the specification states or
+declines the operation; it does not pass the environment's own answer through.
+An identifier an environment gives (a program's, a context's) crosses as an
+opaque value, and its meaning is the one stated here, not the environment's.
+
+**Implementations may differ beneath, and not above.** One calls its kernel,
+another a C library; a third composes an operation from others, or emulates it,
+and they differ in cost. They do not differ in what a consumer can observe,
+beyond what this specification leaves open, and what it leaves open it names: a
+property an implementation claims or does not (clause 6.2), one outcome among
+those an operation states (as a lowered claim on the processors may be refused
+raising, clause 11 entry 41). A consumer written against the specification runs
+on every implementation that provides what it uses, which is what the
+ecosystem above openkal is built upon.
+
+**A consumer that reaches past openkal binds itself to what it reached.** A
+program may call its environment directly --- a system library, a system call
+--- and this specification neither forbids nor observes it. Such a program is
+portable as far as the rest of it is, and what it reached for is its own to
+provide elsewhere. An ok image cannot reach past: it imports only the names this
+specification declares and those other images export (clause 12.2), which is
+what lets the same bytes run on every system a loader serves.
+
 ## 2. Conformance vocabulary
 
 The words *shall*, *shall not* and *may* carry their usual normative force. A
@@ -1713,6 +1749,24 @@ The following are recorded so that they are not mistaken for oversights.
     the shortening, or faults or reads zero beyond its new end, whichever the
     environment does, and no access reads the bytes that were removed; a private
     region may go on showing what it showed, as for any change to its file.
+41. **Physical cores, and a context's claim on the processors.** **Specified
+    in 0.19**, as `kal_task_cores` and `kal_task_set_priority` in `openkal.task`
+    (`task.h`). A compiler run as an ok image prepared one module at a time where
+    the same machine's own program prepared two: it sizes heavy work by
+    physical cores, its C library had nowhere to ask, and the answer "unknown"
+    became one. And its background indexing competed with what its user waited
+    for, which on its own system it marks as background work. Every environment
+    this specification targets states its cores and lowers a thread's claim in
+    one call each, so both meet the admission criterion of version 0.8. They are
+    operations of `openkal.task` because they are about the contexts that
+    interface starts, as `kal_task_parallelism` is (entry 12). Zero cores is
+    "cannot say", as zero contexts is. Three claims rather than a number,
+    because a number would oblige an implementation to map a scale onto
+    environments that have none (clause 7.1), and three are what Linux's
+    scheduling policies, macOS's quality-of-service classes and Windows'
+    background mode can all say. A context that lowered its claim may be refused
+    the raising of it, which is `kal_err_permission`; an environment without the
+    operation does not claim `KAL_TASK_PROP_PRIORITY`.
 
 ## 12. Images
 

@@ -1,4 +1,4 @@
-# The C surface of openkal 0.18.0, one name per line.
+# The C surface of openkal 0.19.0, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -97,10 +97,12 @@ kal_process_stop_requested
 kal_process_terminate
 kal_process_wait
 # openkal.task
+kal_task_cores
 kal_task_current
 kal_task_join
 kal_task_parallelism
 kal_task_props
+kal_task_set_priority
 kal_task_stack
 kal_task_start
 kal_task_start_sized

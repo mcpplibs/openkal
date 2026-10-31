@@ -26,6 +26,8 @@ export using ::kal_task_yield;
 export using ::kal_task_current;
 export using ::kal_task_stack;
 export using ::kal_task_parallelism;
+export using ::kal_task_cores;
+export using ::kal_task_set_priority;
 export using ::kal_task_wait;
 export using ::kal_task_wake;
 export using ::kal_task_props;
@@ -49,6 +51,16 @@ inline constexpr props wait_timeout{KAL_TASK_PROP_WAIT_TIMEOUT};
 // and a C library ported onto openkal keeps its per-context state in one such
 // variable and therefore cannot be ported onto an implementation without it.
 inline constexpr props thread_local_storage{KAL_TASK_PROP_THREAD_LOCAL};
+// kal_task_set_priority lowers a context's claim, and raises it where allowed.
+inline constexpr props priority{KAL_TASK_PROP_PRIORITY};
+
+// The claims kal_task_set_priority takes (version 0.19). `standard' for the
+// default, which is a word of the language.
+namespace claim {
+inline constexpr kal_uintptr standard   = KAL_TASK_PRIORITY_DEFAULT;
+inline constexpr kal_uintptr low        = KAL_TASK_PRIORITY_LOW;
+inline constexpr kal_uintptr background = KAL_TASK_PRIORITY_BACKGROUND;
+}
 
 inline props properties() { return props{kal_task_props()}; }
 inline bool  has(props p) { return properties().has(p); }

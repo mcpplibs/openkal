@@ -22,6 +22,14 @@ struct kal_task { kal_uintptr h; };
  * openkal keeps its per-context state in one such variable, and cannot be
  * ported onto an implementation that lacks the property. */
 #define KAL_TASK_PROP_THREAD_LOCAL ((kal_uintptr)1u << 3)
+/* kal_task_set_priority lowers a context's claim on the processors, and raises
+ * it again where the environment lets it. Version 0.19. */
+#define KAL_TASK_PROP_PRIORITY     ((kal_uintptr)1u << 4)
+
+/* A context's claim on the processors (kal_task_set_priority). Version 0.19. */
+#define KAL_TASK_PRIORITY_DEFAULT    ((kal_uintptr)0u)
+#define KAL_TASK_PRIORITY_LOW        ((kal_uintptr)1u)
+#define KAL_TASK_PRIORITY_BACKGROUND ((kal_uintptr)2u)
 
 #ifdef __cplusplus
 extern "C" {
@@ -151,6 +159,44 @@ int kal_task_stack(void** base, kal_uintptr* size);
  * the second is a reason to ask the operator. An implementation that does not
  * claim KAL_TASK_PROP_PARALLEL answers 1, which is the truth there. */
 kal_uintptr kal_task_parallelism(void);
+
+/* How many physical cores those contexts run on, or zero where the environment
+ * cannot say. Version 0.19.
+ *
+ * ADDED BECAUSE A PROGRAM THAT SIZES HEAVY WORK HAD NOTHING TO SIZE IT BY.
+ * kal_task_parallelism counts the contexts that can run at once, and on a
+ * processor that runs two on one core that is twice the cores. A pool of
+ * compilations sized by it contends with itself for every core it has. A
+ * compiler on an ok image, asking its C library and finding no answer, ran one
+ * compilation at a time where the same machine's own program ran two.
+ *
+ * THE CORES OF THE PROCESSORS THIS PROGRAM MAY RUN ON, as kal_task_parallelism
+ * counts the processors: a program confined to part of the machine is told the
+ * part. Never more than kal_task_parallelism. Zero is "cannot say", as there:
+ * a caller that gets it sizes by kal_task_parallelism, which is what it would
+ * have done without this operation. */
+kal_uintptr kal_task_cores(void);
+
+/* Sets the calling context's claim on the processors. Version 0.19.
+ *
+ * KAL_TASK_PRIORITY_DEFAULT is the claim a context starts with.
+ * KAL_TASK_PRIORITY_LOW is work that may wait for interactive work.
+ * KAL_TASK_PRIORITY_BACKGROUND is work that runs when nothing else wants the
+ * processors --- an index, a cache being filled --- and may be slowed without
+ * bound while they are busy. Each environment spells these its own way; the
+ * three are what the environments this specification targets can all say.
+ *
+ * ADDED BECAUSE A PROGRAM'S BACKGROUND WORK COMPETED WITH WHAT ITS USER WAITED
+ * FOR. A language server indexes a project while a person types in it; on its
+ * own system it marks the indexing threads as background, and on an ok image
+ * it had no way to say so.
+ *
+ * A CONTEXT LOWERED MAY BE UNABLE TO RISE AGAIN: an environment may let any
+ * program lower its claim and only a privileged one raise it. That refusal is
+ * kal_err_permission, and the context keeps its lower claim. An environment
+ * without the operation does not claim KAL_TASK_PROP_PRIORITY and answers
+ * kal_err_not_supported; any other value of `priority' is kal_err_invalid. */
+int kal_task_set_priority(kal_uintptr priority);
 
 /* Suspends the calling context while the word at the given address holds the
  * given value, until another context wakes it or the timeout elapses. The
