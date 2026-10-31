@@ -168,7 +168,7 @@ kal_uintptr kal_task_parallelism(void);
  * processor that runs two on one core that is twice the cores. A pool of
  * compilations sized by it contends with itself for every core it has. A
  * compiler on an ok image, asking its C library and finding no answer, ran one
- * compilation at a time where the same machine's own program ran four.
+ * compilation at a time where the same machine's own program ran two.
  *
  * THE CORES OF THE PROCESSORS THIS PROGRAM MAY RUN ON, as kal_task_parallelism
  * counts the processors: a program confined to part of the machine is told the

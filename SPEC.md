@@ -1752,7 +1752,7 @@ The following are recorded so that they are not mistaken for oversights.
 41. **Physical cores, and a context's claim on the processors.** **Specified
     in 0.19**, as `kal_task_cores` and `kal_task_set_priority` in `openkal.task`
     (`task.h`). A compiler run as an ok image prepared one module at a time where
-    the same machine's own program prepared four: it sizes heavy work by
+    the same machine's own program prepared two: it sizes heavy work by
     physical cores, its C library had nowhere to ask, and the answer "unknown"
     became one. And its background indexing competed with what its user waited
     for, which on its own system it marks as background work. Every environment
