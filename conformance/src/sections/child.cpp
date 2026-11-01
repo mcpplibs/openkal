@@ -235,6 +235,9 @@ after g_after;
                 const int steps = e == errand::hold_memory ? 4 : 64;
                 for (int i = 0; i < steps; ++i) {
                     auto* p = static_cast<volatile unsigned char*>(kal_alloc(step, 4096));
+                    // Refused: an environment that holds a limit by refusing
+                    // allocations ends the unit next, and the copy waits for it.
+                    if (!p && e == errand::grow_memory) break;
                     if (!p) kal_exit(47);
                     for (kal_uintptr at = 0; at < step; at += 4096) p[at] = static_cast<unsigned char>(at >> 12 | 1);
                     if (e == errand::grow_memory) kal_time_sleep(20u * 1000u * 1000u);
