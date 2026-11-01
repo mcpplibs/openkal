@@ -19,6 +19,9 @@ import okc.datagram;
 import okc.space;
 import okc.timeout;
 import okc.map;
+import okc.region;
+import okc.prof;
+import okc.debug;
 
 namespace okc {
 
@@ -48,6 +51,9 @@ int run_all() {
     space::run();
     timeout::run();
     map::run();
+    region::run();
+    prof::run();
+    debug::run();
     termination::run();
 
     return summarise();

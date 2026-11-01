@@ -85,6 +85,15 @@ struct kal_preopen {
 #define KAL_PROCESS_PROP_OPEN_ID        ((kal_uintptr)1u << 8)
 /* KAL_SPAWN_ONE_STRING is answered here. Version 0.17.1. */
 #define KAL_PROCESS_PROP_ONE_STRING     ((kal_uintptr)1u << 9)
+/* kal_process_job_usage answers. Version 0.20. */
+#define KAL_PROCESS_PROP_JOB_USAGE      ((kal_uintptr)1u << 10)
+/* kal_process_job_limit is answered, and the ENVIRONMENT holds a unit to its
+ * limit: the unit cannot exceed it. Version 0.20. */
+#define KAL_PROCESS_PROP_JOB_LIMIT_HARD ((kal_uintptr)1u << 11)
+/* kal_process_job_limit is answered, and the IMPLEMENTATION holds a unit to its
+ * limit by watching what it uses: the unit may exceed it by what it allocates
+ * between two observations before it is ended. Version 0.20. */
+#define KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED ((kal_uintptr)1u << 12)
 
 /* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -310,6 +319,14 @@ int kal_process_spawn(const struct kal_spawn* how,
 int  kal_process_channel(struct kal_stream* mine, struct kal_stream* theirs);
 void kal_process_channel_close(struct kal_stream s);
 
+/* Waits for a started program to end, and reports its status and whether it
+ * was ended rather than ending itself: `terminated' is zero when the program
+ * ended with `status', and non-zero when something ended it. Since 0.20 the
+ * value says by what, where it was this interface's own doing:
+ * KAL_TERMINATED_LIMIT when the program's unit exceeded the limit
+ * kal_process_job_limit placed on it, and 1 for every other end the program
+ * did not choose. A caller that only tests for non-zero is unaffected. */
+#define KAL_TERMINATED_LIMIT 2
 int kal_process_wait(struct kal_process, int* status, int* terminated);
 
 /* Requests the termination of ONE started program, whatever unit it is in.
@@ -418,7 +435,20 @@ int kal_process_end_as_requested(void);
  * names one program for as long as the environment runs; a caller that keeps an
  * identifier keeps the pair, and compares both. `cpu_ns' is the processor time
  * the program has used, in every context it ran. `ended' is non-zero once the
- * program has ended. */
+ * program has ended.
+ *
+ * MEMORY, APPENDED IN 0.20. `memory_bytes' is the memory the environment
+ * charges to the program now, and `memory_peak_bytes' the most it has charged
+ * at once. After the program has ended, `memory_bytes' is zero and the peak
+ * remains for as long as the caller holds the program's handle, waited for or
+ * not --- which is what a C library's `wait4' reports, and why a caller asks
+ * after the wait and before `kal_process_close'. Which memory is charged is the
+ * environment's ---
+ * what is resident in one, the program's own footprint in another, what it has
+ * committed in a third --- and an implementation states which it reports. What
+ * holds everywhere is the unit, a byte; that one implementation reports the
+ * same measure each time; and that the peak never falls. It is a guard against
+ * a program growing without bound, not an account of what it cost. */
 struct kal_program_info {
     kal_u32 self_size;
     kal_u32 present;
@@ -427,6 +457,8 @@ struct kal_program_info {
     kal_u64 cpu_ns;
     kal_u32 ended;
     kal_u32 reserved;
+    kal_u64 memory_bytes;        /* 0.20 */
+    kal_u64 memory_peak_bytes;   /* 0.20 */
 };
 
 /* Positions in `wanted' and `present'. */
@@ -434,7 +466,9 @@ struct kal_program_info {
 #define KAL_PINFO_STARTED ((kal_u32)1u << 1)
 #define KAL_PINFO_CPU     ((kal_u32)1u << 2)
 #define KAL_PINFO_ENDED   ((kal_u32)1u << 3)
-#define KAL_PINFO_ALL     (KAL_PINFO_ID | KAL_PINFO_STARTED | KAL_PINFO_CPU | KAL_PINFO_ENDED)
+#define KAL_PINFO_MEMORY  ((kal_u32)1u << 4)   /* memory_bytes, memory_peak_bytes; 0.20 */
+#define KAL_PINFO_ALL     (KAL_PINFO_ID | KAL_PINFO_STARTED | KAL_PINFO_CPU | KAL_PINFO_ENDED \
+                           | KAL_PINFO_MEMORY)
 
 /* A handle to THIS program, owned and released by kal_process_close. It may be
  * asked about with kal_process_info, and is refused by kal_process_wait and by
@@ -507,6 +541,56 @@ int kal_process_job_terminate(struct kal_job);
  * means where the unit is a process group and closing is releasing a number.
  * Terminating is `kal_process_job_terminate' and nothing else is. */
 void kal_process_job_close(struct kal_job);
+
+/* WHAT A UNIT USES. Version 0.20, clause 11 entry 43.
+ *
+ * The shape is `kal_program_info's: the caller sets `self_size', and the
+ * implementation writes no more of the structure than it states. `members' is
+ * how many programs the unit has, and `memory_bytes' their charges as
+ * `kal_program_info' states them for one program, summed --- or the
+ * environment's own count for the unit where it keeps one, which counts what
+ * the programs share once rather than once per program. Every program in the
+ * unit is counted, including those its members started, since that is what a
+ * unit is.
+ *
+ * NO PEAK. One environment records the most a unit was charged and the others
+ * do not, and an implementation that reported one there would have to remember
+ * every unit it was asked about. A caller that wants the peak asks at the
+ * moments it cares about and keeps the largest answer.
+ *
+ * An implementation that does not claim KAL_PROCESS_PROP_JOB_USAGE reports
+ * kal_err_not_supported. A unit with no program left is kal_err_invalid. */
+struct kal_job_usage {
+    kal_u32 self_size;
+    kal_u32 members;
+    kal_u64 memory_bytes;
+};
+int kal_process_job_usage(struct kal_job, struct kal_job_usage* out);
+
+/* Kinds of limit kal_process_job_limit places. */
+#define KAL_JOB_LIMIT_MEMORY ((kal_uintptr)1)   /* `value' in bytes, as kal_job_usage counts */
+
+/* PLACES A LIMIT ON A UNIT. Version 0.20, clause 11 entry 43.
+ *
+ * When the unit's memory, as `kal_process_job_usage' counts it, exceeds `value',
+ * every program in the unit is ended, and `kal_process_wait' reports each with
+ * `terminated' set to KAL_TERMINATED_LIMIT. THE WHOLE UNIT, NOT ONE OF ITS
+ * PROGRAMS: a unit is a set of programs that end together, and an environment
+ * that ended the largest alone would leave the others waiting on it. A `value'
+ * of zero removes the limit; a later call replaces an earlier one.
+ *
+ * TWO WAYS OF HOLDING IT, AND WHICH IS STATED. Where the implementation claims
+ * KAL_PROCESS_PROP_JOB_LIMIT_HARD, the environment holds the unit to the limit
+ * and it is not exceeded. Where it claims KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED,
+ * the implementation observes the unit's use and ends it when it sees the
+ * limit exceeded; the excess is at most what the unit allocates between two
+ * observations, and an implementation states the longest interval it observes
+ * at. An implementation that claims neither reports kal_err_not_supported; a
+ * kind this version does not assign is kal_err_invalid.
+ *
+ * A program that sets no limit pays nothing for this operation's existence:
+ * whatever observes a unit begins with the first limit. */
+int kal_process_job_limit(struct kal_job, kal_uintptr kind, kal_u64 value);
 
 kal_uintptr kal_process_props(void);
 

@@ -15,6 +15,9 @@
 # constant and has no constexpr spelling; those are listed as skipped so that
 # "absent" is never silently the same as "not applicable".
 set -euo pipefail
+# The order is the bytes', not a locale's: a locale that ignores the underscore put
+# KAL_TERM_ECHO before KAL_TERMINATED_LIMIT here and after it in CI.
+export LC_ALL=C
 
 cd "$(dirname "$0")/.."
 out=src/macros.cppm

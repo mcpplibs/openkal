@@ -238,6 +238,60 @@ void run() {
         }
     }
 
+    // TRANSFERS AT AN OFFSET (version 0.20). Each is observed with the
+    // position somewhere other than the offset, so that an implementation that
+    // composed the transfer from a seek, or moved the position as a side
+    // effect, reports itself: the sequential transfer afterwards reads from
+    // where the position was left, not from beyond the offset.
+    {
+        observe(kind::behaviour, put_file(kName, "0123456789"), "a file is written for transfers at offsets");
+        kal_file f{};
+        const int e = kal::fs::open_file(here(), kName, length(kName),
+                                         kal::fs::open::read | kal::fs::open::write, &f);
+        if (e == kal_ok) {
+            kal_u64 at = 0;
+            kal_fs_seek(f, 2, kal::fs::seek_set, &at);
+            char buf[16] = {};
+            const kal_intptr r = kal_fs_read_at(f, buf, 3, 6);
+            observe(kind::behaviour, r == 3 && buf[0] == '6' && buf[2] == '8',
+                    "a read at an offset reads from the offset");
+            kal_u64 now = 0;
+            observe(kind::behaviour, kal_fs_seek(f, 0, kal::fs::seek_current, &now) == kal_ok && now == 2,
+                    "and leaves the position where it was");
+            const kal_intptr w = kal_fs_write_at(f, "XY", 2, 8);
+            observe(kind::behaviour, w == 2, "a write at an offset writes the whole buffer");
+            kal_fs_seek(f, 0, kal::fs::seek_current, &now);
+            observe(kind::behaviour, now == 2, "and leaves the position where it was");
+            char seq[4] = {};
+            const kal_intptr s1 = kal_stream_read(kal_fs_stream(f), seq, 2);
+            observe(kind::behaviour, s1 == 2 && seq[0] == '2' && seq[1] == '3',
+                    "a sequential transfer afterwards continues from the position");
+            char tail[4] = {};
+            observe(kind::behaviour, kal_fs_read_at(f, tail, 4, 7) == 3
+                        && tail[0] == '7' && tail[1] == 'X' && tail[2] == 'Y',
+                    "a read at an offset sees what a write at an offset placed, up to the end");
+            observe(kind::behaviour, kal_fs_read_at(f, tail, 4, 10) == 0
+                        && kal_fs_read_at(f, tail, 4, 1000) == 0,
+                    "a read at or beyond the end reads nothing");
+            observe(kind::behaviour, kal_fs_write_at(f, "Z", 1, 12) == 1,
+                    "a write beyond the end extends the file");
+            kal_node_info info = fresh();
+            observe(kind::behaviour, kal_fs_file_info(f, kal::fs::field::all, &info) == kal_ok && info.size == 13
+                        && kal_fs_read_at(f, tail, 3, 10) == 3 && tail[0] == 0 && tail[1] == 0 && tail[2] == 'Z',
+                    "and what lies between the old end and the write reads as zero");
+            kal_fs_close_file(f);
+        }
+
+        if (performs(kind::cost) && put_file(kName, "0123456789") &&
+            kal::fs::open_file(here(), kName, length(kName), kal::fs::open::read, &f) == kal_ok) {
+            char b[4];
+            const kal_duration t0 = kal_time_monotonic();
+            for (int i = 0; i < cost_iterations; ++i) kal_fs_read_at(f, b, 4, static_cast<kal_u64>(i % 6));
+            measure("reading at an offset", kal_time_monotonic() - t0, cost_iterations);
+            kal_fs_close_file(f);
+        }
+    }
+
     // The three conditions clause 7.8 records, each observed by its effect. A
     // return value alone would accept an implementation that reported success
     // and did nothing, which is exactly the outcome those flags exist to

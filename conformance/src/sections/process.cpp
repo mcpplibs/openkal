@@ -131,6 +131,15 @@ void run() {
             int status = 0, terminated = 0;
             observe(kind::behaviour, kal_process_wait(self, &status, &terminated) == kal_err_invalid,
                     "a program does not wait for itself");
+            // MEMORY (0.20): what the environment charges the program now, and
+            // the most it has charged, which is never less.
+            if ((info.present & kal::process::info::memory) != 0) {
+                observe(kind::behaviour, info.memory_bytes > 0 && info.memory_peak_bytes >= info.memory_bytes,
+                        "a running program is charged memory, and its peak is no less");
+            } else {
+                unobserved(kind::behaviour, "a running program is charged memory, and its peak is no less",
+                           "the implementation does not report KAL_PINFO_MEMORY");
+            }
             kal_program_info tiny{};
             tiny.self_size = 4;
             observe(kind::behaviour, kal_process_info(self, kal::process::info::all, &tiny) == kal_err_invalid,
@@ -286,6 +295,89 @@ void run() {
                     "an unclaimed channel is refused rather than half provided");
     }
 
+    // WHAT A UNIT USES, AND A LIMIT ON IT (version 0.20). Both are observed
+    // on a copy that writes its memory through, so that every environment's
+    // measure sees it.
+#ifdef MCPP_FEATURE_TIME
+    if (kal::process::has(kal::process::job) && kal::process::has(kal::process::job_usage)) {
+        kal_job unit{};
+        kal_process child{};
+        if (start_copy_in_unit(argument_for(errand::hold_memory), unit, child)) {
+            kal_job_usage use{};
+            use.self_size = sizeof use;
+            int e = kal_err_invalid;
+            for (int i = 0; i < 1000; ++i) {
+                e = kal_process_job_usage(unit, &use);
+                if (e == kal_ok && use.memory_bytes >= (kal_u64{24} << 20)) break;
+                kal_time_sleep(5u * 1000u * 1000u);
+            }
+            claim("the unit's members", use.members);
+            claim("the unit's memory_bytes", static_cast<kal_uintptr>(use.memory_bytes));
+            observe(kind::behaviour, e == kal_ok && use.members >= 1,
+                    "a unit's use is reported, and counts the program started in it");
+            observe(kind::behaviour, e == kal_ok && use.memory_bytes >= (kal_u64{24} << 20),
+                    "the unit is charged the memory its program wrote");
+            kal_process_job_terminate(unit);
+            int status = 0, terminated = 0;
+            kal_process_wait(child, &status, &terminated);
+            observe(kind::behaviour, terminated == 1,
+                    "a program its unit's termination ended is reported as terminated, not as limited");
+            // What it used remains while its handle is held, waited for or not.
+            kal_program_info after{};
+            after.self_size = sizeof after;
+            if (kal_process_info(child, kal::process::info::memory, &after) == kal_ok
+                && (after.present & kal::process::info::memory) != 0) {
+                claim("the ended program's memory_bytes", static_cast<kal_uintptr>(after.memory_bytes));
+                claim("the ended program's memory_peak_bytes", static_cast<kal_uintptr>(after.memory_peak_bytes));
+                observe(kind::behaviour, after.memory_bytes == 0 && after.memory_peak_bytes >= (kal_u64{24} << 20),
+                        "an ended program is charged nothing now, and its peak remains until its handle is released");
+            } else {
+                unobserved(kind::behaviour,
+                           "an ended program is charged nothing now, and its peak remains until its handle is released",
+                           "the implementation does not report KAL_PINFO_MEMORY for an ended program");
+            }
+            kal_process_close(child);
+            kal_process_job_close(unit);
+        } else {
+            unobserved(kind::behaviour, "a copy is started in a unit",
+                       "a copy of this program could not be started");
+        }
+    } else {
+        kal_job_usage use{};
+        use.self_size = sizeof use;
+        observe(kind::behaviour, kal_process_job_usage(kal_job{}, &use) == kal_err_not_supported,
+                "an unclaimed unit usage is refused rather than half provided");
+    }
+
+    if (kal::process::has(kal::process::job)
+        && (kal::process::has(kal::process::job_limit_hard)
+            || kal::process::has(kal::process::job_limit_supervised))) {
+        kal_job unit{};
+        kal_process child{};
+        if (start_copy_in_unit(argument_for(errand::grow_memory), unit, child)) {
+            observe(kind::behaviour, kal_process_job_limit(unit, kal_uintptr{99}, 1) == kal_err_invalid,
+                    "a kind of limit this version does not assign is refused");
+            const int e = kal_process_job_limit(unit, kal::process::limit_memory, kal_u64{96} << 20);
+            observe(kind::behaviour, e == kal_ok, "a limit is placed on a unit");
+            int status = 0, terminated = 0;
+            kal_process_wait(child, &status, &terminated);
+            claim("the limited program's status", static_cast<kal_uintptr>(status));
+            claim("the limited program's terminated", static_cast<kal_uintptr>(terminated));
+            observe(kind::behaviour, terminated == kal::process::terminated_limit,
+                    "a unit that exceeds its limit is ended, and its program reported as limited");
+            kal_process_close(child);
+            kal_process_job_close(unit);
+        } else {
+            unobserved(kind::behaviour, "a copy is started in a unit",
+                       "a copy of this program could not be started");
+        }
+    } else {
+        observe(kind::behaviour,
+                kal_process_job_limit(kal_job{}, kal::process::limit_memory, 1) == kal_err_not_supported,
+                "an unclaimed unit limit is refused rather than half provided");
+    }
+#endif
+
     if (performs(kind::abi)) {
         observe(kind::abi, sizeof(kal_process) == sizeof(kal_uintptr),
                 "a process handle occupies one machine word");
@@ -298,7 +390,10 @@ void run() {
                                     | kal::process::job
                                     | kal::process::stop_requested
                                     | kal::process::open_id
-                                    | kal::process::one_string).bits;
+                                    | kal::process::one_string
+                                    | kal::process::job_usage
+                                    | kal::process::job_limit_hard
+                                    | kal::process::job_limit_supervised).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),

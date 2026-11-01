@@ -40,7 +40,7 @@ constexpr const char* name_of(kind k) {
 // can be read side by side.
 enum class interface_id {
     abort, stream, memory, env, time, fs, process, task,
-    terminal, net, datagram, space, timeout, map, count
+    terminal, net, datagram, space, timeout, map, region, prof, debug, count
 };
 
 struct interface_row {
@@ -153,6 +153,27 @@ inline constexpr interface_row inventory[] = {
       false,
 #endif
       "map" },
+    { "openkal.region",   false,
+#ifdef MCPP_FEATURE_REGION
+      true,
+#else
+      false,
+#endif
+      "region" },
+    { "openkal.prof",     false,
+#ifdef MCPP_FEATURE_PROF
+      true,
+#else
+      false,
+#endif
+      "prof" },
+    { "openkal.debug",    false,
+#ifdef MCPP_FEATURE_DEBUG
+      true,
+#else
+      false,
+#endif
+      "debug" },
 };
 
 // Which kinds of examination this build performs. Behaviour is unconditional:

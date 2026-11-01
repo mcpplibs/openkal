@@ -1,4 +1,4 @@
-# openkal Specification, version 0.18
+# openkal Specification, version 0.20
 
 ## 1. Scope
 
@@ -85,10 +85,14 @@ provides an interface in whole or not at all.
 | `openkal.space` | an address space, and a context executing in one | optional | ✓ | ✓ | ✓ |
 | `openkal.timeout` | a bound upon operations that would otherwise wait | optional | ✓ | ✓ | ✓ |
 | `openkal.map` | a part of a file's contents in the address space | optional | ✓ | ✓ | ✓ |
+| `openkal.region` | a range of the address space, reserved and backed as it is used | optional | ✓ | ✓ | ✓ |
+| `openkal.prof` | what a program states about its own work to a measurement | optional | ✓ | ✓ | ✓ |
+| `openkal.debug` | the name of an address in a program's own code | optional | ✓ | ✓ | ✓ |
 | `openkal.event` | readiness of a set of resources | reserved | | | |
 
-Version 0.15 specifies the core and optional interfaces, and version 0.18 adds
-`openkal.map` (clause 11, entry 40). The reserved row is not specified, and its
+Version 0.15 specifies the core and optional interfaces, version 0.18 adds
+`openkal.map` (clause 11, entry 40), and version 0.20 adds `openkal.region`,
+`openkal.prof` and `openkal.debug` (entries 44 and 45). The reserved row is not specified, and its
 name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1767,6 +1771,95 @@ The following are recorded so that they are not mistaken for oversights.
     background mode can all say. A context that lowered its claim may be refused
     the raising of it, which is `kal_err_permission`; an environment without the
     operation does not claim `KAL_TASK_PROP_PRIORITY`.
+42. **A transfer at an offset.** **Specified in 0.20**, as `kal_fs_read_at`
+    and `kal_fs_write_at` in `openkal.fs` (`fs.h`). A C library above this
+    interface composed `pread` from a seek, a read and a seek back --- three
+    calls where one suffices, under a lock of its own so that a second context
+    could not move the position in between, and still wrong for a sequential
+    transfer the same file was making. Measured on a compiler run as an image:
+    66 thousand reads and 71 thousand seeks where the same program built for
+    its environment made 648 thousand positional reads and no seeks, and the
+    lock's waits were a further 73 thousand calls. Every environment this
+    specification targets transfers at an offset in one call, so both meet the
+    admission criterion of version 0.8. One of them moves a handle's position
+    when a transfer on it is given an offset; an implementation there transfers
+    at the offset through a second handle to the same file, opened when it is
+    first needed, whose position nothing observes --- so the position a program
+    and the programs it gave the file to share is the environment's own, as it
+    is elsewhere (clause 1.1). Neither operation uses or changes the position; where a write at an offset lands on a file opened
+    for appending is the environment's, and is named rather than reconciled,
+    because reconciling it would oblige every implementation to remember how
+    each file was opened (clause 7.1).
+43. **What a unit uses, and a limit on it.** **Specified in 0.20**, as
+    `kal_process_job_usage`, `kal_process_job_limit` and the memory of
+    `kal_program_info` in `openkal.process` (`process.h`). A program that
+    starts workers in a unit (entry 15) bounds what they may use together, so
+    that a burst of work does not take the machine: a language server on one
+    environment placed its workers in a control group with a memory ceiling and
+    on the others ran them unbounded or not at all. The three environments state
+    a program's memory in one call each, and hold a set of programs to a ceiling
+    in two ways: one family of systems lets a program create such a group where
+    it has been delegated the right, the other places a ceiling on a job object
+    it already uses for the unit, and the third has no such group. So the
+    specification states the limit and names the two ways it can be held:
+    `HARD`, where the environment holds it, and `SUPERVISED`, where the
+    implementation observes the unit at an interval it states and ends it on
+    seeing the excess. Both end the WHOLE unit, because a unit ends together;
+    an environment whose own ceiling ends one program or fails an allocation is
+    brought to that outcome by its implementation. Which memory is counted is
+    the environment's (resident, footprint, committed), stated by the
+    implementation, because a common definition would have to be computed from
+    something no environment reports (clause 7.1); what is common is the unit,
+    a byte, a measure that does not change between calls, and, for one program,
+    a peak that never falls. A unit's usage counts every program in it, which
+    every environment records (a control group, a process group, a job object),
+    and states no peak, because only one environment records a unit's peak and
+    reporting one elsewhere would oblige an implementation to remember every
+    unit (clause 7.1). `kal_process_wait` reports a program a limit
+    ended with `terminated` set to `KAL_TERMINATED_LIMIT`, which a caller that
+    tested for non-zero already treats as an end it did not choose.
+44. **A range of the address space reserved and backed as it is used.**
+    **Specified in 0.20**, as the optional interface `openkal.region`
+    (`region.h`). A C library above this interface built its allocator on
+    `kal_alloc`, which obtains memory usable at once and returns it whole: every
+    group of small allocations freed became a release, and its next use a fresh
+    request whose pages were faulted in and zeroed again --- 792 thousand faults
+    where the same program built for its environment took 55 thousand. What an
+    allocator of a general kind needs is the other half of an address space:
+    a large aligned reservation, backing a part of it as it is used, returning
+    the backing while keeping the addresses, and releasing the whole. Every
+    environment with a page table does each in one call, so the five operations
+    meet the admission criterion of version 0.8. It is an interface of its own
+    rather than operations of `openkal.memory`, whose place in the core set
+    (clause 3.2) would require them of an environment without a page table,
+    which could only refuse them (clause 6.1). Two returns are distinguished
+    because environments distinguish them and an allocator uses both: after
+    `kal_region_decommit` a part is backed again only by `kal_region_commit`
+    and then reads as zero; after `kal_region_discard` it stays usable and its
+    contents are unspecified, which lets an environment take the memory back
+    lazily. `KAL_REGION_PROP_OVERCOMMIT` states the environments in which a
+    reservation is usable at once and backing is not charged apart from it. No
+    protection is stated, as none is anywhere in this specification. A C
+    library builds its anonymous `mmap`, `munmap` and `madvise` upon it, which
+    is the test that the operations are general rather than one allocator's.
+45. **What a program states to a measurement, and the name of an address.**
+    **Specified in 0.20**, as the optional interfaces `openkal.prof`
+    (`prof.h`) and `openkal.debug` (`debug.h`). A program run as an image could
+    be measured only as an anonymous region: a profiler of its environment saw
+    addresses it could not name, and nothing told it what the program's layers
+    were doing --- how often the allocator went to the environment, how long a
+    context waited for a lock. A loader holds what is missing (it binds every
+    call across this interface, and it read the image's symbol table), so the
+    two interfaces are a loader's to provide (clause 12.3). `openkal.prof` is
+    designed to cost nothing unmeasured: `kal_prof_active` is asked once, a
+    counter is the program's own cell read by the measurement when it records,
+    and a phase is a pair of marks. `openkal.debug` names an address from the
+    symbol table; it does not walk frames, because a program unwinds itself
+    from tables it already holds (clause 12.2), and the name is returned as the
+    table states it. Neither carries anything of the environment (clause 1.1).
+    A cycle counter was considered for `openkal.prof` and not adopted: it would
+    be a second time base beside `kal_time_monotonic`, which a measurement
+    already has.
 
 ## 12. Images
 
@@ -1847,6 +1940,18 @@ image's convention. The presentation is mechanical and is generated from
 loader's and not the implementation's: an implementation is written in its
 environment's convention, as every program of that environment is, and a
 convention of images is a fact about images.
+
+A loader may provide `openkal.prof` and `openkal.debug` to the images it binds,
+beside the implementation's interfaces (version 0.20, clause 11 entry 45). Both
+are about the program as the loader placed it --- its calls, its counters, its
+symbol table --- and the loader is the party that holds those, so this is not a
+second implementation in the process (clause 10.1): neither interface has a
+resource of the environment, and neither keeps state an implementation keeps.
+The image's `kal_interfaces` then answers the implementation's positions and the
+loader's together. A loader that measures counts each call an image makes
+across this interface by binding the image's import to a counting entry instead
+of the implementation's; one that does not binds the implementation's entry, so
+a program that is not measured pays nothing.
 
 ### 12.4 The note
 

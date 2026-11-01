@@ -300,6 +300,28 @@ int kal_fs_seek(struct kal_file, kal_i64 offset, int whence,
  * what lies beyond. */
 int kal_fs_truncate(struct kal_file, kal_u64 size);
 
+/* TRANSFERS AT AN OFFSET. Version 0.20, clause 11 entry 42.
+ *
+ * `kal_fs_read_at' reads at most `len' bytes of the file beginning at `offset'
+ * and `kal_fs_write_at' writes the whole buffer there; the results are those of
+ * `kal_stream_read' and `kal_stream_write' through `kal_fs_stream' --- a count,
+ * zero for the end of the file when reading, or the negated error value.
+ *
+ * NEITHER USES OR CHANGES THE FILE'S POSITION. The position a transfer through
+ * the file's stream and `kal_fs_seek' observe is the same after the call as
+ * before it, and transfers at offsets on one file from several contexts at once
+ * do not disturb one another or a sequential transfer under way. That is the
+ * whole reason the operations exist: composed from a seek, a transfer and a
+ * seek back, they are three calls where one suffices, and they are wrong
+ * whenever a second context moves the position between the first and the last.
+ *
+ * A write at an offset to a file opened with KAL_OPEN_APPEND is placed at the
+ * offset or at the end of the file, whichever the environment places it; a
+ * program that needs one of them opens the file without appending. A transfer
+ * the file was not opened for is refused as it is through the file's stream. */
+kal_intptr kal_fs_read_at(struct kal_file, void* buf, kal_uintptr len, kal_u64 offset);
+kal_intptr kal_fs_write_at(struct kal_file, const void* buf, kal_uintptr len, kal_u64 offset);
+
 /* Enquiry, creation and removal, all relative to a directory. Enquiry about a
  * name that does not exist succeeds and reports kal_node_absent rather than
  * failing: a caller that asks what a name refers to has been answered when told

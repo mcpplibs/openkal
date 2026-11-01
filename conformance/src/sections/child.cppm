@@ -27,6 +27,9 @@ enum class errand {
     report_no_preopens,  // ... and a count of zero leaves it none (clause 7.13)
     end_as_requested,    // takes the request over, then ends as it would have (0.17)
     map_beyond_shortened,    // reads a mapped page its file no longer holds (0.18)
+    hold_memory,         // holds 32 MiB written through, then waits to be ended (0.20)
+    grow_memory,         // grows by 8 MiB at a time to 512 MiB, then waits; ends
+                         // itself with 77 after twenty seconds (0.20)
 };
 
 // The names the starter grants and the copy expects, in order, and the marker
@@ -67,6 +70,10 @@ bool start_copy(const char* first_element, const char* errand_argument,
 // running when it is made.
 bool start_copy_running(const char* first_element, const char* errand_argument,
                         kal_process& out);
+
+// The same, placing the copy in the unit `unit' names (a word of zero forms a
+// new one and receives its identity).
+bool start_copy_in_unit(const char* errand_argument, kal_job& unit, kal_process& out);
 
 // The same, granting the copy the given directories.
 bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
