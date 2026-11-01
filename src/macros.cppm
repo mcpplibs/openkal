@@ -12,6 +12,7 @@
 module;
 #include <openkal/abort.h>
 #include <openkal/datagram.h>
+#include <openkal/debug.h>
 #include <openkal/env.h>
 #include <openkal/exec.h>
 #include <openkal/fs.h>
@@ -19,7 +20,9 @@ module;
 #include <openkal/memory.h>
 #include <openkal/net.h>
 #include <openkal/process.h>
+#include <openkal/prof.h>
 #include <openkal/random.h>
+#include <openkal/region.h>
 #include <openkal/space.h>
 #include <openkal/stream.h>
 #include <openkal/task.h>
@@ -51,6 +54,7 @@ inline constexpr kal_uintptr KAL_FS_PROP_REMOVE_OPEN_M          = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_FS_PROP_RENAME_NO_REPLACE_M    = (kal_uintptr)(KAL_FS_PROP_RENAME_NO_REPLACE);
 inline constexpr kal_uintptr KAL_IFACE_ABORT_M                  = (kal_uintptr)(KAL_IFACE_ABORT);
 inline constexpr kal_uintptr KAL_IFACE_DATAGRAM_M               = (kal_uintptr)(KAL_IFACE_DATAGRAM);
+inline constexpr kal_uintptr KAL_IFACE_DEBUG_M                  = (kal_uintptr)(KAL_IFACE_DEBUG);
 inline constexpr kal_uintptr KAL_IFACE_ENV_M                    = (kal_uintptr)(KAL_IFACE_ENV);
 inline constexpr kal_uintptr KAL_IFACE_EXEC_M                   = (kal_uintptr)(KAL_IFACE_EXEC);
 inline constexpr kal_uintptr KAL_IFACE_FS_M                     = (kal_uintptr)(KAL_IFACE_FS);
@@ -58,7 +62,9 @@ inline constexpr kal_uintptr KAL_IFACE_MAP_M                    = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_IFACE_MEMORY_M                 = (kal_uintptr)(KAL_IFACE_MEMORY);
 inline constexpr kal_uintptr KAL_IFACE_NET_M                    = (kal_uintptr)(KAL_IFACE_NET);
 inline constexpr kal_uintptr KAL_IFACE_PROCESS_M                = (kal_uintptr)(KAL_IFACE_PROCESS);
+inline constexpr kal_uintptr KAL_IFACE_PROF_M                   = (kal_uintptr)(KAL_IFACE_PROF);
 inline constexpr kal_uintptr KAL_IFACE_RANDOM_M                 = (kal_uintptr)(KAL_IFACE_RANDOM);
+inline constexpr kal_uintptr KAL_IFACE_REGION_M                 = (kal_uintptr)(KAL_IFACE_REGION);
 inline constexpr kal_uintptr KAL_IFACE_SPACE_M                  = (kal_uintptr)(KAL_IFACE_SPACE);
 inline constexpr kal_uintptr KAL_IFACE_STREAM_M                 = (kal_uintptr)(KAL_IFACE_STREAM);
 inline constexpr kal_uintptr KAL_IFACE_TASK_M                   = (kal_uintptr)(KAL_IFACE_TASK);
@@ -72,6 +78,7 @@ inline constexpr kal_uintptr KAL_INFO_KIND_M                    = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_INFO_MODIFIED_M                = (kal_uintptr)(KAL_INFO_MODIFIED);
 inline constexpr kal_uintptr KAL_INFO_SIZE_M                    = (kal_uintptr)(KAL_INFO_SIZE);
 inline constexpr kal_uintptr KAL_INFO_WRITABLE_M                = (kal_uintptr)(KAL_INFO_WRITABLE);
+inline constexpr kal_uintptr KAL_JOB_LIMIT_MEMORY_M             = (kal_uintptr)(KAL_JOB_LIMIT_MEMORY);
 inline constexpr kal_uintptr KAL_LOCK_EXCLUSIVE_M               = (kal_uintptr)(KAL_LOCK_EXCLUSIVE);
 inline constexpr kal_uintptr KAL_LOCK_SHARED_M                  = (kal_uintptr)(KAL_LOCK_SHARED);
 inline constexpr kal_uintptr KAL_LOCK_WAIT_M                    = (kal_uintptr)(KAL_LOCK_WAIT);
@@ -90,12 +97,16 @@ inline constexpr kal_uintptr KAL_PINFO_ALL_M                    = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_PINFO_CPU_M                    = (kal_uintptr)(KAL_PINFO_CPU);
 inline constexpr kal_uintptr KAL_PINFO_ENDED_M                  = (kal_uintptr)(KAL_PINFO_ENDED);
 inline constexpr kal_uintptr KAL_PINFO_ID_M                     = (kal_uintptr)(KAL_PINFO_ID);
+inline constexpr kal_uintptr KAL_PINFO_MEMORY_M                 = (kal_uintptr)(KAL_PINFO_MEMORY);
 inline constexpr kal_uintptr KAL_PINFO_STARTED_M                = (kal_uintptr)(KAL_PINFO_STARTED);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_BOUND_LIFETIME_M  = (kal_uintptr)(KAL_PROCESS_PROP_BOUND_LIFETIME);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_CHANNEL_M         = (kal_uintptr)(KAL_PROCESS_PROP_CHANNEL);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_EXIT_STATUS_M     = (kal_uintptr)(KAL_PROCESS_PROP_EXIT_STATUS);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_GRANT_DIR_M       = (kal_uintptr)(KAL_PROCESS_PROP_GRANT_DIR);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_JOB_M             = (kal_uintptr)(KAL_PROCESS_PROP_JOB);
+inline constexpr kal_uintptr KAL_PROCESS_PROP_JOB_LIMIT_HARD_M  = (kal_uintptr)(KAL_PROCESS_PROP_JOB_LIMIT_HARD);
+inline constexpr kal_uintptr KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED_M = (kal_uintptr)(KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED);
+inline constexpr kal_uintptr KAL_PROCESS_PROP_JOB_USAGE_M       = (kal_uintptr)(KAL_PROCESS_PROP_JOB_USAGE);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_ONE_STRING_M      = (kal_uintptr)(KAL_PROCESS_PROP_ONE_STRING);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_OPEN_ID_M         = (kal_uintptr)(KAL_PROCESS_PROP_OPEN_ID);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_STOP_REQUESTED_M  = (kal_uintptr)(KAL_PROCESS_PROP_STOP_REQUESTED);
@@ -103,6 +114,8 @@ inline constexpr kal_uintptr KAL_PROCESS_PROP_STREAM_PASSING_M  = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_PROCESS_PROP_TERMINATE_M       = (kal_uintptr)(KAL_PROCESS_PROP_TERMINATE);
 inline constexpr kal_uintptr KAL_RANDOM_PROP_BLOCKING_M         = (kal_uintptr)(KAL_RANDOM_PROP_BLOCKING);
 inline constexpr kal_uintptr KAL_RANDOM_PROP_HARDWARE_M         = (kal_uintptr)(KAL_RANDOM_PROP_HARDWARE);
+inline constexpr kal_uintptr KAL_REGION_COMMIT_M                = (kal_uintptr)(KAL_REGION_COMMIT);
+inline constexpr kal_uintptr KAL_REGION_PROP_OVERCOMMIT_M       = (kal_uintptr)(KAL_REGION_PROP_OVERCOMMIT);
 inline constexpr kal_uintptr KAL_RENAME_NO_REPLACE_M            = (kal_uintptr)(KAL_RENAME_NO_REPLACE);
 inline constexpr kal_uintptr KAL_SEEK_CURRENT_M                 = (kal_uintptr)(KAL_SEEK_CURRENT);
 inline constexpr kal_uintptr KAL_SEEK_END_M                     = (kal_uintptr)(KAL_SEEK_END);
@@ -124,6 +137,7 @@ inline constexpr kal_uintptr KAL_TASK_PROP_PRIORITY_M           = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_TASK_PROP_THREAD_LOCAL_M       = (kal_uintptr)(KAL_TASK_PROP_THREAD_LOCAL);
 inline constexpr kal_uintptr KAL_TASK_PROP_WAIT_TIMEOUT_M       = (kal_uintptr)(KAL_TASK_PROP_WAIT_TIMEOUT);
 inline constexpr kal_uintptr KAL_TERM_ECHO_M                    = (kal_uintptr)(KAL_TERM_ECHO);
+inline constexpr kal_uintptr KAL_TERMINATED_LIMIT_M             = (kal_uintptr)(KAL_TERMINATED_LIMIT);
 inline constexpr kal_uintptr KAL_TERM_LINE_EDIT_M               = (kal_uintptr)(KAL_TERM_LINE_EDIT);
 inline constexpr kal_uintptr KAL_TERM_PASS_CONTROL_M            = (kal_uintptr)(KAL_TERM_PASS_CONTROL);
 inline constexpr kal_uintptr KAL_TERM_PASS_INPUT_M              = (kal_uintptr)(KAL_TERM_PASS_INPUT);

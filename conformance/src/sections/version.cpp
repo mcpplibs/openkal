@@ -68,6 +68,18 @@ void run() {
 #ifdef MCPP_FEATURE_PROCESS
     if (!kal::provides(kal::iface::process)) agrees = false;
 #endif
+#ifdef MCPP_FEATURE_MAP
+    if (!kal::provides(kal::iface::map)) agrees = false;
+#endif
+#ifdef MCPP_FEATURE_REGION
+    if (!kal::provides(kal::iface::region)) agrees = false;
+#endif
+#ifdef MCPP_FEATURE_PROF
+    if (!kal::provides(kal::iface::prof)) agrees = false;
+#endif
+#ifdef MCPP_FEATURE_DEBUG
+    if (!kal::provides(kal::iface::debug)) agrees = false;
+#endif
     observe(kind::behaviour, agrees,
             "every interface this suite linked against is reported as present");
 

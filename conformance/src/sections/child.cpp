@@ -15,6 +15,7 @@ import openkal.time;
 import openkal.fs;
 import openkal.process;
 import openkal.map;
+import openkal.memory;
 
 namespace okc {
 namespace {
@@ -38,6 +39,8 @@ const char* argument_for(errand e) {
         case errand::report_no_preopens: return "--child-no-preopens";
         case errand::end_as_requested:   return "--child-end-as-requested";
         case errand::map_beyond_shortened: return "--child-map-beyond-shortened";
+        case errand::hold_memory:        return "--child-hold-memory";
+        case errand::grow_memory:        return "--child-grow-memory";
         case errand::none:               break;
     }
     return "";
@@ -59,6 +62,8 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::report_no_preopens))) return errand::report_no_preopens;
         if (same(a, len, argument_for(errand::end_as_requested)))   return errand::end_as_requested;
         if (same(a, len, argument_for(errand::map_beyond_shortened))) return errand::map_beyond_shortened;
+        if (same(a, len, argument_for(errand::hold_memory)))  return errand::hold_memory;
+        if (same(a, len, argument_for(errand::grow_memory)))  return errand::grow_memory;
     }
 #endif
     return errand::none;
@@ -219,6 +224,26 @@ after g_after;
             }
 #endif
             kal_exit(45);
+        case errand::hold_memory:
+        case errand::grow_memory:
+            // Memory written through, so that every environment charges it ---
+            // one that charges what is resident sees it as one that charges
+            // what is committed does. 47: the memory could not be obtained.
+#ifdef MCPP_FEATURE_TIME
+            {
+                constexpr kal_uintptr step = kal_uintptr{8} << 20;
+                const int steps = e == errand::hold_memory ? 4 : 64;
+                for (int i = 0; i < steps; ++i) {
+                    auto* p = static_cast<volatile unsigned char*>(kal_alloc(step, 4096));
+                    if (!p) kal_exit(47);
+                    for (kal_uintptr at = 0; at < step; at += 4096) p[at] = static_cast<unsigned char>(at >> 12 | 1);
+                    if (e == errand::grow_memory) kal_time_sleep(20u * 1000u * 1000u);
+                }
+                for (int i = 0; i < 4000; ++i) kal_time_sleep(5u * 1000u * 1000u);
+                kal_exit(77);
+            }
+#endif
+            kal_exit(45);
         case errand::report_no_preopens:
 #ifdef MCPP_FEATURE_FS
             kal_exit(kal_fs_preopen_count() == 0 ? 0 : 46);
@@ -327,6 +352,18 @@ bool start_copy(const char* first_element, const char* errand_argument,
     return e == kal_ok;
 }
 
+bool start_copy_in_unit(const char* errand_argument, kal_job& unit, kal_process& out) {
+    kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
+    if (!locate_self(base, rel, rel_len)) return false;
+    const char* argv[2] = { "openkal-conformance-child", errand_argument };
+    kal_uintptr lens[2];
+    for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
+    const kal_spawn_streams streams{ 0, 0, 0 };
+    const kal_spawn         how{ base, kal::fs::working(), &unit, nullptr, 0, 0 };
+    return kal_process_spawn(&how, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
+                             &streams, &out) == kal_ok;
+}
+
 bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
                          kal_uintptr count, int& status, int& terminated) {
     kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
@@ -351,6 +388,7 @@ bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
 
 bool start_copy(const char*, const char*, int&, int&) { return false; }
 bool start_copy_running(const char*, const char*, kal_process&) { return false; }
+bool start_copy_in_unit(const char*, kal_job&, kal_process&) { return false; }
 bool start_copy_granting(const char*, const kal_preopen*, kal_uintptr, int&, int&) { return false; }
 
 #endif

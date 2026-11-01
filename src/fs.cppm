@@ -43,6 +43,8 @@ export using ::kal_fs_close_file;
 export using ::kal_fs_stream;
 export using ::kal_fs_seek;
 export using ::kal_fs_truncate;
+export using ::kal_fs_read_at;
+export using ::kal_fs_write_at;
 export using ::kal_fs_info;
 export using ::kal_fs_file_info;
 export using ::kal_fs_set_modified;

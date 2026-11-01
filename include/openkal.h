@@ -30,6 +30,9 @@
 #include "openkal/datagram.h"
 #include "openkal/space.h"
 #include "openkal/map.h"
+#include "openkal/region.h"
+#include "openkal/prof.h"
+#include "openkal/debug.h"
 /* Last, because its declarations are the operations of the interfaces above
  * with one argument added, and it includes each of them. */
 #include "openkal/timeout.h"

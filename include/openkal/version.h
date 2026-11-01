@@ -42,7 +42,7 @@
  * for the reason tools/check-readme-versions.sh exists --- the one fact a
  * consumer actually asks for was checked by nobody. */
 #define KAL_VERSION_MAJOR 0u
-#define KAL_VERSION_MINOR 19u
+#define KAL_VERSION_MINOR 20u
 #define KAL_VERSION_PATCH 0u
 
 #define KAL_VERSION_MAKE(major, minor, patch)             \
@@ -79,6 +79,9 @@
 #define KAL_IFACE_SPACE    ((kal_u64)1u << 13)
 #define KAL_IFACE_TIMEOUT  ((kal_u64)1u << 14)
 #define KAL_IFACE_MAP      ((kal_u64)1u << 15)   /* version 0.18 */
+#define KAL_IFACE_REGION   ((kal_u64)1u << 16)   /* version 0.20 */
+#define KAL_IFACE_PROF     ((kal_u64)1u << 17)   /* version 0.20 */
+#define KAL_IFACE_DEBUG    ((kal_u64)1u << 18)   /* version 0.20 */
 
 #ifdef __cplusplus
 extern "C" {

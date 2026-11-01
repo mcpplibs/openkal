@@ -1,4 +1,4 @@
-# The C surface of openkal 0.19.0, one name per line.
+# The C surface of openkal 0.20.0, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -70,6 +70,7 @@ kal_fs_open_dir
 kal_fs_preopen
 kal_fs_preopen_count
 kal_fs_props
+kal_fs_read_at
 kal_fs_remove
 kal_fs_rename
 kal_fs_rename_flags
@@ -80,6 +81,7 @@ kal_fs_set_modified_at
 kal_fs_stream
 kal_fs_truncate
 kal_fs_unlock
+kal_fs_write_at
 # openkal.process
 kal_process_channel
 kal_process_channel_close
@@ -88,7 +90,9 @@ kal_process_end_as_requested
 kal_process_info
 kal_process_job_close
 kal_process_job_enter
+kal_process_job_limit
 kal_process_job_terminate
+kal_process_job_usage
 kal_process_open_id
 kal_process_props
 kal_process_self
@@ -156,3 +160,16 @@ kal_timeout_write
 kal_map_file
 kal_map_release
 kal_map_sync
+# openkal.region
+kal_region_commit
+kal_region_decommit
+kal_region_discard
+kal_region_props
+kal_region_release
+kal_region_reserve
+# openkal.prof
+kal_prof_active
+kal_prof_counter
+kal_prof_mark
+# openkal.debug
+kal_debug_symbolize
