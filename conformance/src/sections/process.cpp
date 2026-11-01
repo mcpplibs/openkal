@@ -311,6 +311,8 @@ void run() {
                 if (e == kal_ok && use.memory_bytes >= (kal_u64{24} << 20)) break;
                 kal_time_sleep(5u * 1000u * 1000u);
             }
+            claim("the unit's members", use.members);
+            claim("the unit's memory_bytes", static_cast<kal_uintptr>(use.memory_bytes));
             observe(kind::behaviour, e == kal_ok && use.members >= 1,
                     "a unit's use is reported, and counts the program started in it");
             observe(kind::behaviour, e == kal_ok && use.memory_bytes >= (kal_u64{24} << 20),
@@ -325,6 +327,8 @@ void run() {
             after.self_size = sizeof after;
             if (kal_process_info(child, kal::process::info::memory, &after) == kal_ok
                 && (after.present & kal::process::info::memory) != 0) {
+                claim("the ended program's memory_bytes", static_cast<kal_uintptr>(after.memory_bytes));
+                claim("the ended program's memory_peak_bytes", static_cast<kal_uintptr>(after.memory_peak_bytes));
                 observe(kind::behaviour, after.memory_bytes == 0 && after.memory_peak_bytes >= (kal_u64{24} << 20),
                         "an ended program is charged nothing now, and its peak remains until its handle is released");
             } else {
@@ -357,6 +361,8 @@ void run() {
             observe(kind::behaviour, e == kal_ok, "a limit is placed on a unit");
             int status = 0, terminated = 0;
             kal_process_wait(child, &status, &terminated);
+            claim("the limited program's status", static_cast<kal_uintptr>(status));
+            claim("the limited program's terminated", static_cast<kal_uintptr>(terminated));
             observe(kind::behaviour, terminated == kal::process::terminated_limit,
                     "a unit that exceeds its limit is ended, and its program reported as limited");
             kal_process_close(child);
