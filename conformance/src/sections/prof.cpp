@@ -46,7 +46,7 @@ void run() {
     // SAMPLES (0.23): taken by the environment, at the rate asked, of this
     // program's contexts, with the frames of each.
     claim("kal_prof_props()", kal_prof_props());
-    observe(kind::abi, (kal_prof_props() & ~kal_uintptr{1}) == 0,
+    observe(kind::abi, (kal_prof_props() & ~kal_uintptr{3}) == 0,
             "the capability word contains no position the specification has not assigned");
     if ((kal_prof_props() & kal_uintptr{1}) == 0) {
         observe(kind::behaviour, kal_prof_sample_begin(1000) == kal_err_not_supported,

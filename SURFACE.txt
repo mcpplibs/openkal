@@ -183,6 +183,9 @@ kal_prof_props
 kal_prof_sample_begin
 kal_prof_sample_end
 kal_prof_sample_take
+kal_prof_touch_begin
+kal_prof_touch_end
+kal_prof_touch_take
 # openkal.debug
 kal_debug_props
 kal_debug_symbolize

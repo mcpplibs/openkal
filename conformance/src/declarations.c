@@ -132,6 +132,9 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_prof_sample_begin);
     (void)sizeof(&kal_prof_sample_end);
     (void)sizeof(&kal_prof_sample_take);
+    (void)sizeof(&kal_prof_touch_begin);
+    (void)sizeof(&kal_prof_touch_end);
+    (void)sizeof(&kal_prof_touch_take);
     (void)sizeof(&kal_random_fill);
     (void)sizeof(&kal_random_props);
     (void)sizeof(&kal_region_commit);

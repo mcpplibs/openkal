@@ -5,6 +5,7 @@ import openkal.exec;
 import openkal.memory;
 import openkal.macros;
 import openkal.stream;
+import openkal.prof;
 import okc.report;
 import okc.spec;
 
@@ -37,6 +38,57 @@ constexpr unsigned long kReturns42Size = sizeof(kReturns42);
 #endif
 
 using fn = int (*)(void);
+
+fn function_at(void* p) {
+    fn f = nullptr;
+    auto* d = reinterpret_cast<unsigned char*>(&f);
+    const auto* b = reinterpret_cast<const unsigned char*>(&p);
+    for (unsigned long i = 0; i < sizeof f; ++i) d[i] = b[i];
+    return f;
+}
+
+#if defined(MCPP_FEATURE_PROF)
+// TOUCHES (0.23): the order in which the program first executes the pages of a
+// part, recorded by the environment while the program runs as it would.
+void touches() {
+    const kal_uintptr g = kal_exec_granularity();
+    if ((kal_prof_props() & kal_uintptr{2}) == 0) {
+        observe(kind::behaviour, kal_prof_touch_begin(nullptr, g) == kal_err_not_supported,
+                "touches are refused where the implementation does not state them");
+        return;
+    }
+    if (g == 0 || !(kal_exec_props() & kal::exec::available.bits)) {
+        unobserved(kind::behaviour, "the first execution of each page is recorded, in order",
+                   "executable memory is not available");
+        return;
+    }
+    auto* r = static_cast<unsigned char*>(kal_exec_alloc(3 * g));
+    if (r == nullptr) return;
+    for (kal_uintptr page = 0; page < 3; ++page)
+        for (unsigned long i = 0; i < kReturns42Size; ++i) r[page * g + i] = kReturns42[i];
+    observe(kind::behaviour, kal_prof_touch_begin(r, 3 * g) == kal_err_invalid,
+            "a part that is not executable is refused");
+    if (kal_exec_publish(r, 3 * g) != kal_ok) { kal_exec_free(r, 3 * g); return; }
+#if defined(__GNUC__) || defined(__clang__)
+    __builtin___clear_cache(reinterpret_cast<char*>(r), reinterpret_cast<char*>(r) + 3 * g);
+#endif
+    observe(kind::behaviour, kal_prof_touch_begin(r, 0) == kal_err_invalid
+                             && kal_prof_touch_begin(r, g / 2 == 0 ? 1 : g / 2) == kal_err_invalid,
+            "a size of zero, or not of whole pages, is refused");
+    observe(kind::behaviour, kal_prof_touch_begin(r, 3 * g) == kal_ok, "touches are recorded in a part");
+    const int a = function_at(r + 2 * g)(), b = function_at(r)(), c = function_at(r + 2 * g)();
+    observe(kind::behaviour, a == 42 && b == 42 && c == 42, "the program runs as it would");
+    kal_uintptr got[8] = {};
+    const kal_intptr n = kal_prof_touch_take(got, 8);
+    observe(kind::behaviour,
+            n == 2 && got[0] == reinterpret_cast<kal_uintptr>(r + 2 * g) && got[1] == reinterpret_cast<kal_uintptr>(r),
+            "the first execution of each page is recorded once, in order");
+    observe(kind::behaviour, kal_prof_touch_end() == kal_ok && function_at(r + g)() == 42
+                             && kal_prof_touch_take(got, 8) == 0,
+            "recording ends, and the part is as it was");
+    kal_exec_free(r, 3 * g);
+}
+#endif
 
 #if defined(MCPP_FEATURE_FS)
 fn as_function(void* p) {
@@ -372,6 +424,11 @@ void run() {
     claim("KAL_EXEC_PROP_BTI", kal_exec_props() & kal::exec::bti.bits);
     at_an_address();
     zero_and_sealed();
+#if defined(MCPP_FEATURE_PROF)
+    touches();
+#else
+    unobserved(kind::behaviour, "the first execution of each page is recorded", "the prof interface was not selected");
+#endif
 #if defined(MCPP_FEATURE_FS)
     from_a_file();
 #else

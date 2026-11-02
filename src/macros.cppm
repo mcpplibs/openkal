@@ -136,6 +136,7 @@ inline constexpr kal_uintptr KAL_PROCESS_PROP_STOP_REQUESTED_M  = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_PROCESS_PROP_STREAM_PASSING_M  = (kal_uintptr)(KAL_PROCESS_PROP_STREAM_PASSING);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_TERMINATE_M       = (kal_uintptr)(KAL_PROCESS_PROP_TERMINATE);
 inline constexpr kal_uintptr KAL_PROF_PROP_SAMPLES_M            = (kal_uintptr)(KAL_PROF_PROP_SAMPLES);
+inline constexpr kal_uintptr KAL_PROF_PROP_TOUCHES_M            = (kal_uintptr)(KAL_PROF_PROP_TOUCHES);
 inline constexpr kal_uintptr KAL_PROF_SAMPLE_DEPTH_M            = (kal_uintptr)(KAL_PROF_SAMPLE_DEPTH);
 inline constexpr kal_uintptr KAL_RANDOM_PROP_BLOCKING_M         = (kal_uintptr)(KAL_RANDOM_PROP_BLOCKING);
 inline constexpr kal_uintptr KAL_RANDOM_PROP_HARDWARE_M         = (kal_uintptr)(KAL_RANDOM_PROP_HARDWARE);

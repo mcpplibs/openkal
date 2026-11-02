@@ -73,6 +73,7 @@ static_assert(kal::macros::KAL_RESOURCES_PERFORMANCE_M == 1u);
 static_assert(kal::macros::KAL_RESOURCES_ECONOMY_M == 2u);
 static_assert(kal::macros::KAL_DEBUG_PROP_FAULT_REPORT_M == 1u);
 static_assert(kal::macros::KAL_PROF_PROP_SAMPLES_M == 1u);
+static_assert(kal::macros::KAL_PROF_PROP_TOUCHES_M == 2u);
 static_assert(kal::macros::KAL_PROF_SAMPLE_DEPTH_M == 64u);
 
 }  // namespace

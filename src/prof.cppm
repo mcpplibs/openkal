@@ -18,6 +18,9 @@ export using ::kal_prof_sample_begin;
 export using ::kal_prof_sample_take;
 export using ::kal_prof_sample_end;
 export using ::kal_prof_sample;
+export using ::kal_prof_touch_begin;
+export using ::kal_prof_touch_take;
+export using ::kal_prof_touch_end;
 
 // A sample (0.23): the time, the context, the depth and its reserve, then the
 // frames, one machine word each.

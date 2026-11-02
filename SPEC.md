@@ -2042,17 +2042,22 @@ The following are recorded so that they are not mistaken for oversights.
     `struct kal_program_info`. Where a fault is dear, the faults of a phase and
     not its processor time are what a phase of starting a program spends; one
     environment counts only the sum, which is stated.
-56. **A fault reported, and samples taken, by the environment.** **Specified
-    in 0.23**, as `kal_debug_props` and `KAL_DEBUG_PROP_FAULT_REPORT`, and
-    `kal_prof_props`, `KAL_PROF_PROP_SAMPLES`, `struct kal_prof_sample` and the
-    three sampling operations; an implementation provides `openkal.debug` and
-    `openkal.prof` to a program built for its environment from this version.
-    Interrupting a running context and reading where it stands needs a timer
-    delivered to it or another context that may suspend it, which only the
-    environment has; the environment's own profilers do not name an image's
-    addresses on two of the three systems; and the party that ends a program
-    for a fault is the one that can still say where. Frames are those of the
-    chain of frame pointers, which the platform's build keeps.
+56. **A fault reported, and samples and touches taken, by the environment.**
+    **Specified in 0.23**, as `kal_debug_props` and
+    `KAL_DEBUG_PROP_FAULT_REPORT`, and `kal_prof_props`, `KAL_PROF_PROP_SAMPLES`,
+    `struct kal_prof_sample` and the three sampling operations, and
+    `KAL_PROF_PROP_TOUCHES` and the three operations that record the order in
+    which a program first executes the pages of a part of a region; an
+    implementation provides `openkal.debug` and `openkal.prof` to a program
+    built for its environment from this version. Interrupting a running
+    context and reading where it stands needs a timer delivered to it or
+    another context that may suspend it, and the first execution of a page is
+    a fault the environment takes: only the environment has either. The
+    environment's own profilers do not name an image's addresses on two of
+    the three systems, and the party that ends a program for a fault is the one
+    that can still say where. Frames are those of the chain of frame pointers,
+    which the platform's build keeps. A loader above this interface measures
+    touches through it, and does not install handlers of its own.
 57. **A preference about cost, and what is available.** **Specified in
     0.23**, as `KAL_SPAWN_RESOURCES_BALANCED`, `_PERFORMANCE` and `_ECONOMY`
     in `openkal.process`, `kal_env_resources` in `openkal.env`, and

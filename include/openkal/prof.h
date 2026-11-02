@@ -79,7 +79,7 @@ void kal_prof_mark(const char* name, kal_uintptr len, int begin);
  *
  * kal_prof_sample_begin reports kal_err_not_supported where KAL_PROF_PROP_SAMPLES
  * is not set, kal_err_invalid for a rate of zero or above 10 000, and
- * kal_err_again while sampling already. Clause 11 entry 55. */
+ * kal_err_again while sampling already. Clause 11 entry 56. */
 #define KAL_PROF_SAMPLE_DEPTH 64u
 struct kal_prof_sample {
     kal_u64     time_ns;     /* the monotonic clock (openkal.time) */
@@ -95,6 +95,35 @@ kal_uintptr kal_prof_props(void);
 int        kal_prof_sample_begin(kal_u32 per_second);
 kal_intptr kal_prof_sample_take(struct kal_prof_sample* out, kal_uintptr count);
 int        kal_prof_sample_end(void);
+
+/* TOUCHES (version 0.23): the order in which the program first executes the
+ * pages of a part of a region (openkal.exec), taken by the environment. After
+ * kal_prof_touch_begin, the implementation records the first execution of
+ * each page of kal_exec_granularity in [`at', `at' + `size') --- a part that is
+ * executable, published or a file's --- once, in the order they come;
+ * kal_prof_touch_take moves up to `count' of the recorded addresses, each the
+ * start of a page, to `out' and returns how many, in that order; and
+ * kal_prof_touch_end stops recording in every part, as the parts were. A part
+ * is added by each kal_prof_touch_begin, to as many as the implementation
+ * holds (kal_err_no_memory beyond). The program runs as it would: a touch is
+ * recorded and the instruction carried out.
+ *
+ * WHY THE ENVIRONMENT TAKES THEM. Which page a program reaches first is known
+ * where the page is first reached --- the environment's fault on a page not
+ * yet made executable, or on one guarded for the purpose --- and a loader
+ * above this interface has neither. The order lays out an image's code so
+ * that what a start executes is together, and states the pages a loader reads
+ * in at once (KAL_EXEC_MAP_PREFETCH; clause 12.4, type 4).
+ *
+ * kal_prof_touch_begin reports kal_err_not_supported where KAL_PROF_PROP_TOUCHES
+ * is not set, and kal_err_invalid for a size of zero, for `at' or `size' not a
+ * multiple of kal_exec_granularity, or for a part not executable. Clause 11
+ * entry 56. */
+#define KAL_PROF_PROP_TOUCHES ((kal_uintptr)1u << 1)
+
+int        kal_prof_touch_begin(const void* at, kal_uintptr size);
+kal_intptr kal_prof_touch_take(kal_uintptr* out, kal_uintptr count);
+int        kal_prof_touch_end(void);
 
 #ifdef __cplusplus
 }
