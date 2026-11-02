@@ -94,6 +94,9 @@ struct kal_preopen {
  * limit by watching what it uses: the unit may exceed it by what it allocates
  * between two observations before it is ended. Version 0.20. */
 #define KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED ((kal_uintptr)1u << 12)
+/* KAL_SPAWN_NULL_IN, KAL_SPAWN_NULL_OUT and KAL_SPAWN_NULL_ERR are answered
+ * here. Version 0.22. */
+#define KAL_PROCESS_PROP_NULL_STREAMS   ((kal_uintptr)1u << 13)
 
 /* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -243,6 +246,23 @@ struct kal_spawn {
  * after it by single spaces, as they are. An environment that gives a program a
  * vector answers kal_err_not_supported: the request means nothing there. */
 #define KAL_SPAWN_ONE_STRING ((kal_uintptr)1u << 1)
+
+/* THE ENVIRONMENT'S NULL DEVICE AT A POSITION. Version 0.22, clause 7.15.
+ *
+ * A position of `kal_spawn_streams' is inherited (zero) or receives a stream the
+ * caller placed. These give it a third answer: at that position the started
+ * program reads the end of input, and what it writes there is accepted and
+ * discarded. Every environment that starts programs has such a device and names
+ * it in its own spelling --- `/dev/null' on Linux and macOS, `NUL' on Windows ---
+ * and a program cannot reach it through this interface by a name, because the
+ * interface names nothing outside the directories it supplies. A C library maps
+ * its own spelling of the device onto these.
+ *
+ * A flag beside a non-zero stream at the same position is kal_err_invalid: the
+ * two answers exclude each other. */
+#define KAL_SPAWN_NULL_IN  ((kal_uintptr)1u << 2)
+#define KAL_SPAWN_NULL_OUT ((kal_uintptr)1u << 3)
+#define KAL_SPAWN_NULL_ERR ((kal_uintptr)1u << 4)
 
 /* A set of started programs that end together --- see `kal_spawn.job'. One
  * machine word, as every handle here is. */

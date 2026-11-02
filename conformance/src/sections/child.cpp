@@ -41,6 +41,7 @@ const char* argument_for(errand e) {
         case errand::map_beyond_shortened: return "--child-map-beyond-shortened";
         case errand::hold_memory:        return "--child-hold-memory";
         case errand::grow_memory:        return "--child-grow-memory";
+        case errand::read_and_write_null: return "--child-read-and-write-null";
         case errand::none:               break;
     }
     return "";
@@ -64,6 +65,7 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::map_beyond_shortened))) return errand::map_beyond_shortened;
         if (same(a, len, argument_for(errand::hold_memory)))  return errand::hold_memory;
         if (same(a, len, argument_for(errand::grow_memory)))  return errand::grow_memory;
+        if (same(a, len, argument_for(errand::read_and_write_null))) return errand::read_and_write_null;
     }
 #endif
     return errand::none;
@@ -224,6 +226,20 @@ after g_after;
             }
 #endif
             kal_exit(45);
+        case errand::read_and_write_null:
+            // The three positions hold the null device. 61: a read did not
+            // report the end of input. 62, 63: a write to standard output or
+            // standard error was not accepted in full. 60: all three held.
+#ifdef MCPP_FEATURE_CORE
+            {
+                char buf[16];
+                if (kal_stream_read(kal_stdin(), buf, sizeof buf) != 0) kal_exit(61);
+                if (kal_stream_write(kal_stdout(), "discarded\n", 10) != 10) kal_exit(62);
+                if (kal_stream_write(kal_stderr(), "discarded\n", 10) != 10) kal_exit(63);
+                kal_exit(60);
+            }
+#endif
+            kal_exit(64);
         case errand::hold_memory:
         case errand::grow_memory:
             // Memory written through, so that every environment charges it ---
@@ -387,12 +403,31 @@ bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
     return e == kal_ok;
 }
 
+bool start_copy_with(const char* errand_argument, kal_uintptr flags,
+                     const kal_spawn_streams& streams, int& spawned,
+                     int& status, int& terminated) {
+    kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
+    if (!locate_self(base, rel, rel_len)) return false;
+    const char* argv[2] = { "openkal-conformance-child", errand_argument };
+    kal_uintptr lens[2];
+    for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
+    const kal_spawn how{ base, kal::fs::working(), nullptr, nullptr, 0, flags };
+    kal_process child{};
+    spawned = kal_process_spawn(&how, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
+                                &streams, &child);
+    if (spawned != kal_ok) return true;
+    const int e = kal_process_wait(child, &status, &terminated);
+    kal_process_close(child);
+    return e == kal_ok;
+}
+
 #else
 
 bool start_copy(const char*, const char*, int&, int&) { return false; }
 bool start_copy_running(const char*, const char*, kal_process&) { return false; }
 bool start_copy_in_unit(const char*, kal_job&, kal_process&) { return false; }
 bool start_copy_granting(const char*, const kal_preopen*, kal_uintptr, int&, int&) { return false; }
+bool start_copy_with(const char*, kal_uintptr, const kal_spawn_streams&, int&, int&, int&) { return false; }
 
 #endif
 

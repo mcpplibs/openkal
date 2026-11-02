@@ -398,7 +398,8 @@ void run() {
                                     | kal::process::one_string
                                     | kal::process::job_usage
                                     | kal::process::job_limit_hard
-                                    | kal::process::job_limit_supervised).bits;
+                                    | kal::process::job_limit_supervised
+                                    | kal::process::null_streams).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),
@@ -473,6 +474,48 @@ void run() {
             unobserved(kind::behaviour,
                        "a joined command line where programs receive vectors is refused",
                        "the implementation claims prop_one_string");
+        }
+
+        // THE NULL DEVICE AT A POSITION (0.22, clause 7.15). A copy given it at
+        // all three positions reads the end of input and has every write
+        // accepted; a flag beside a stream at its position is invalid; an
+        // implementation that does not claim the flags refuses them.
+        {
+            const kal_uintptr all = (kal::process::null_in_flag | kal::process::null_out_flag
+                                     | kal::process::null_err_flag).bits;
+            if (kal::process::has(kal::process::null_streams)) {
+                const kal_spawn_streams inherit{ {0}, {0}, {0} };
+                int spawned = -1, status = -1, terminated = -1;
+                const bool ran = start_copy_with(argument_for(errand::read_and_write_null), all,
+                                                 inherit, spawned, status, terminated);
+                observe(kind::behaviour, ran && spawned == kal_ok && terminated == 0 && status == 60,
+                        "a position given the null device reads the end of input and accepts every write");
+                kal_stream mine{}, theirs{};
+                if (kal::process::has(kal::process::channel)
+                    && kal_process_channel(&mine, &theirs) == kal_ok) {
+                    const kal_spawn_streams placed{ {0}, theirs, {0} };
+                    spawned = -1;
+                    start_copy_with(argument_for(errand::exit_with_33),
+                                    kal::process::null_out_flag.bits, placed, spawned, status, terminated);
+                    kal_process_channel_close(theirs);
+                    kal_process_channel_close(mine);
+                    observe(kind::behaviour, spawned == kal_err_invalid,
+                            "the null device beside a stream at one position is invalid");
+                } else {
+                    unobserved(kind::behaviour, "the null device beside a stream at one position is invalid",
+                               "the implementation provides no channel");
+                }
+            } else {
+                kal_process p{};
+                const char* argv[1] = { "x" };
+                const kal_uintptr lens[1] = { 1 };
+                const kal_spawn how{ kal::fs::working(), kal::fs::working(), nullptr,
+                                     nullptr, 0, all };
+                const int e = kal_process_spawn(&how, "x", 1, argv, lens, 1,
+                                                nullptr, nullptr, 0, nullptr, &p);
+                observe(kind::behaviour, e == kal_err_not_supported,
+                        "the null device this implementation cannot give is refused, not ignored");
+            }
         }
 
         // THE UNIT IS ASKED FOR BY A POINTER AND NOT BY A FLAG, so an

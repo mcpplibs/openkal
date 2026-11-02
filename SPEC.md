@@ -1,4 +1,4 @@
-# openkal Specification, version 0.21
+# openkal Specification, version 0.22
 
 ## 1. Scope
 
@@ -92,7 +92,7 @@ provides an interface in whole or not at all.
 
 Version 0.15 specifies the core and optional interfaces, version 0.18 adds
 `openkal.map` (clause 11, entry 40), and version 0.20 adds `openkal.region`,
-`openkal.prof` and `openkal.debug` (entries 44 and 45); version 0.21 adds no interface. The reserved row is not specified, and its
+`openkal.prof` and `openkal.debug` (entries 44 and 45); versions 0.21 and 0.22 add no interface. The reserved row is not specified, and its
 name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1030,6 +1030,26 @@ A volume that cannot remove a held name at once is answered before the call
 (clause 6.2): the position is not claimed, and a caller that needs the
 directory gone closes what it holds first.
 
+### 7.15 The null device at a position
+
+A position of `kal_spawn_streams` is inherited, or receives a stream the caller
+placed. `KAL_SPAWN_NULL_IN`, `KAL_SPAWN_NULL_OUT` and `KAL_SPAWN_NULL_ERR` give
+it the environment's null device: at that position the started program reads
+the end of input, and every write is accepted in full and discarded. An
+implementation claims the three with `KAL_PROCESS_PROP_NULL_STREAMS`; one that
+does not reports `kal_err_not_supported` and starts nothing. A flag beside a
+non-zero stream at the same position is `kal_err_invalid`.
+
+The device is a resource of every environment that starts programs, and each
+names it in its own spelling: `/dev/null` on Linux and macOS, `NUL` on Windows.
+This specification names nothing outside the directories it supplies, so the
+device is reached by the position it is given at and not by a name; a C library
+maps its own spelling of the device onto the flags. A library cannot compose the
+device from what precedes it: a placed stream is a channel or a file, and a
+channel's far end either ends the started program's writes with an error once
+its reader is released, or keeps a reader in the caller for as long as the
+program runs.
+
 ## 8. Evolution
 
 Each interface is versioned independently. A revision may add declarations and
@@ -1882,6 +1902,22 @@ The following are recorded so that they are not mistaken for oversights.
     its handle is held (`kal_program_info`), as its peak memory does since 0.20:
     every environment keeps it in the record of the ended program, and a C
     library's `wait4` reports the two together.
+47. **The null device at a position.** **Specified in 0.22**, clause 7.15, as
+    `KAL_SPAWN_NULL_IN`, `KAL_SPAWN_NULL_OUT`, `KAL_SPAWN_NULL_ERR` and
+    `KAL_PROCESS_PROP_NULL_STREAMS` in `openkal.process` (`process.h`). A
+    language server run as an image started each worker that builds a module
+    with its standard input and output sent to `/dev/null`, as LLVM's
+    `ExecuteNoWait` sends an empty redirection; on the one environment whose
+    preopens are volumes and not a root, the C library found no such name, and
+    every start failed with `ENOENT`. The device is the environment's and not
+    the library's: a started program needs a handle of the environment at the
+    position, which a library could otherwise supply only as a channel drained
+    by the caller for as long as the program runs. It is a flag of the start
+    and not a stream a program opens, because a stream would need a release of
+    its own beside `kal_process_channel_close`, and a program that reads or
+    writes the device itself is served by its C library without the
+    environment. It is a position and not required, because an environment
+    that starts no programs has nothing to give it to.
 
 ## 12. Images
 

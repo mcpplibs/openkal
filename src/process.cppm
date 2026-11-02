@@ -82,6 +82,7 @@ inline constexpr props one_string    {KAL_PROCESS_PROP_ONE_STRING};   // 0.17.1
 inline constexpr props job_usage     {KAL_PROCESS_PROP_JOB_USAGE};    // 0.20
 inline constexpr props job_limit_hard{KAL_PROCESS_PROP_JOB_LIMIT_HARD};             // 0.20
 inline constexpr props job_limit_supervised{KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED}; // 0.20
+inline constexpr props null_streams  {KAL_PROCESS_PROP_NULL_STREAMS};  // 0.22
 
 // The fields of kal_program_info, for `wanted' and `present' (0.17).
 namespace info {
@@ -102,6 +103,9 @@ using spawn_flags = kal::props<spawn_flag_tag>;
 
 inline constexpr spawn_flags bound_lifetime_flag{KAL_SPAWN_BOUND_LIFETIME};
 inline constexpr spawn_flags one_string_flag{KAL_SPAWN_ONE_STRING};   // 0.17.1
+inline constexpr spawn_flags null_in_flag {KAL_SPAWN_NULL_IN};    // 0.22
+inline constexpr spawn_flags null_out_flag{KAL_SPAWN_NULL_OUT};   // 0.22
+inline constexpr spawn_flags null_err_flag{KAL_SPAWN_NULL_ERR};   // 0.22
 
 using how = kal_spawn;
 using job_handle = kal_job;
