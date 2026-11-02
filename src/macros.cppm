@@ -44,6 +44,7 @@ inline constexpr kal_uintptr KAL_DIR_UNCHANGING_M               = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_EXEC_MAP_BTI_M                 = (kal_uintptr)(KAL_EXEC_MAP_BTI);
 inline constexpr kal_uintptr KAL_EXEC_MAP_EXECUTE_M             = (kal_uintptr)(KAL_EXEC_MAP_EXECUTE);
 inline constexpr kal_uintptr KAL_EXEC_MAP_PREFETCH_M            = (kal_uintptr)(KAL_EXEC_MAP_PREFETCH);
+inline constexpr kal_uintptr KAL_EXEC_MAP_WRITE_M               = (kal_uintptr)(KAL_EXEC_MAP_WRITE);
 inline constexpr kal_uintptr KAL_EXEC_PROP_AVAILABLE_M          = (kal_uintptr)(KAL_EXEC_PROP_AVAILABLE);
 inline constexpr kal_uintptr KAL_EXEC_PROP_BTI_M                = (kal_uintptr)(KAL_EXEC_PROP_BTI);
 inline constexpr kal_uintptr KAL_EXEC_PROP_FILE_M               = (kal_uintptr)(KAL_EXEC_PROP_FILE);

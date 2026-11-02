@@ -71,6 +71,7 @@ inline constexpr map_how read   {0};
 inline constexpr map_how execute{KAL_EXEC_MAP_EXECUTE};
 inline constexpr map_how prefetch{KAL_EXEC_MAP_PREFETCH};   // 0.23
 inline constexpr map_how bti_marked{KAL_EXEC_MAP_BTI};     // 0.23
+inline constexpr map_how write{KAL_EXEC_MAP_WRITE};         // 0.23: private, written, never executed
 
 // What kal_exec_seal_part asks beyond read-only (0.23).
 struct seal_tag;

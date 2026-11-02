@@ -51,6 +51,7 @@ static_assert(kal::macros::KAL_EXEC_PROP_SEAL_FOREVER_M == 16u);
 static_assert(kal::macros::KAL_EXEC_PROP_BTI_M == 32u);
 static_assert(kal::macros::KAL_EXEC_MAP_PREFETCH_M == 2u);
 static_assert(kal::macros::KAL_EXEC_MAP_BTI_M == 4u);
+static_assert(kal::macros::KAL_EXEC_MAP_WRITE_M == 8u);
 static_assert(kal::macros::KAL_EXEC_SEAL_FOREVER_M == 1u);
 static_assert(kal::macros::KAL_FS_PROP_ATTENUATE_M == 4096u);
 static_assert(kal::macros::KAL_FS_PROP_READ_ONLY_M == 8192u);

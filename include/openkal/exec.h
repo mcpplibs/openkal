@@ -142,8 +142,9 @@ kal_uintptr kal_exec_granularity(void);
  * that copies them into the region writes and makes resident the whole of
  * them each time a program starts, where a program of the environment maps
  * them and pays for the pages it touches. A part that is a file's is never
- * writable, so no part of a region is both writable and executable here
- * either.
+ * both writable and executable: it is written only where `how' holds
+ * KAL_EXEC_MAP_WRITE, which excludes KAL_EXEC_MAP_EXECUTE, so no part of a
+ * region is both here either.
  *
  * `offset' and `size' are measured from the start of the region and are
  * multiples of kal_exec_granularity; `at' is a multiple of KAL_MAP_ALIGNMENT
@@ -155,8 +156,8 @@ kal_uintptr kal_exec_granularity(void);
  * as for kal_map_file. In each of these the region is unchanged.
  *
  * What the part held before is gone. A part may be made a file's once, and is
- * neither published nor written afterwards; the rest of the region is as it
- * was. The part outlives the file's handle and is released with the region by
+ * neither published nor written afterwards, unless it was made the file's to be
+ * written (KAL_EXEC_MAP_WRITE); the rest of the region is as it was. The part outlives the file's handle and is released with the region by
  * kal_exec_free. Whether a change to the file appears in the part is not
  * specified, as for a private region of openkal.map. An architecture with a
  * separate instruction cache needs nothing of the caller here: the bytes reach
@@ -174,6 +175,20 @@ int kal_exec_map_part(void* region, kal_uintptr offset, kal_uintptr size,
  * type 4). A request about time and not about meaning: an implementation that
  * cannot gather them maps the part as without it. */
 #define KAL_EXEC_MAP_PREFETCH ((kal_uintptr)1u << 1)
+
+/* The part's bytes are the file's until the program writes them, and a page the
+ * program writes is its own copy (0.23): a private part, as a private region of
+ * openkal.map is, read and written and never executed; the file is not
+ * changed. With KAL_EXEC_MAP_EXECUTE, kal_err_invalid. The part may be sealed
+ * afterwards (kal_exec_seal_part) as any written part may.
+ *
+ * A loader needs it for the data of an image at its base (clause 12.4, type 3):
+ * the stored bytes are what the image's writable segments hold before the
+ * program runs, and a loader that copies them makes the whole of them resident
+ * and the program's own in every program that starts, where a program of the
+ * environment maps its data and pays for the pages it writes. Data an image
+ * never writes stays the file's pages, shared by every program that maps it. */
+#define KAL_EXEC_MAP_WRITE ((kal_uintptr)1u << 3)
 
 /* The part's instructions are executed with branch-target enforcement (0.23):
  * an indirect branch that lands where the code did not mark a target faults.

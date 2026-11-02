@@ -1999,15 +1999,20 @@ The following are recorded so that they are not mistaken for oversights.
     can write one word overwrites, where a program of the environment has them
     made read-only by its loader. Sealing for ever is a position, because the
     environment decides whether a protection can be made permanent.
-52. **A part read in at once, and branch targets enforced.** **Specified in
-    0.23**, as `KAL_EXEC_MAP_PREFETCH`, `KAL_EXEC_MAP_BTI` and
-    `KAL_EXEC_PROP_BTI`. The first gathers the page faults a program takes on
-    its first touch of each page of a part into one request: where a fault is
-    dear --- a virtual machine, measured at 24 microseconds each --- the pages
-    an image states it touches when it starts (clause 12.4, type 4) are read in
-    with the part. The second maps instructions built with branch-target
-    marks so that an indirect branch landing elsewhere faults, where the
-    environment enforces it.
+52. **A part read in at once, a part written privately, and branch targets
+    enforced.** **Specified in 0.23**, as `KAL_EXEC_MAP_PREFETCH`,
+    `KAL_EXEC_MAP_WRITE`, `KAL_EXEC_MAP_BTI` and `KAL_EXEC_PROP_BTI`. The first
+    gathers the page faults a program takes on its first touch of each page of
+    a part into one request: where a fault is dear --- a virtual machine,
+    measured at 24 microseconds each --- the pages an image states it touches
+    when it starts (clause 12.4, type 4) are read in with the part. The second
+    makes a part the file's bytes until the program writes them, each page it
+    writes its own copy and none executed: an image's data at its base (type 3)
+    is then the file's pages, shared by every program and resident where it is
+    touched, as the data of a program of the environment is, where a copy made
+    the whole of it every program's own. The third maps instructions built with
+    branch-target marks so that an indirect branch landing elsewhere faults,
+    where the environment enforces it.
 53. **A handle with less, and a program held to its grants.** **Specified in
     0.23**, as `kal_fs_dir_attenuate`, `struct kal_dir_rights`,
     `KAL_DIR_*` and `KAL_FS_PROP_ATTENUATE`, `_READ_ONLY`, `_UNCHANGING` in

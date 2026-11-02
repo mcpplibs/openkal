@@ -251,6 +251,27 @@ void from_a_file() {
                 "part of a region is made a file's bytes, to be read, and read in now");
         observe(kind::behaviour, kal_exec_map_part(r, kAlign, kAlign, f, kAlign, kal::exec::execute.bits) == kal_ok,
                 "part of a region is made a file's bytes, to be executed");
+        // WRITTEN PRIVATELY (0.23): the file's bytes until the program writes
+        // them, its own copy then, and the file unchanged.
+        if (void* w = kal_exec_alloc(2 * kAlign)) {
+            auto* d = static_cast<unsigned char*>(w);
+            observe(kind::behaviour,
+                    kal_exec_map_part(w, 0, kAlign, f, 0, (kal::exec::write | kal::exec::execute).bits) == kal_err_invalid,
+                    "a part both written and executed is refused");
+            const bool mapped = kal_exec_map_part(w, 0, kAlign, f, 0, kal::exec::write.bits) == kal_ok;
+            observe(kind::behaviour, mapped && d[5] == pattern(5), "part of a region is made a file's bytes, to be written");
+            if (mapped) {
+                const auto mine = static_cast<unsigned char>(pattern(5) + 1);
+                d[5] = mine;
+                unsigned char back = 0;
+                const bool read = kal_fs_read_at(f, &back, 1, 5) == 1;
+                observe(kind::behaviour, d[5] == mine && read && back == pattern(5),
+                        "what the program writes there is its own, and the file is unchanged");
+                observe(kind::behaviour, kal_exec_seal_part(w, 0, kAlign, 0) == kal_ok && d[5] == mine,
+                        "and the part is sealed as it was written");
+            }
+            kal_exec_free(w, 2 * kAlign);
+        }
         // The handle may go: the parts outlive it.
         kal_fs_close_file(f);
         f = kal_file{};
