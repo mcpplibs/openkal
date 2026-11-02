@@ -30,6 +30,8 @@ enum class errand {
     hold_memory,         // holds 32 MiB written through, then waits to be ended (0.20)
     grow_memory,         // grows by 8 MiB at a time to 512 MiB, then waits; ends
                          // itself with 77 after twenty seconds (0.20)
+    read_and_write_null, // reads the end of input and writes in full at its three
+                         // positions, given the null device there (0.22)
 };
 
 // The names the starter grants and the copy expects, in order, and the marker
@@ -78,5 +80,11 @@ bool start_copy_in_unit(const char* errand_argument, kal_job& unit, kal_process&
 // The same, granting the copy the given directories.
 bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
                          kal_uintptr count, int& status, int& terminated);
+
+// The same, with the given flags and streams; `spawned' is what the start
+// answered, and the copy is awaited only when it started (0.22).
+bool start_copy_with(const char* errand_argument, kal_uintptr flags,
+                     const kal_spawn_streams& streams, int& spawned,
+                     int& status, int& terminated);
 
 }  // namespace okc

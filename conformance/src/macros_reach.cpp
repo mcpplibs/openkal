@@ -41,5 +41,9 @@ static_assert(kal::macros::KAL_PROCESS_PROP_STOP_REQUESTED_M == 128u);
 static_assert(kal::macros::KAL_SPAWN_BOUND_LIFETIME_M == 1u);
 static_assert(kal::macros::KAL_SPAWN_ONE_STRING_M == 2u);
 static_assert(kal::macros::KAL_PROCESS_PROP_ONE_STRING_M == 512u);
+static_assert(kal::macros::KAL_SPAWN_NULL_IN_M == 4u);
+static_assert(kal::macros::KAL_SPAWN_NULL_OUT_M == 8u);
+static_assert(kal::macros::KAL_SPAWN_NULL_ERR_M == 16u);
+static_assert(kal::macros::KAL_PROCESS_PROP_NULL_STREAMS_M == 8192u);
 
 }  // namespace
