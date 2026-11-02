@@ -1,4 +1,4 @@
-# openkal Specification, version 0.22
+# openkal Specification, version 0.23
 
 ## 1. Scope
 
@@ -92,7 +92,7 @@ provides an interface in whole or not at all.
 
 Version 0.15 specifies the core and optional interfaces, version 0.18 adds
 `openkal.map` (clause 11, entry 40), and version 0.20 adds `openkal.region`,
-`openkal.prof` and `openkal.debug` (entries 44 and 45); versions 0.21 and 0.22 add no interface. The reserved row is not specified, and its
+`openkal.prof` and `openkal.debug` (entries 44 and 45); versions 0.21 to 0.23 add no interface. The reserved row is not specified, and its
 name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1000,6 +1000,15 @@ own concern; a grant confines a program that uses only its preopens, and the
 confinement of one that does not is the environment's responsibility (clause 11,
 entry 6).
 
+A granted directory may be an attenuated handle (`kal_fs_dir_attenuate`,
+version 0.23): the started program receives it with its rights and statements,
+and reads them in `kal_fs_props` of its preopen. A caller that sets
+`KAL_SPAWN_CONFINE` asks the environment to hold the started program to its
+grants and their rights even where it reaches files without this interface; an
+implementation that claims `KAL_PROCESS_PROP_CONFINE` does so before the program
+runs its first instruction, and one that does not refuses the flag and starts
+nothing (clause 11, entry 53).
+
 The requirement was descriptive in version 0.13, in clause 11, entry 18, and two
 implementations departed from it without any observation reporting the
 departure. One conveyed every inheritable handle of the caller; another conveyed
@@ -1051,6 +1060,33 @@ device from what precedes it: a placed stream is a file's or a channel's end; a
 file keeps what is written, and a channel's far end either ends the started
 program's writes with an error once its reader is released, or keeps a reader in
 the caller for as long as the program runs.
+
+### 7.16 A handle with less
+
+`kal_fs_dir_attenuate` derives from a directory handle one that reaches the same
+directory with less: read-only (`KAL_DIR_READ_ONLY`), with the holder's
+statement that nothing beneath changes (`KAL_DIR_UNCHANGING`), or recording the
+names reached beneath it (`KAL_DIR_RECORDED`). A derived handle has the rights
+of the one it came from less those withdrawn, and the statements of both;
+nothing restores a right. A directory opened beneath it has its rights and
+statements, and so does a program it is granted to. The rights are held by the
+implementation on every operation through the handle; an implementation that
+answers from what it read before, under `KAL_DIR_UNCHANGING`, is answering a
+question the holder declared settled. The record is the holder's file, appended
+in whole entries by every program holding a handle on it, and ended by `e` for
+each program that ended normally (`fs.h`). Clause 11, entry 53.
+
+### 7.17 A preference about cost
+
+A program's resource preference --- balanced, performance (memory and storage
+spent for time) or economy (time spent for memory and storage) --- is stated by
+the program's caller (`KAL_SPAWN_RESOURCES_*`), inherited where nothing is
+stated, and read with `kal_env_resources`. No operation of this specification
+answers otherwise for it: each layer of the program, and the implementation,
+chooses within itself where it trades one resource for another, and the
+environment applies its own policy for memory where it has one. A balanced
+program sizes what it keeps by what `kal_memory_info` reports available.
+Clause 11, entry 57.
 
 ## 8. Evolution
 
@@ -1920,6 +1956,124 @@ The following are recorded so that they are not mistaken for oversights.
     writes the device itself is served by its C library without the
     environment. It is a position and not required, because an environment
     that starts no programs has nothing to give it to.
+48. **An image placed at its base.** **Specified in 0.23**, as
+    `kal_exec_alloc_at` and `KAL_EXEC_PROP_PLACE` in `openkal.exec`
+    (`exec.h`), with the placement note (clause 12.4, version 1.1) and its use
+    by a loader (clause 12.3). An image is position-independent (12.2), so a
+    loader wrote, on every start, each address its relative relocations
+    compute: measured for a language server's image, 164 000 relocations over
+    two mebibytes of read-only-after-relocation data, made resident in each of
+    the 176 programs a build of its modules starts --- about 900 page faults a
+    program more than the same server built for its environment at one
+    address, which on a virtual machine of a continuous-integration service
+    cost a fifth of the build's processor time. An image computed once for one
+    base and placed there is the file's pages, as such a program is. The
+    reservation at an address is an operation and not a hint to
+    `kal_exec_alloc`, because a loader that is refused must know it before it
+    writes anything; it is a position, because an environment may decide where
+    every program's memory lies; and the address is the image's, chosen when it
+    is sealed, not the environment's.
+49. **A name with every link followed.** **Specified in 0.23**, as
+    `kal_fs_resolved_name` and `KAL_FS_PROP_RESOLVED_NAME` in `openkal.fs`
+    (`fs.h`). A C library's `realpath` asked about each component of a name in
+    turn whether it is a link: measured in a language server's session run as
+    an image, half a million enquiries, where the program of its environment
+    asked the environment once for each file it opened (`/proc/self/fd` on one
+    system, `F_GETPATH` on another). Every environment that keeps links answers
+    the question for a name it has resolved, and nothing above it can compose
+    the enquiries into one. The name is absolute and in the environment's
+    spelling, as `kal_env_image` states one: a C library maps it onto its own
+    names as it maps that one. It is a position of the volume, as the other
+    operations of names are.
+50. **A region is zero when it is returned.** **Stated in 0.23** of
+    `kal_exec_alloc` and `kal_exec_alloc_at` (`exec.h`); every implementation
+    gave fresh pages before. A loader that wrote the part of a segment beyond
+    its file's bytes made every page of it resident before the program touched
+    one; measured for a language server's worker, 780 KiB of zeros written on
+    every start.
+51. **A part sealed read-only.** **Specified in 0.23**, as
+    `kal_exec_seal_part`, `KAL_EXEC_SEAL_FOREVER` and
+    `KAL_EXEC_PROP_SEAL_FOREVER` in `openkal.exec`. A loader relocated an
+    image's read-only-after-relocation data and left it writable: its global
+    offset table and its tables of virtual functions, the words an attacker who
+    can write one word overwrites, where a program of the environment has them
+    made read-only by its loader. Sealing for ever is a position, because the
+    environment decides whether a protection can be made permanent.
+52. **A part read in at once, a part written privately, and branch targets
+    enforced.** **Specified in 0.23**, as `KAL_EXEC_MAP_PREFETCH`,
+    `KAL_EXEC_MAP_WRITE`, `KAL_EXEC_MAP_BTI` and `KAL_EXEC_PROP_BTI`. The first
+    gathers the page faults a program takes on its first touch of each page of
+    a part into one request: where a fault is dear --- a virtual machine,
+    measured at 24 microseconds each --- the pages an image states it touches
+    when it starts (clause 12.4, type 4) are read in with the part. The second
+    makes a part the file's bytes until the program writes them, each page it
+    writes its own copy and none executed: an image's data at its base (type 3)
+    is then the file's pages, shared by every program and resident where it is
+    touched, as the data of a program of the environment is, where a copy made
+    the whole of it every program's own. The third maps instructions built with
+    branch-target marks so that an indirect branch landing elsewhere faults,
+    where the environment enforces it.
+53. **A handle with less, and a program held to its grants.** **Specified in
+    0.23**, as `kal_fs_dir_attenuate`, `struct kal_dir_rights`,
+    `KAL_DIR_*` and `KAL_FS_PROP_ATTENUATE`, `_READ_ONLY`, `_UNCHANGING` in
+    `openkal.fs`, and `KAL_SPAWN_CONFINE` and `KAL_PROCESS_PROP_CONFINE` in
+    `openkal.process` (clauses 7.13 and 7.16). Three needs met by one
+    operation upon a capability. A language server's engine probed, in each of
+    its workers and for each compile command, the compilers installed on the
+    machine: three hundred thousand failed enquiries in a session, which a
+    program granted only the directories its build names answers in its own
+    C library without asking, and which a tree its holder states does not
+    change lets an implementation answer from what it listed. A tool that
+    decides when a cached result is stale needs every name a program reached,
+    including those it found absent, which the program's own report of its
+    inputs omits: a header added earlier on a search path changes the result
+    and appears in no list of what was read. And a program that parses what it
+    was given --- a source file of a repository it did not choose --- is held,
+    if subverted, to what its caller granted. The record and the statement are
+    attributes of the handle, not of a runner: the environment answers them,
+    whatever runs the program. Confinement is the caller's request and not a
+    consequence of granting, because a program built for its environment
+    needs directories it was not granted.
+54. **A listing with attributes.** **Specified in 0.23**, as
+    `kal_fs_list_next_info` and `KAL_FS_PROP_LIST_INFO`. A program that lists
+    a directory and asks of each entry what it is crossed this interface twice
+    for each entry; two environments return a batch of entries with all of
+    their attributes in one request, and a kernel that implements this
+    interface crosses its boundary once for both. The same version states what
+    the end of a listing reports --- `kal_ok`, the iterator zero and the name
+    empty --- which one implementation had reported as `kal_err_not_found`.
+55. **Page faults counted.** **Specified in 0.23**, as `faults_minor`,
+    `faults_major`, `KAL_PINFO_FAULTS` and `KAL_PINFO_MAJOR` appended to
+    `struct kal_program_info`. Where a fault is dear, the faults of a phase and
+    not its processor time are what a phase of starting a program spends; one
+    environment counts only the sum, which is stated.
+56. **A fault reported, and samples and touches taken, by the environment.**
+    **Specified in 0.23**, as `kal_debug_props` and
+    `KAL_DEBUG_PROP_FAULT_REPORT`, and `kal_prof_props`, `KAL_PROF_PROP_SAMPLES`,
+    `struct kal_prof_sample` and the three sampling operations, and
+    `KAL_PROF_PROP_TOUCHES` and the three operations that record the order in
+    which a program first executes the pages of a part of a region; an
+    implementation provides `openkal.debug` and `openkal.prof` to a program
+    built for its environment from this version. Interrupting a running
+    context and reading where it stands needs a timer delivered to it or
+    another context that may suspend it, and the first execution of a page is
+    a fault the environment takes: only the environment has either. The
+    environment's own profilers do not name an image's addresses on two of
+    the three systems, and the party that ends a program for a fault is the one
+    that can still say where. Frames are those of the chain of frame pointers,
+    which the platform's build keeps. A loader above this interface measures
+    touches through it, and does not install handlers of its own.
+57. **A preference about cost, and what is available.** **Specified in
+    0.23**, as `KAL_SPAWN_RESOURCES_BALANCED`, `_PERFORMANCE` and `_ECONOMY`
+    in `openkal.process`, `kal_env_resources` in `openkal.env`, and
+    `kal_memory_info` and `struct kal_memory_status` in `openkal.memory`
+    (clause 7.17). Each layer of a program holds caches and reserves whose
+    size trades memory or storage for time --- a loader's prepared images, a
+    C library's free memory kept for reuse, an implementation's answers ---
+    and each had chosen one point for every program. The party that knows what
+    a program is for states it once; a balanced program adapts to what is
+    available. It is a preference and not a limit, and no operation answers
+    differently for it, as `kal_task_set_priority` changes no result.
 
 ## 12. Images
 
@@ -2000,6 +2154,19 @@ zero, where the image's bytes are not a file's at a multiple of
 `KAL_MAP_ALIGNMENT` (an image a program carries in its own bytes), and where a
 relocation writes the segment.
 
+Where the implementation sets `KAL_EXEC_PROP_PLACE` (version 0.23) and the image
+carries a placement note (12.4), a loader asks for the image's span at the
+note's base (`kal_exec_alloc_at`). Given it, the loader takes each stored
+segment's bytes instead of the file's and applies only the relocations that
+name a symbol: a part of a stored segment that is read-only after relocation
+(the image's `PT_GNU_RELRO`) and that no such relocation writes is the file's
+bytes (`kal_exec_map_part`) where `KAL_EXEC_PROP_FILE` is set, and the rest is
+copied. Refused, or where the position is zero, the loader reserves the span
+anywhere and relocates the file's segments as before. The program observes the
+same memory either way; what differs is that a program placed at its base writes
+no address its relative relocations compute, as a program of its environment
+linked for one address does not.
+
 Where an environment's own convention differs from the image's --- on x86-64,
 one environment passes arguments in other registers --- the loader presents each
 entry in the image's convention, and a function the image passes to the
@@ -2011,7 +2178,10 @@ environment's convention, as every program of that environment is, and a
 convention of images is a fact about images.
 
 A loader may provide `openkal.prof` and `openkal.debug` to the images it binds,
-beside the implementation's interfaces (version 0.20, clause 11 entry 45). Both
+beside the implementation's interfaces (version 0.20, clause 11 entry 45); from
+version 0.23 an implementation also provides them to a program built for its
+environment, and a loader forwards an image's samples to its own
+implementation (clause 11, entry 56). Both
 are about the program as the loader placed it --- its calls, its counters, its
 symbol table --- and the loader is the party that holds those, so this is not a
 second implementation in the process (clause 10.1): neither interface has a
@@ -2022,16 +2192,30 @@ across this interface by binding the image's import to a counting entry instead
 of the implementation's; one that does not binds the implementation's entry, so
 a program that is not measured pays nothing.
 
+A loader does not write the part of a segment beyond its file's bytes: the
+region is zero (clause 11, entry 50), and a page of it the program never touches
+is never made resident. Once it has applied an image's relocations, it seals the
+image's `PT_GNU_RELRO` (`kal_exec_seal_part`), for ever for an image it will not
+unload (entry 51). Where an image states the pages it touches when it starts
+(12.4, type 4), it maps those parts with `KAL_EXEC_MAP_PREFETCH`; where an
+image's program property note states that every object carries branch-target
+marks, it maps the instructions with `KAL_EXEC_MAP_BTI` (entry 52).
+
 ### 12.4 The note
 
 An image carries notes whose owner is `OPENKAL`, in a section `.note.openkal`:
 
 | type | descriptor |
 | --- | --- |
-| 1, requirements | `kal_u32` major and `kal_u32` minor version of this clause (1 and 0), then a `kal_u64` of `KAL_IFACE_*` positions: **the interfaces the image requires**, derived from the names it imports other than weakly |
+| 1, requirements | `kal_u32` major and `kal_u32` minor version of this clause (1 and 1; 1 and 0 before version 0.23 added the placement note), then a `kal_u64` of `KAL_IFACE_*` positions: **the interfaces the image requires**, derived from the names it imports other than weakly |
 | 2, signature | 32 bytes of an Ed25519 public key, then 64 bytes of the signature, over the whole file with these 96 bytes read as zero |
+| 3, placement | a `kal_u64` base, a multiple of 65536; a `kal_u32` count and a `kal_u32` zero; then, for each of `count` writable loadable segments that have bytes in the file, in ascending order of address, three `kal_u64`: the segment's address in the image, the file offset of its stored bytes, congruent to that address modulo 65536, and their length, the segment's size in the file. The stored bytes are the segment's file bytes with each relative relocation, and each of the packed relative form, applied for `base`; a relocation that names a symbol is not applied. Version 1.1 of this clause |
+| 4, touch | a `kal_u32` count and a `kal_u32` zero; then, for each of `count` ranges, two `kal_u32`: the first 65536-byte block of the range in the file and the number of blocks, in the order the image first touches them when it starts. Version 1.1 of this clause |
+| 5, prepared | reserved for a loader's own prepared copy of an image --- its segments computed for another base, its state after its initialisers --- which a loader writes for itself and does not distribute; an image as distributed carries no note of this type, and a loader refuses one that does |
 
-The first is required and the second is not. A loader compares the required interfaces with `kal_interfaces` and
+The first is required and the others are not. A count of zero states no
+placement, and a loader reads a placement note only after the requirements note
+states version 1.1 or higher. A loader compares the required interfaces with `kal_interfaces` and
 refuses to load an image that requires one the implementation does not provide,
 naming the interface. That is clause 6.1 in this arrangement: the loader binds
 at load what a linker binds at link, so it reports at load what a linker reports

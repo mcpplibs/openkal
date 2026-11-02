@@ -103,6 +103,24 @@ kal_intptr kal_env_loader(char* out, kal_uintptr cap);
  * kal_err_not_found, negated. */
 kal_intptr kal_env_system(char* out, kal_uintptr cap);
 
+/* The resource preference this program was started with (version 0.23):
+ * KAL_RESOURCES_BALANCED, the default; KAL_RESOURCES_PERFORMANCE, memory and
+ * storage spent for time; KAL_RESOURCES_ECONOMY, time spent for memory and
+ * storage. A program's caller states it (KAL_SPAWN_RESOURCES_*, process.h); a
+ * program started otherwise has the one its environment conveys, and balanced
+ * where none is. The answer does not change while the program runs.
+ *
+ * WHAT IT IS FOR. Every layer of a program holds caches and reserves whose
+ * size trades one resource for another --- a loader's prepared images, a C
+ * library's free memory, an implementation's answers --- and each chose one
+ * point for every program. A preference stated once, by the party that knows
+ * what the program is for, lets each choose the point that program wants; a
+ * balanced program adapts each to what kal_memory_info says is available. */
+#define KAL_RESOURCES_BALANCED    0
+#define KAL_RESOURCES_PERFORMANCE 1
+#define KAL_RESOURCES_ECONOMY     2
+int kal_env_resources(void);
+
 #ifdef __cplusplus
 }
 #endif

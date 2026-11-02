@@ -57,7 +57,9 @@ static_assert(__builtin_offsetof(kal_program_info, cpu_ns) == 24, "clause 5.3");
 static_assert(__builtin_offsetof(kal_program_info, ended) == 32, "clause 5.3");
 static_assert(__builtin_offsetof(kal_program_info, memory_bytes) == 40, "clause 5.3");
 static_assert(__builtin_offsetof(kal_program_info, memory_peak_bytes) == 48, "clause 5.3");
-static_assert(sizeof(kal_program_info) == 56, "clause 5.3");
+static_assert(__builtin_offsetof(kal_program_info, faults_minor) == 56, "clause 5.3");   // 0.23
+static_assert(__builtin_offsetof(kal_program_info, faults_major) == 64, "clause 5.3");   // 0.23
+static_assert(sizeof(kal_program_info) == 72, "clause 5.3");
 static_assert(__builtin_offsetof(kal_job_usage, memory_bytes) == 8, "clause 5.3");
 static_assert(sizeof(kal_job_usage) == 16, "clause 5.3");
 
@@ -83,6 +85,7 @@ inline constexpr props job_usage     {KAL_PROCESS_PROP_JOB_USAGE};    // 0.20
 inline constexpr props job_limit_hard{KAL_PROCESS_PROP_JOB_LIMIT_HARD};             // 0.20
 inline constexpr props job_limit_supervised{KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED}; // 0.20
 inline constexpr props null_streams  {KAL_PROCESS_PROP_NULL_STREAMS};  // 0.22
+inline constexpr props confine       {KAL_PROCESS_PROP_CONFINE};       // 0.23
 
 // The fields of kal_program_info, for `wanted' and `present' (0.17).
 namespace info {
@@ -91,6 +94,8 @@ inline constexpr kal_u32 started = KAL_PINFO_STARTED;
 inline constexpr kal_u32 cpu     = KAL_PINFO_CPU;
 inline constexpr kal_u32 ended   = KAL_PINFO_ENDED;
 inline constexpr kal_u32 memory  = KAL_PINFO_MEMORY;   // 0.20
+inline constexpr kal_u32 faults  = KAL_PINFO_FAULTS;   // 0.23
+inline constexpr kal_u32 major   = KAL_PINFO_MAJOR;    // 0.23
 inline constexpr kal_u32 all     = KAL_PINFO_ALL;
 }
 
@@ -106,6 +111,10 @@ inline constexpr spawn_flags one_string_flag{KAL_SPAWN_ONE_STRING};   // 0.17.1
 inline constexpr spawn_flags null_in_flag {KAL_SPAWN_NULL_IN};    // 0.22
 inline constexpr spawn_flags null_out_flag{KAL_SPAWN_NULL_OUT};   // 0.22
 inline constexpr spawn_flags null_err_flag{KAL_SPAWN_NULL_ERR};   // 0.22
+inline constexpr spawn_flags confine_flag {KAL_SPAWN_CONFINE};    // 0.23
+inline constexpr spawn_flags balanced_flag   {KAL_SPAWN_RESOURCES_BALANCED};     // 0.23
+inline constexpr spawn_flags performance_flag{KAL_SPAWN_RESOURCES_PERFORMANCE};  // 0.23
+inline constexpr spawn_flags economy_flag    {KAL_SPAWN_RESOURCES_ECONOMY};      // 0.23
 
 using how = kal_spawn;
 using job_handle = kal_job;

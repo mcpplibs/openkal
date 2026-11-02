@@ -2,8 +2,10 @@ module okc.exec;
 
 import openkal.types;
 import openkal.exec;
+import openkal.memory;
 import openkal.macros;
 import openkal.stream;
+import openkal.prof;
 import okc.report;
 import okc.spec;
 
@@ -37,6 +39,57 @@ constexpr unsigned long kReturns42Size = sizeof(kReturns42);
 
 using fn = int (*)(void);
 
+fn function_at(void* p) {
+    fn f = nullptr;
+    auto* d = reinterpret_cast<unsigned char*>(&f);
+    const auto* b = reinterpret_cast<const unsigned char*>(&p);
+    for (unsigned long i = 0; i < sizeof f; ++i) d[i] = b[i];
+    return f;
+}
+
+#if defined(MCPP_FEATURE_PROF)
+// TOUCHES (0.23): the order in which the program first executes the pages of a
+// part, recorded by the environment while the program runs as it would.
+void touches() {
+    const kal_uintptr g = kal_exec_granularity();
+    if ((kal_prof_props() & kal_uintptr{2}) == 0) {
+        observe(kind::behaviour, kal_prof_touch_begin(nullptr, g) == kal_err_not_supported,
+                "touches are refused where the implementation does not state them");
+        return;
+    }
+    if (g == 0 || !(kal_exec_props() & kal::exec::available.bits)) {
+        unobserved(kind::behaviour, "the first execution of each page is recorded, in order",
+                   "executable memory is not available");
+        return;
+    }
+    auto* r = static_cast<unsigned char*>(kal_exec_alloc(3 * g));
+    if (r == nullptr) return;
+    for (kal_uintptr page = 0; page < 3; ++page)
+        for (unsigned long i = 0; i < kReturns42Size; ++i) r[page * g + i] = kReturns42[i];
+    observe(kind::behaviour, kal_prof_touch_begin(r, 3 * g) == kal_err_invalid,
+            "a part that is not executable is refused");
+    if (kal_exec_publish(r, 3 * g) != kal_ok) { kal_exec_free(r, 3 * g); return; }
+#if defined(__GNUC__) || defined(__clang__)
+    __builtin___clear_cache(reinterpret_cast<char*>(r), reinterpret_cast<char*>(r) + 3 * g);
+#endif
+    observe(kind::behaviour, kal_prof_touch_begin(r, 0) == kal_err_invalid
+                             && kal_prof_touch_begin(r, g / 2 == 0 ? 1 : g / 2) == kal_err_invalid,
+            "a size of zero, or not of whole pages, is refused");
+    observe(kind::behaviour, kal_prof_touch_begin(r, 3 * g) == kal_ok, "touches are recorded in a part");
+    const int a = function_at(r + 2 * g)(), b = function_at(r)(), c = function_at(r + 2 * g)();
+    observe(kind::behaviour, a == 42 && b == 42 && c == 42, "the program runs as it would");
+    kal_uintptr got[8] = {};
+    const kal_intptr n = kal_prof_touch_take(got, 8);
+    observe(kind::behaviour,
+            n == 2 && got[0] == reinterpret_cast<kal_uintptr>(r + 2 * g) && got[1] == reinterpret_cast<kal_uintptr>(r),
+            "the first execution of each page is recorded once, in order");
+    observe(kind::behaviour, kal_prof_touch_end() == kal_ok && function_at(r + g)() == 42
+                             && kal_prof_touch_take(got, 8) == 0,
+            "recording ends, and the part is as it was");
+    kal_exec_free(r, 3 * g);
+}
+#endif
+
 #if defined(MCPP_FEATURE_FS)
 fn as_function(void* p) {
     fn f = nullptr;
@@ -68,6 +121,83 @@ bool make_file() {
     }
     kal_fs_close_file(f);
     return ok;
+}
+
+// A region at the address asked for (0.23): an address just released is given
+// again, and one a region holds is refused with nothing reserved; where the
+// position is zero, every request is refused. An address that is not a multiple
+// of the reservation quantum is refused either way.
+void at_an_address() {
+    const kal_uintptr q = kal_memory_granularity();
+    const kal_uintptr size = 4 * q;
+    void* r = kal_exec_alloc(size);
+    if (r == nullptr) {
+        unobserved(kind::behaviour, "a region is reserved at the address asked for",
+                   "no region could be reserved to find a free address");
+        return;
+    }
+    auto* bytes = static_cast<unsigned char*>(r);
+    observe(kind::behaviour, kal_exec_alloc_at(bytes + 1, size) == nullptr,
+            "an address that is not a multiple of the reservation quantum is refused");
+    if (!kal::exec::has(kal::exec::place)) {
+        kal_exec_free(r, size);
+        observe(kind::behaviour, kal_exec_alloc_at(r, size) == nullptr,
+                "a region at an address is refused where the implementation does not claim it");
+        return;
+    }
+    observe(kind::behaviour, kal_exec_alloc_at(r, size) == nullptr,
+            "an address a region holds is refused");
+    bytes[0] = 5;
+    observe(kind::behaviour, bytes[0] == 5, "and the region there is as it was");
+    kal_exec_free(r, size);
+    void* again = kal_exec_alloc_at(r, size);
+    observe(kind::behaviour, again == r, "a region is reserved at an address just released");
+    if (again == r) {
+        auto* b = static_cast<unsigned char*>(again);
+        b[size - 1] = 6;
+        observe(kind::behaviour, b[size - 1] == 6, "and is written as a region kal_exec_alloc returned");
+        kal_exec_free(again, size);
+    }
+}
+
+// A REGION IS ZERO WHEN IT IS RETURNED, AND A PART OF IT IS SEALED READ-ONLY
+// (0.23): what it held stays readable; sealed for ever, it is not published or
+// sealed again.
+void zero_and_sealed() {
+    const kal_uintptr g = kal_exec_granularity();
+    const kal_uintptr size = 4 * g;
+    void* r = kal_exec_alloc(size);
+    if (r == nullptr || g == 0) {
+        unobserved(kind::behaviour, "a region is zero when it is returned", "no region could be reserved");
+        return;
+    }
+    auto* c = static_cast<unsigned char*>(r);
+    bool zero = true;
+    for (kal_uintptr at = 0; at < size; at += 509) if (c[at] != 0) zero = false;
+    observe(kind::behaviour, zero, "a region is zero when it is returned");
+    observe(kind::behaviour, kal_exec_seal_part(r, 1, g, 0) == kal_err_invalid,
+            "a part to seal that is not at a multiple of the granularity is refused");
+    observe(kind::behaviour, kal_exec_seal_part(r, g, g, kal_uintptr{1} << 9) == kal_err_invalid,
+            "a position of the sealing flags this version does not assign is refused");
+    c[g] = 11;
+    c[g + g - 1] = 12;
+    observe(kind::behaviour, kal_exec_seal_part(r, g, g, 0) == kal_ok && c[g] == 11 && c[g + g - 1] == 12,
+            "a part is sealed read-only, and holds what it held");
+    c[2 * g] = 13;
+    const int forever = kal_exec_seal_part(r, 2 * g, g, kal::exec::forever.bits);
+    observe(kind::behaviour, forever == kal_ok && c[2 * g] == 13, "a part is sealed for the life of the program");
+    if (kal::exec::has(kal::exec::seal_forever)) {
+        observe(kind::behaviour, kal_exec_publish_part(r, 2 * g, g) == kal_err_permission
+                                 && kal_exec_seal_part(r, 2 * g, g, 0) == kal_err_permission,
+                "a part sealed for ever is neither published nor sealed again");
+        // The region keeps a part sealed for ever, and is not released.
+    } else {
+        unobserved(kind::behaviour, "a part sealed for ever is neither published nor sealed again",
+                   "the implementation does not state KAL_EXEC_PROP_SEAL_FOREVER");
+        c[3 * g] = 14;
+        observe(kind::behaviour, c[3 * g] == 14, "the rest of the region is still writable");
+        kal_exec_free(r, size);
+    }
 }
 
 void from_a_file() {
@@ -115,10 +245,33 @@ void from_a_file() {
         observe(kind::behaviour, kal_exec_map_part(r, 0, kAlign, f, 0, kal_uintptr{1} << 9) == kal_err_invalid,
                 "a position of `how' this version does not assign is refused");
 
-        observe(kind::behaviour, kal_exec_map_part(r, 0, kAlign, f, 0, kal::exec::read.bits) == kal_ok,
-                "part of a region is made a file's bytes, to be read");
+        observe(kind::behaviour,
+                kal_exec_map_part(r, 0, kAlign, f, 0, (kal::exec::read | kal::exec::prefetch | kal::exec::bti_marked).bits)
+                    == kal_ok,
+                "part of a region is made a file's bytes, to be read, and read in now");
         observe(kind::behaviour, kal_exec_map_part(r, kAlign, kAlign, f, kAlign, kal::exec::execute.bits) == kal_ok,
                 "part of a region is made a file's bytes, to be executed");
+        // WRITTEN PRIVATELY (0.23): the file's bytes until the program writes
+        // them, its own copy then, and the file unchanged.
+        if (void* w = kal_exec_alloc(2 * kAlign)) {
+            auto* d = static_cast<unsigned char*>(w);
+            observe(kind::behaviour,
+                    kal_exec_map_part(w, 0, kAlign, f, 0, (kal::exec::write | kal::exec::execute).bits) == kal_err_invalid,
+                    "a part both written and executed is refused");
+            const bool mapped = kal_exec_map_part(w, 0, kAlign, f, 0, kal::exec::write.bits) == kal_ok;
+            observe(kind::behaviour, mapped && d[5] == pattern(5), "part of a region is made a file's bytes, to be written");
+            if (mapped) {
+                const auto mine = static_cast<unsigned char>(pattern(5) + 1);
+                d[5] = mine;
+                unsigned char back = 0;
+                const bool read = kal_fs_read_at(f, &back, 1, 5) == 1;
+                observe(kind::behaviour, d[5] == mine && read && back == pattern(5),
+                        "what the program writes there is its own, and the file is unchanged");
+                observe(kind::behaviour, kal_exec_seal_part(w, 0, kAlign, 0) == kal_ok && d[5] == mine,
+                        "and the part is sealed as it was written");
+            }
+            kal_exec_free(w, 2 * kAlign);
+        }
         // The handle may go: the parts outlive it.
         kal_fs_close_file(f);
         f = kal_file{};
@@ -154,7 +307,8 @@ void run() {
 
     claim("kal_exec_props()", kal_exec_props());
     observe(kind::abi,
-            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available | kal::exec::file).bits) == 0,
+            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available | kal::exec::file | kal::exec::place
+                                  | kal::exec::seal_forever | kal::exec::bti).bits) == 0,
             "no position the specification has not assigned is reported");
 
     // WHETHER THE INTERFACE CAN BE EXERCISED BY THIS ARTIFACT IS READ BEFORE
@@ -286,6 +440,16 @@ void run() {
     }
 
     claim("KAL_EXEC_PROP_FILE", kal_exec_props() & kal::exec::file.bits);
+    claim("KAL_EXEC_PROP_PLACE", kal_exec_props() & kal::exec::place.bits);
+    claim("KAL_EXEC_PROP_SEAL_FOREVER", kal_exec_props() & kal::exec::seal_forever.bits);
+    claim("KAL_EXEC_PROP_BTI", kal_exec_props() & kal::exec::bti.bits);
+    at_an_address();
+    zero_and_sealed();
+#if defined(MCPP_FEATURE_PROF)
+    touches();
+#else
+    unobserved(kind::behaviour, "the first execution of each page is recorded", "the prof interface was not selected");
+#endif
 #if defined(MCPP_FEATURE_FS)
     from_a_file();
 #else

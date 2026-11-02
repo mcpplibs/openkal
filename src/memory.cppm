@@ -19,6 +19,8 @@ export import openkal.types;
 export using ::kal_alloc;
 export using ::kal_free;
 export using ::kal_memory_granularity;
+export using ::kal_memory_info;
+export using ::kal_memory_status;
 
 export namespace kal {
 
@@ -31,5 +33,23 @@ inline void  free (void* p, kal_uintptr size, kal_uintptr align) { kal_free(p, s
 // reports 1. It is an operation and not a constant because it is a property of
 // the machine the program runs on rather than of the machine it was built for.
 inline kal_uintptr granularity() { return kal_memory_granularity(); }
+
+static_assert(sizeof(kal_memory_status) == 24, "clause 5.3");
+static_assert(__builtin_offsetof(kal_memory_status, available_bytes) == 16, "clause 5.3");
+
+// The fields of kal_memory_status, for `present' (0.23).
+namespace mstatus {
+inline constexpr kal_u32 total     = KAL_MSTATUS_TOTAL;
+inline constexpr kal_u32 available = KAL_MSTATUS_AVAILABLE;
+}
+
+// What the environment can give this program now (0.23); `present' says which
+// of the two it filled.
+inline kal_memory_status memory_status() {
+    kal_memory_status s{};
+    s.self_size = sizeof s;
+    kal_memory_info(&s);
+    return s;
+}
 
 }

@@ -63,6 +63,10 @@ export using ::kal_fs_props;
 export using ::kal_fs_max_name;
 export using ::kal_fs_link_create;
 export using ::kal_fs_link_read;
+export using ::kal_fs_resolved_name;
+export using ::kal_fs_list_next_info;
+export using ::kal_fs_dir_attenuate;
+export using ::kal_dir_rights;
 
 static_assert(sizeof(kal_dir)  == sizeof(kal_uintptr), "clause 7.2");
 static_assert(sizeof(kal_file) == sizeof(kal_uintptr), "clause 7.2");
@@ -98,6 +102,11 @@ static_assert(__builtin_offsetof(kal_node_info, writable)    == 44);
 static_assert(__builtin_offsetof(kal_node_info, executable)  == 48);
 static_assert(__builtin_offsetof(kal_node_info, reserved)    == 52);
 static_assert(sizeof(kal_node_info) == 56);
+// The rights of an attenuation (0.23): two words of size and reserve, the
+// flags, and the record's handle --- one machine word each after the first.
+static_assert(__builtin_offsetof(kal_dir_rights, flags) == 8, "clause 5.3");
+static_assert(__builtin_offsetof(kal_dir_rights, record) == 8 + sizeof(kal_uintptr), "clause 5.3");
+static_assert(sizeof(kal_dir_rights) == 8 + 2 * sizeof(kal_uintptr), "clause 5.3");
 
 export namespace kal::fs {
 
@@ -125,6 +134,20 @@ inline constexpr props local_endpoint{KAL_FS_PROP_LOCAL_ENDPOINT};
 // A name is removed at once although a file of that name is open (clause
 // 7.14). Version 0.17.
 inline constexpr props remove_open{KAL_FS_PROP_REMOVE_OPEN};
+// kal_fs_resolved_name is answered on this volume. Version 0.23.
+inline constexpr props resolved_name{KAL_FS_PROP_RESOLVED_NAME};
+// Attenuation, and what a handle carries; a listing with attributes (0.23).
+inline constexpr props attenuate{KAL_FS_PROP_ATTENUATE};
+inline constexpr props read_only{KAL_FS_PROP_READ_ONLY};
+inline constexpr props unchanging{KAL_FS_PROP_UNCHANGING};
+inline constexpr props list_info{KAL_FS_PROP_LIST_INFO};
+
+// What kal_fs_dir_attenuate takes away or states (0.23).
+struct dir_right_tag;
+using dir_rights = kal::props<dir_right_tag>;
+inline constexpr dir_rights dir_read_only{KAL_DIR_READ_ONLY};
+inline constexpr dir_rights dir_unchanging{KAL_DIR_UNCHANGING};
+inline constexpr dir_rights dir_recorded{KAL_DIR_RECORDED};
 
 struct rename_flag_tag;
 using rename_flags = kal::props<rename_flag_tag>;

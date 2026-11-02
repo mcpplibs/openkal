@@ -46,6 +46,33 @@ void  kal_free(void* p, kal_uintptr size, kal_uintptr align);
  * machine that no operation here could act upon. */
 kal_uintptr kal_memory_granularity(void);
 
+/* What the environment can give this program now (version 0.23).
+ *
+ * `total_bytes' is the most this program may use: the machine's memory, or a
+ * smaller limit set on the program or on a unit it belongs to. `available_bytes'
+ * is what can be given to it without taking memory another program uses ---
+ * free memory, and memory held only to be given back when asked. Both are
+ * estimates the environment makes at the call. The caller sets `self_size'
+ * (clause 5.3); the implementation states in `present' which it filled, and
+ * writes no more of the structure than `self_size' states. Returns kal_ok, or
+ * kal_err_invalid for a `self_size' smaller than the two words before
+ * `total_bytes'.
+ *
+ * A layer that holds memory or storage it could give back --- a cache, a free
+ * list kept for reuse --- sizes it by these, so that a program under a balanced
+ * preference (kal_env_resources) is fast where memory is plentiful and gives
+ * way where it is not. */
+struct kal_memory_status {
+    kal_u32 self_size;
+    kal_u32 present;
+    kal_u64 total_bytes;
+    kal_u64 available_bytes;
+};
+#define KAL_MSTATUS_TOTAL     ((kal_u32)1u << 0)
+#define KAL_MSTATUS_AVAILABLE ((kal_u32)1u << 1)
+
+int kal_memory_info(struct kal_memory_status* out);
+
 #ifdef __cplusplus
 }
 #endif

@@ -42,6 +42,9 @@ const char* argument_for(errand e) {
         case errand::hold_memory:        return "--child-hold-memory";
         case errand::grow_memory:        return "--child-grow-memory";
         case errand::read_and_write_null: return "--child-read-and-write-null";
+        case errand::report_resources:   return "--child-report-resources";
+        case errand::fault:              return "--child-fault";
+        case errand::write_in_first_grant: return "--child-write-in-first-grant";
         case errand::none:               break;
     }
     return "";
@@ -66,6 +69,9 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::hold_memory)))  return errand::hold_memory;
         if (same(a, len, argument_for(errand::grow_memory)))  return errand::grow_memory;
         if (same(a, len, argument_for(errand::read_and_write_null))) return errand::read_and_write_null;
+        if (same(a, len, argument_for(errand::report_resources))) return errand::report_resources;
+        if (same(a, len, argument_for(errand::fault)))            return errand::fault;
+        if (same(a, len, argument_for(errand::write_in_first_grant))) return errand::write_in_first_grant;
     }
 #endif
     return errand::none;
@@ -240,6 +246,33 @@ after g_after;
             }
 #endif
             kal_exit(64);
+        case errand::report_resources:
+#ifdef MCPP_FEATURE_ENV
+            kal_exit(40 + kal_env_resources());
+#endif
+            kal_exit(49);
+        case errand::fault: {
+            // Through a pointer the compiler cannot see is null, so that the
+            // write is made and not reasoned away.
+            int* volatile nowhere = nullptr;
+            *nowhere = 1;
+            kal_exit(50);
+        }
+        case errand::write_in_first_grant:
+#ifdef MCPP_FEATURE_FS
+            {
+                kal_dir d{}; kal_uintptr l = 0;
+                if (kal_fs_preopen(0, &d, nullptr, 0, &l) != kal_ok) kal_exit(72);
+                kal_file f{};
+                static const char name[] = "okc-conformance-confined.tmp";
+                const int e2 = kal::fs::open_file(d, name, sizeof name - 1,
+                                                  kal::fs::open::write | kal::fs::open::create, &f);
+                if (e2 == kal_err_permission) kal_exit(70);
+                if (e2 == kal_ok) { kal_fs_close_file(f); kal_fs_remove(d, name, sizeof name - 1); kal_exit(71); }
+                kal_exit(72);
+            }
+#endif
+            kal_exit(72);
         case errand::hold_memory:
         case errand::grow_memory:
             // Memory written through, so that every environment charges it ---
@@ -403,6 +436,24 @@ bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
     return e == kal_ok;
 }
 
+bool start_copy_granting_with(const char* errand_argument, const kal_preopen* grants,
+                              kal_uintptr count, kal_uintptr flags, const kal_spawn_streams& streams,
+                              int& spawned, int& status, int& terminated) {
+    kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
+    if (!locate_self(base, rel, rel_len)) return false;
+    const char* argv[2] = { "openkal-conformance-child", errand_argument };
+    kal_uintptr lens[2];
+    for (int i = 0; i < 2; ++i) { kal_uintptr n = 0; while (argv[i][n]) ++n; lens[i] = n; }
+    const kal_spawn how{ base, base, nullptr, grants, count, flags };
+    kal_process child{};
+    spawned = kal_process_spawn(&how, rel, rel_len, argv, lens, 2, nullptr, nullptr, 0,
+                                &streams, &child);
+    if (spawned != kal_ok) return true;
+    const int e = kal_process_wait(child, &status, &terminated);
+    kal_process_close(child);
+    return e == kal_ok;
+}
+
 bool start_copy_with(const char* errand_argument, kal_uintptr flags,
                      const kal_spawn_streams& streams, int& spawned,
                      int& status, int& terminated) {
@@ -428,6 +479,8 @@ bool start_copy_running(const char*, const char*, kal_process&) { return false; 
 bool start_copy_in_unit(const char*, kal_job&, kal_process&) { return false; }
 bool start_copy_granting(const char*, const kal_preopen*, kal_uintptr, int&, int&) { return false; }
 bool start_copy_with(const char*, kal_uintptr, const kal_spawn_streams&, int&, int&, int&) { return false; }
+bool start_copy_granting_with(const char*, const kal_preopen*, kal_uintptr, kal_uintptr,
+                              const kal_spawn_streams&, int&, int&, int&) { return false; }
 
 #endif
 

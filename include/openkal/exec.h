@@ -37,8 +37,37 @@ extern "C" {
  * Alignment is the environment's page granularity or coarser; a caller that
  * needs a particular alignment obtains it within the region. There is no
  * alignment parameter because the granularity that matters here is the one the
- * environment protects at, and a caller cannot usefully ask for less. */
+ * environment protects at, and a caller cannot usefully ask for less.
+ *
+ * THE REGION'S BYTES ARE ZERO WHEN IT IS RETURNED (stated in 0.23; every
+ * implementation gave fresh pages before). A loader relies on it for the part
+ * of a segment beyond its file's bytes: writing zeros there made every page of
+ * it resident before the program touched one, where a program of the
+ * environment pays for the pages it uses. */
 void* kal_exec_alloc(kal_uintptr size);
+
+/* Reserves the region at `at', as kal_exec_alloc reserves one, where nothing
+ * is reserved there and the environment lets a program place memory there.
+ * Returns `at', or a null pointer with nothing reserved. Version 0.23, where
+ * KAL_EXEC_PROP_PLACE is set; otherwise a null pointer.
+ *
+ * A loader needs it. An image's writable segments hold the addresses its
+ * relative relocations compute from where the image is placed, and a loader
+ * that places it anywhere writes every such address on every start --- measured
+ * for a language server's image, 164 000 of them over two mebibytes, made
+ * resident in each of the 176 programs a build of its modules starts, where a
+ * program of the environment linked for one address writes none. An image may
+ * carry its writable segments computed for one address (clause 12.4); a loader
+ * that is given that address maps or copies them and writes only what names an
+ * import.
+ *
+ * `at' is a multiple of kal_memory_granularity, and `size' is not zero;
+ * otherwise a null pointer. The region is released by kal_exec_free, and is in
+ * every other respect one kal_exec_alloc returned. The address is a request: an
+ * environment that has placed something there, or does not let a program choose
+ * where its memory lies, answers with a null pointer, and the caller reserves
+ * one with kal_exec_alloc instead. */
+void* kal_exec_alloc_at(void* at, kal_uintptr size);
 
 /* Makes a region obtained from kal_exec_alloc executable and no longer
  * writable. Returns kal_ok, or an error if the environment refuses.
@@ -65,6 +94,34 @@ int kal_exec_publish(void* p, kal_uintptr size);
  * overlap may be published in any order. */
 int kal_exec_publish_part(void* region, kal_uintptr offset, kal_uintptr size);
 
+/* Makes PART of a region obtained from kal_exec_alloc read-only and not
+ * executable: a loader's read-only-after-relocation data, once relocated.
+ * Version 0.23.
+ *
+ * A loader needs it for the protection a program of the environment has. An
+ * image's addresses of functions and of its own data that relocation writes ---
+ * its global offset table, its tables of virtual functions --- are written
+ * once, when it is loaded, and a program linked for its environment has them
+ * made read-only by its loader then. Left writable, they are what an attacker
+ * who can write one word overwrites to redirect the program.
+ *
+ * `offset' and `size' are as for kal_exec_publish_part. KAL_EXEC_SEAL_FOREVER
+ * in `flags' asks that neither the part's protection nor its mapping change
+ * again for the life of the program; an implementation that claims
+ * KAL_EXEC_PROP_SEAL_FOREVER holds that: kal_exec_publish_part and
+ * kal_exec_seal_part of the part are refused afterwards (kal_err_permission),
+ * and kal_exec_free of the region releases nothing, the region remaining for
+ * the program's life. One that does not claim it makes the part read-only as
+ * asked.
+ * A loader asks it of an image it will not unload. Another position in `flags'
+ * is kal_err_invalid, and nothing changes. A part already made a file's
+ * (kal_exec_map_part) is read-only already, and sealing it changes nothing
+ * else. */
+int kal_exec_seal_part(void* region, kal_uintptr offset, kal_uintptr size, kal_uintptr flags);
+
+/* Positions in the `flags' argument of kal_exec_seal_part. */
+#define KAL_EXEC_SEAL_FOREVER ((kal_uintptr)1u << 0)
+
 /* The quantum in which kal_exec_publish_part publishes: the environment's
  * protection granularity. Version 0.17.
  *
@@ -85,8 +142,9 @@ kal_uintptr kal_exec_granularity(void);
  * that copies them into the region writes and makes resident the whole of
  * them each time a program starts, where a program of the environment maps
  * them and pays for the pages it touches. A part that is a file's is never
- * writable, so no part of a region is both writable and executable here
- * either.
+ * both writable and executable: it is written only where `how' holds
+ * KAL_EXEC_MAP_WRITE, which excludes KAL_EXEC_MAP_EXECUTE, so no part of a
+ * region is both here either.
  *
  * `offset' and `size' are measured from the start of the region and are
  * multiples of kal_exec_granularity; `at' is a multiple of KAL_MAP_ALIGNMENT
@@ -98,8 +156,8 @@ kal_uintptr kal_exec_granularity(void);
  * as for kal_map_file. In each of these the region is unchanged.
  *
  * What the part held before is gone. A part may be made a file's once, and is
- * neither published nor written afterwards; the rest of the region is as it
- * was. The part outlives the file's handle and is released with the region by
+ * neither published nor written afterwards, unless it was made the file's to be
+ * written (KAL_EXEC_MAP_WRITE); the rest of the region is as it was. The part outlives the file's handle and is released with the region by
  * kal_exec_free. Whether a change to the file appears in the part is not
  * specified, as for a private region of openkal.map. An architecture with a
  * separate instruction cache needs nothing of the caller here: the bytes reach
@@ -110,6 +168,35 @@ int kal_exec_map_part(void* region, kal_uintptr offset, kal_uintptr size,
 /* Positions in the `how' argument of kal_exec_map_part. Absent, the part is
  * read and not executed. */
 #define KAL_EXEC_MAP_EXECUTE ((kal_uintptr)1u << 0)
+
+/* The part's bytes are read in now (0.23): the page faults a program would take
+ * on its first touch of each page, gathered into the one request. A loader asks
+ * it for the pages an image states it touches when it starts (clause 12.4,
+ * type 4). A request about time and not about meaning: an implementation that
+ * cannot gather them maps the part as without it. */
+#define KAL_EXEC_MAP_PREFETCH ((kal_uintptr)1u << 1)
+
+/* The part's bytes are the file's until the program writes them, and a page the
+ * program writes is its own copy (0.23): a private part, as a private region of
+ * openkal.map is, read and written and never executed; the file is not
+ * changed. With KAL_EXEC_MAP_EXECUTE, kal_err_invalid. The part may be sealed
+ * afterwards (kal_exec_seal_part) as any written part may.
+ *
+ * A loader needs it for the data of an image at its base (clause 12.4, type 3):
+ * the stored bytes are what the image's writable segments hold before the
+ * program runs, and a loader that copies them makes the whole of them resident
+ * and the program's own in every program that starts, where a program of the
+ * environment maps its data and pays for the pages it writes. Data an image
+ * never writes stays the file's pages, shared by every program that maps it. */
+#define KAL_EXEC_MAP_WRITE ((kal_uintptr)1u << 3)
+
+/* The part's instructions are executed with branch-target enforcement (0.23):
+ * an indirect branch that lands where the code did not mark a target faults.
+ * With KAL_EXEC_MAP_EXECUTE only; enforced where KAL_EXEC_PROP_BTI is set and
+ * otherwise mapped as without it. A loader asks it of an image whose every
+ * object was built with the marks, which its program property note states
+ * (PT_GNU_PROPERTY, GNU_PROPERTY_AARCH64_FEATURE_1_BTI). */
+#define KAL_EXEC_MAP_BTI ((kal_uintptr)1u << 2)
 
 /* Releases a region obtained from kal_exec_alloc, published or not. The size is
  * the one passed to the reservation. */
@@ -154,9 +241,26 @@ void kal_exec_free(void* p, kal_uintptr size);
  * A POSITION AND NOT AN INTERFACE, because it is a second way to obtain what
  * this interface provides and not a resource of its own; and not required,
  * because one environment makes a part of a reservation a file's view only
- * where the reservation was made of placeholders, which would make every
- * region a table of pieces (clause 7.1). */
+ * where the reservation was made of placeholders, so that its implementation
+ * keeps every region as a table of pieces (openkal-windows does from 0.19,
+ * on a system that has them). */
 #define KAL_EXEC_PROP_FILE ((kal_uintptr)1u << 2)
+
+/* kal_exec_alloc_at reserves a region at the address asked for, where nothing
+ * is there. Version 0.23. Where the position is zero, kal_exec_alloc_at answers
+ * with a null pointer and a loader places an image where kal_exec_alloc does.
+ * A position and not required, because an environment may decide where every
+ * program's memory lies. */
+#define KAL_EXEC_PROP_PLACE ((kal_uintptr)1u << 3)
+
+/* kal_exec_seal_part holds KAL_EXEC_SEAL_FOREVER. Version 0.23. A position
+ * because the environment decides whether a protection can be made permanent:
+ * one does from a kernel version on, one by lowering the part's greatest
+ * protection, one not at all. */
+#define KAL_EXEC_PROP_SEAL_FOREVER ((kal_uintptr)1u << 4)
+
+/* KAL_EXEC_MAP_BTI is enforced. Version 0.23. */
+#define KAL_EXEC_PROP_BTI ((kal_uintptr)1u << 5)
 
 kal_uintptr kal_exec_props(void);
 

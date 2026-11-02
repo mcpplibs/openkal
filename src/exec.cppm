@@ -22,6 +22,8 @@ export import openkal.types;
 export import openkal.fs;
 
 export using ::kal_exec_alloc;
+export using ::kal_exec_alloc_at;
+export using ::kal_exec_seal_part;
 export using ::kal_exec_publish;
 export using ::kal_exec_free;
 export using ::kal_exec_props;
@@ -50,6 +52,16 @@ inline constexpr props available{KAL_EXEC_PROP_AVAILABLE};
 // the position is zero, a loader copies the file's bytes into the region.
 inline constexpr props file{KAL_EXEC_PROP_FILE};
 
+// A region may be reserved at the address asked for, where nothing is there
+// (version 0.23). Where the position is zero, kal_exec_alloc_at answers with a
+// null pointer.
+inline constexpr props place{KAL_EXEC_PROP_PLACE};
+
+// kal_exec_seal_part holds KAL_EXEC_SEAL_FOREVER; KAL_EXEC_MAP_BTI is enforced
+// (version 0.23).
+inline constexpr props seal_forever{KAL_EXEC_PROP_SEAL_FOREVER};
+inline constexpr props bti{KAL_EXEC_PROP_BTI};
+
 // How a part is made a file's, in its own kind for the reason
 // `kal::map::how' is in one.
 struct map_how_tag;
@@ -57,11 +69,24 @@ using map_how = kal::props<map_how_tag>;
 
 inline constexpr map_how read   {0};
 inline constexpr map_how execute{KAL_EXEC_MAP_EXECUTE};
+inline constexpr map_how prefetch{KAL_EXEC_MAP_PREFETCH};   // 0.23
+inline constexpr map_how bti_marked{KAL_EXEC_MAP_BTI};     // 0.23
+inline constexpr map_how write{KAL_EXEC_MAP_WRITE};         // 0.23: private, written, never executed
+
+// What kal_exec_seal_part asks beyond read-only (0.23).
+struct seal_tag;
+using seal_flags = kal::props<seal_tag>;
+inline constexpr seal_flags seal_once{0};
+inline constexpr seal_flags forever{KAL_EXEC_SEAL_FOREVER};
 
 inline props properties() { return props{kal_exec_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 inline void* alloc(kal_uintptr size) { return kal_exec_alloc(size); }
+inline void* alloc_at(void* at, kal_uintptr size) { return kal_exec_alloc_at(at, size); }
+inline int   seal_part(void* region, kal_uintptr offset, kal_uintptr size, seal_flags how = seal_once) {
+    return kal_exec_seal_part(region, offset, size, how.bits);
+}
 inline int   publish(void* p, kal_uintptr size) { return kal_exec_publish(p, size); }
 inline int   publish_part(void* region, kal_uintptr offset, kal_uintptr size) {
     return kal_exec_publish_part(region, offset, size);

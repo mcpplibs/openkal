@@ -11,3 +11,4 @@ export module openkal.debug;
 export import openkal.types;
 
 export using ::kal_debug_symbolize;
+export using ::kal_debug_props;

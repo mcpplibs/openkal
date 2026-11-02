@@ -13,3 +13,16 @@ export import openkal.types;
 export using ::kal_prof_active;
 export using ::kal_prof_counter;
 export using ::kal_prof_mark;
+export using ::kal_prof_props;
+export using ::kal_prof_sample_begin;
+export using ::kal_prof_sample_take;
+export using ::kal_prof_sample_end;
+export using ::kal_prof_sample;
+export using ::kal_prof_touch_begin;
+export using ::kal_prof_touch_take;
+export using ::kal_prof_touch_end;
+
+// A sample (0.23): the time, the context, the depth and its reserve, then the
+// frames, one machine word each.
+static_assert(__builtin_offsetof(kal_prof_sample, depth) == 16, "clause 5.3");
+static_assert(__builtin_offsetof(kal_prof_sample, pc) == 24, "clause 5.3");
