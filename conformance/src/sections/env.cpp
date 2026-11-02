@@ -187,6 +187,18 @@ void run() {
                     && same(first, second, static_cast<kal_uintptr>(l1)),
                 "an argument reads the same on a later enquiry");
     }
+
+    // The resource preference (0.23): one of three, and the same each time.
+    {
+        const int r = kal_env_resources();
+        claim("kal_env_resources", static_cast<kal_uintptr>(r));
+        using kal::env::resources;
+        observe(kind::behaviour, r == static_cast<int>(resources::balanced)
+                                 || r == static_cast<int>(resources::performance)
+                                 || r == static_cast<int>(resources::economy),
+                "the resource preference is one of the three");
+        observe(kind::stability, kal_env_resources() == r, "and does not change while the program runs");
+    }
 #endif
 }
 

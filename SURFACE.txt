@@ -34,11 +34,13 @@ kal_stream_write
 kal_alloc
 kal_free
 kal_memory_granularity
+kal_memory_info
 # openkal.env
 kal_env_arg
 kal_env_arg_count
 kal_env_image
 kal_env_loader
+kal_env_resources
 kal_env_system
 kal_env_var
 kal_env_var_at
@@ -56,12 +58,14 @@ kal_random_props
 kal_fs_capacity
 kal_fs_close_dir
 kal_fs_close_file
+kal_fs_dir_attenuate
 kal_fs_file_info
 kal_fs_info
 kal_fs_link_create
 kal_fs_link_read
 kal_fs_list_begin
 kal_fs_list_next
+kal_fs_list_next_info
 kal_fs_lock
 kal_fs_max_name
 kal_fs_mkdir
@@ -123,6 +127,7 @@ kal_exec_map_part
 kal_exec_props
 kal_exec_publish
 kal_exec_publish_part
+kal_exec_seal_part
 # openkal.terminal
 kal_terminal_get_mode
 kal_terminal_props
@@ -174,5 +179,10 @@ kal_region_reserve
 kal_prof_active
 kal_prof_counter
 kal_prof_mark
+kal_prof_props
+kal_prof_sample_begin
+kal_prof_sample_end
+kal_prof_sample_take
 # openkal.debug
+kal_debug_props
 kal_debug_symbolize

@@ -74,10 +74,10 @@ space    = ["process"]   # a started context is waited for as a process
 timeout  = []
 map      = ["fs"]        # a region is of an open file (version 0.18)
 region   = []            # a range reserved and backed as it is used (version 0.20)
-# A LOADER'S INTERFACES (version 0.20, clause 12.3). An implementation built for
-# its environment ordinarily provides neither, so they are named neither in
-# `optional' nor in `full'; a run of this suite as an image under a loader that
-# provides them names them.
+# A LOADER'S INTERFACES (version 0.20, clause 12.3), which an implementation
+# also provides to a program built for its environment from version 0.23:
+# samples and a fault's report need the environment. Named in `optional' for
+# that reason; a run of this suite as an image under a loader names them too.
 prof     = []
 debug    = []
 
@@ -118,7 +118,7 @@ debug    = []
 # bare-metal one provides it only if its board has a source, and neither is a
 # deviation. The caller names this set for an implementation that provides
 # these interfaces and omits it for one that does not.
-optional = ["exec", "random", "terminal", "net", "datagram", "space", "timeout", "map", "region"]
+optional = ["exec", "random", "terminal", "net", "datagram", "space", "timeout", "map", "region", "prof", "debug"]
 
 # The kinds of examination. Behaviour is always performed; the other three are
 # selected, because each costs time that a reader running the suite to answer

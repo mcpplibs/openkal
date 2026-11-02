@@ -2,8 +2,11 @@ module okc.debug;
 
 import openkal.types;
 import openkal.debug;
+import openkal.process;
+import openkal.stream;
 import okc.report;
 import okc.spec;
+import okc.child;
 
 namespace okc::debug {
 namespace {
@@ -44,6 +47,51 @@ void run() {
     observe(kind::behaviour, kal_debug_symbolize(0, name, sizeof name, nullptr) == -static_cast<kal_intptr>(kal_err_not_found),
             "address zero is in no image");
     (void)named_for_the_suite(1);
+
+    // WHAT ENDS A PROGRAM FOR A FAULT SAYS WHERE (0.23): the copy writes through
+    // a null pointer, and what it wrote to its error stream before it was ended
+    // names the fault and its frames.
+    claim("kal_debug_props()", kal_debug_props());
+    observe(kind::abi, (kal_debug_props() & ~kal_uintptr{1}) == 0,
+            "the capability word contains no position the specification has not assigned");
+#if defined(MCPP_FEATURE_PROCESS) && defined(MCPP_FEATURE_ENV) && defined(MCPP_FEATURE_FS)
+    if ((kal_debug_props() & kal_uintptr{1}) != 0 && kal::process::has(kal::process::channel)) {
+        kal_stream mine{}, theirs{};
+        if (kal_process_channel(&mine, &theirs) == kal_ok) {
+            const kal_spawn_streams streams{ {0}, {0}, theirs };
+            int spawned = -1, status = -1, terminated = -1;
+            // The copy is awaited before its error stream is read: a report is
+            // a few hundred bytes, which a channel holds.
+            const bool ran = start_copy_with(argument_for(errand::fault), 0, streams, spawned, status, terminated);
+            kal_process_channel_close(theirs);
+            char report[8192];
+            kal_uintptr have = 0;
+            for (;;) {
+                if (have >= sizeof report) break;
+                const kal_intptr r = kal_stream_read(mine, report + have, sizeof report - have);
+                if (r <= 0) break;
+                have += static_cast<kal_uintptr>(r);
+            }
+            kal_process_channel_close(mine);
+            auto holds = [&](const char* part) {
+                kal_uintptr n = 0; while (part[n]) ++n;
+                for (kal_uintptr i = 0; i + n <= have; ++i) {
+                    kal_uintptr k = 0;
+                    while (k < n && report[i + k] == part[k]) ++k;
+                    if (k == n) return true;
+                }
+                return false;
+            };
+            observe(kind::behaviour, ran && spawned == kal_ok && terminated != 0,
+                    "a program that faults is ended by its environment");
+            observe(kind::behaviour, holds("openkal: fault: ") && holds("openkal:   #0 "),
+                    "and what ends it reports the fault and its frames on its error stream");
+        }
+    } else {
+        unobserved(kind::behaviour, "what ends a program for a fault reports the fault and its frames",
+                   "the implementation does not state KAL_DEBUG_PROP_FAULT_REPORT, or provides no channel");
+    }
+#endif
 #endif
 }
 

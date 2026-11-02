@@ -41,9 +41,216 @@ long read_file(const char* name, char* buf, kal_uintptr cap) {
     if (kal::fs::open_file(here(), name, length(name), kal::fs::open::read, &f) != kal_ok)
         return -1;
     kal_stream st{ kal_fs_stream(f) };
-    const kal_intptr r = kal_stream_read(st, buf, cap);
+    kal_uintptr have = 0;
+    while (have < cap) {
+        const kal_intptr r = kal_stream_read(st, buf + have, cap - have);
+        if (r <= 0) break;
+        have += static_cast<kal_uintptr>(r);
+    }
     kal_fs_close_file(f);
-    return r >= 0 ? static_cast<long>(r) : -1;
+    return static_cast<long>(have);
+}
+
+// Whether `entry' (`<kind><name>\0') appears in the record `rec' of `n'
+// bytes, and how many times.
+int count_entry(const char* rec, long n, char kind, const char* name) {
+    int seen = 0;
+    const kal_uintptr nl = length(name);
+    for (long at = 0; at < n;) {
+        long end = at;
+        while (end < n && rec[end] != 0) ++end;
+        if (end - at == static_cast<long>(nl) + 1 && rec[at] == kind) {
+            bool same = true;
+            for (kal_uintptr i = 0; i < nl && same; ++i) same = rec[at + 1 + static_cast<long>(i)] == name[i];
+            if (same) ++seen;
+        }
+        at = end + 1;
+    }
+    return seen;
+}
+
+// A LISTING WITH ATTRIBUTES (0.23): what it gives is what an enquiry gives, and
+// it states no more than it gave.
+void listing_with_attributes() {
+    put_file(kName, "four");
+    kal_uintptr iter = 0;
+    if (kal_fs_list_begin(here(), &iter) != kal_ok) {
+        unobserved(kind::behaviour, "a listing gives what an enquiry gives", "the directory could not be listed");
+        kal_fs_remove(here(), kName, length(kName));
+        return;
+    }
+    const kal_u32 wanted = kal::fs::field::kind | kal::fs::field::size | kal::fs::field::modified | kal::fs::field::identity;
+    bool agrees = true, within = true, found = false;
+    for (int guard = 0; iter != 0 && guard < 100000; ++guard) {
+        char name[512]; kal_uintptr nlen = 0;
+        kal_node_info li = kal::fs::info_for_caller();
+        if (kal_fs_list_next_info(here(), &iter, name, sizeof name, &nlen, wanted, &li) != kal_ok) break;
+        if (iter == 0 && nlen == 0) break;
+        if ((li.present & ~(wanted | kal::fs::field::kind)) != 0 || (li.present & kal::fs::field::kind) == 0) within = false;
+        if (nlen == length(kName)) {
+            bool same = true;
+            for (kal_uintptr i = 0; i < nlen && same; ++i) same = name[i] == kName[i];
+            if (same) {
+                found = true;
+                kal_node_info fi = kal::fs::info_for_caller();
+                if (kal_fs_info(here(), name, nlen, 0, wanted, &fi) != kal_ok || fi.kind != li.kind) agrees = false;
+                if ((li.present & kal::fs::field::size) && li.size != 4) agrees = false;
+                if ((li.present & kal::fs::field::identity) && (fi.present & kal::fs::field::identity)
+                    && (li.identity[0] != fi.identity[0] || li.identity[1] != fi.identity[1]))
+                    agrees = false;
+            }
+        }
+    }
+    observe(kind::behaviour, within, "a listing states the entry's kind, and no field it was not asked for");
+    observe(kind::behaviour, found && agrees, "what a listing gives of a file is what an enquiry gives");
+    if ((kal_fs_props(here()) & kal::fs::list_info.bits) != 0) {
+        kal_uintptr it = 0;
+        bool gives = kal_fs_list_begin(here(), &it) == kal_ok;
+        while (gives && it != 0) {
+            char name[512]; kal_uintptr nlen = 0;
+            kal_node_info li = kal::fs::info_for_caller();
+            if (kal_fs_list_next_info(here(), &it, name, sizeof name, &nlen, wanted, &li) != kal_ok) break;
+            if (it == 0 && nlen == 0) break;
+            if (li.kind == kal_node_file
+                && (li.present & (kal::fs::field::size | kal::fs::field::modified | kal::fs::field::identity))
+                       != (kal::fs::field::size | kal::fs::field::modified | kal::fs::field::identity))
+                gives = false;
+        }
+        observe(kind::behaviour, gives, "a volume that states KAL_FS_PROP_LIST_INFO gives size, time and identity");
+    } else {
+        unobserved(kind::behaviour, "a volume that states KAL_FS_PROP_LIST_INFO gives size, time and identity",
+                   "the volume does not state it");
+    }
+    kal_fs_remove(here(), kName, length(kName));
+}
+
+// ATTENUATION (0.23): a handle with less, which takes away and never gives
+// back; what it records.
+void attenuation() {
+    kal_dir_rights r{};
+    r.self_size = sizeof r;
+    r.flags = kal::fs::dir_read_only.bits;
+    kal_dir ro{};
+    if ((kal_fs_props(here()) & kal::fs::attenuate.bits) == 0) {
+        observe(kind::behaviour, kal_fs_dir_attenuate(here(), &r, &ro) == kal_err_not_supported,
+                "attenuation is refused where the volume does not state it");
+        return;
+    }
+    put_file(kName, "x");
+    kal_fs_remove(here(), kDir, length(kDir));
+    kal_fs_mkdir(here(), kDir, length(kDir));
+    kal_dir_rights bad = r;
+    bad.flags = kal_uintptr{1} << 9;
+    observe(kind::behaviour, kal_fs_dir_attenuate(here(), &bad, &ro) == kal_err_invalid,
+            "a position of the rights this version does not assign is refused");
+    bad = r; bad.self_size = 4;
+    observe(kind::behaviour, kal_fs_dir_attenuate(here(), &bad, &ro) == kal_err_invalid,
+            "rights shorter than their fixed fields are refused");
+    bad = r; bad.flags = kal::fs::dir_recorded.bits;
+    observe(kind::behaviour, kal_fs_dir_attenuate(here(), &bad, &ro) == kal_err_invalid,
+            "a record asked for without a file to write it to is refused");
+
+    if (kal_fs_dir_attenuate(here(), &r, &ro) != kal_ok) {
+        observe(kind::behaviour, false, "a directory handle is attenuated read-only");
+        kal_fs_remove(here(), kName, length(kName));
+        kal_fs_remove(here(), kDir, length(kDir));
+        return;
+    }
+    observe(kind::behaviour, (kal_fs_props(ro) & kal::fs::read_only.bits) != 0
+                             && (kal_fs_props(here()) & kal::fs::read_only.bits) == 0,
+            "the attenuated handle states it is read-only, and the one it came from does not");
+    kal_file f{};
+    const bool reads = kal::fs::open_file(ro, kName, length(kName), kal::fs::open::read, &f) == kal_ok;
+    if (reads) kal_fs_close_file(f);
+    observe(kind::behaviour, reads, "a read-only handle opens a file for reading");
+    observe(kind::behaviour,
+            kal::fs::open_file(ro, kOther, length(kOther), kal::fs::open::write | kal::fs::open::create, &f)
+                == kal_err_permission,
+            "a read-only handle refuses to create a file");
+    observe(kind::behaviour,
+            kal::fs::open_file(ro, kName, length(kName), kal::fs::open::write, &f) == kal_err_permission,
+            "and to open one for writing");
+    observe(kind::behaviour, kal_fs_remove(ro, kName, length(kName)) == kal_err_permission,
+            "and to remove a name");
+    observe(kind::behaviour, kal_fs_rename(ro, kName, length(kName), ro, kOther, length(kOther)) == kal_err_permission,
+            "and to rename one");
+    observe(kind::behaviour, kal_fs_mkdir(ro, kOther, length(kOther)) == kal_err_permission,
+            "and to make a directory");
+    kal_dir sub{};
+    if (kal_fs_open_dir(ro, kDir, length(kDir), &sub) == kal_ok) {
+        observe(kind::behaviour, (kal_fs_props(sub) & kal::fs::read_only.bits) != 0
+                                 && kal::fs::open_file(sub, kName, length(kName),
+                                                       kal::fs::open::write | kal::fs::open::create, &f)
+                                        == kal_err_permission,
+                "a directory opened beneath a read-only handle is read-only");
+        kal_fs_close_dir(sub);
+    }
+    kal_dir_rights none{};
+    none.self_size = sizeof none;
+    kal_dir again{};
+    if (kal_fs_dir_attenuate(ro, &none, &again) == kal_ok) {
+        observe(kind::behaviour, (kal_fs_props(again) & kal::fs::read_only.bits) != 0,
+                "attenuation takes away and does not give back");
+        kal_fs_close_dir(again);
+    }
+    kal_fs_close_dir(ro);
+
+    kal_dir_rights u{};
+    u.self_size = sizeof u;
+    u.flags = kal::fs::dir_unchanging.bits;
+    kal_dir un{};
+    if (kal_fs_dir_attenuate(here(), &u, &un) == kal_ok) {
+        kal_node_info i = kal::fs::info_for_caller();
+        observe(kind::behaviour, (kal_fs_props(un) & kal::fs::unchanging.bits) != 0
+                                 && kal_fs_info(un, kOther, length(kOther), 0, kal::fs::field::kind, &i) == kal_ok
+                                 && i.kind == kal_node_absent,
+                "a handle that states nothing beneath changes answers as before");
+        kal_fs_close_dir(un);
+    }
+
+    // THE RECORD: each name once, with what was found; written when the
+    // handle is closed.
+    static const char kRecord[] = "okc-conformance.record";
+    static const char kAbsent[] = "okc-conformance-absent.tmp";
+    kal_file rec{};
+    if (kal::fs::open_file(here(), kRecord, sizeof kRecord - 1,
+                           kal::fs::open::write | kal::fs::open::create | kal::fs::open::truncate, &rec) == kal_ok) {
+        kal_dir_rights w{};
+        w.self_size = sizeof w;
+        w.flags = kal::fs::dir_recorded.bits;
+        w.record = rec;
+        kal_dir rd{};
+        if (kal_fs_dir_attenuate(here(), &w, &rd) == kal_ok) {
+            for (int twice = 0; twice < 2; ++twice) {
+                if (kal::fs::open_file(rd, kName, length(kName), kal::fs::open::read, &f) == kal_ok) kal_fs_close_file(f);
+                kal_node_info i = kal::fs::info_for_caller();
+                kal_fs_info(rd, kAbsent, sizeof kAbsent - 1, 0, kal::fs::field::kind, &i);
+            }
+            kal_uintptr it = 0;
+            if (kal_fs_list_begin(rd, &it) == kal_ok)
+                while (it != 0) {
+                    char name[512]; kal_uintptr nlen = 0; int kind = 0;
+                    if (kal_fs_list_next(rd, &it, name, sizeof name, &nlen, &kind) != kal_ok) break;
+                    if (it == 0 && nlen == 0) break;
+                }
+            kal_fs_close_dir(rd);
+            char buf[4096];
+            const long n = read_file(kRecord, buf, sizeof buf);
+            observe(kind::behaviour, n > 0 && count_entry(buf, n, 'r', kName) == 1,
+                    "a file opened through a recorded handle is recorded once, as read");
+            observe(kind::behaviour, n > 0 && count_entry(buf, n, 'a', kAbsent) == 1,
+                    "a name asked about and absent is recorded once, as absent");
+            observe(kind::behaviour, n > 0 && count_entry(buf, n, 'l', ".") == 1,
+                    "the directory listed is recorded, by the name `.'");
+        } else {
+            observe(kind::behaviour, false, "a handle is attenuated to record what it reaches");
+        }
+        kal_fs_close_file(rec);
+        kal_fs_remove(here(), kRecord, sizeof kRecord - 1);
+    }
+    kal_fs_remove(here(), kName, length(kName));
+    kal_fs_remove(here(), kOther, length(kOther));
+    kal_fs_remove(here(), kDir, length(kDir));
 }
 #endif
 
@@ -342,11 +549,12 @@ void run() {
             int seen = 0;
             char reported[256]; kal_uintptr at = 0;
             kal_uintptr iter = 0;
+            bool ended_well = false;
             if (kal_fs_list_begin(d, &iter) == kal_ok) {
                 for (;;) {
-                    char name[512]; kal_uintptr len = 0; int knd = 0;
+                    char name[512]; kal_uintptr len = 99; int knd = 0;
                     if (kal_fs_list_next(d, &iter, name, sizeof name, &len, &knd) != kal_ok) break;
-                    if (iter == 0) break;
+                    if (iter == 0) { ended_well = len == 0; break; }
                     ++seen;
                     if (at + len + 2 < sizeof reported) {
                         if (at) reported[at++] = ' ';
@@ -358,6 +566,8 @@ void run() {
             reported[at < sizeof reported ? at : sizeof reported - 1] = '\0';
             observe(kind::behaviour, seen == 2,
                     "enumeration reports the entries that were created and nothing else");
+            observe(kind::behaviour, ended_well,
+                    "the end of an enumeration is kal_ok, the iterator zero and the name empty");
             if (seen != 2) { line("  what it reported: "); line(reported); line("\n"); }
 
             kal_fs_remove(d, "a", 1);
@@ -859,7 +1069,9 @@ void run() {
                                     | kal::fs::locks | kal::fs::capacity
                                     | kal::fs::executable | kal::fs::rename_no_replace
                                     | kal::fs::local_endpoint | kal::fs::remove_open
-                                    | kal::fs::resolved_name).bits;
+                                    | kal::fs::resolved_name | kal::fs::attenuate
+                                    | kal::fs::read_only | kal::fs::unchanging
+                                    | kal::fs::list_info).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 
@@ -906,6 +1118,9 @@ void run() {
         measure("opening and releasing a file", kal_time_monotonic() - t0, cost_iterations);
         kal_fs_remove(here(), kName, length(kName));
     }
+
+    listing_with_attributes();
+    attenuation();
 #endif
 }
 

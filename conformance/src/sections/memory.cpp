@@ -128,6 +128,25 @@ void run() {
         kal_free(big, 1u << 20, 4096);
     }
 
+    // What the environment can give (0.23): a total, what is available now,
+    // and the second no more than the first.
+    {
+        kal_memory_status m{};
+        m.self_size = sizeof m;
+        const int e = kal_memory_info(&m);
+        observe(kind::behaviour, e == kal_ok && (m.present & (kal::mstatus::total | kal::mstatus::available)) != 0,
+                "what the environment can give this program is stated");
+        observe(kind::behaviour, (m.present & ~(kal::mstatus::total | kal::mstatus::available)) == 0,
+                "and no field this version does not assign");
+        if ((m.present & kal::mstatus::total) && (m.present & kal::mstatus::available))
+            observe(kind::behaviour, m.total_bytes > 0 && m.available_bytes <= m.total_bytes,
+                    "what is available is no more than the total");
+        kal_memory_status s{};
+        s.self_size = 4;
+        observe(kind::behaviour, kal_memory_info(&s) == kal_err_invalid,
+                "a structure shorter than its fixed fields is refused");
+    }
+
     if (performs(kind::cost)) {
         const kal_duration t0 = kal_time_monotonic();
         for (int i = 0; i < cost_iterations; ++i) {

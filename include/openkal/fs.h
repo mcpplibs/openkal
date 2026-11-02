@@ -176,6 +176,20 @@ struct kal_node_info {
 #define KAL_FS_PROP_RESOLVED_NAME  ((kal_uintptr)1u << 11) /* kal_fs_resolved_name
                                                             * is answered here.
                                                             * 0.23 */
+#define KAL_FS_PROP_ATTENUATE      ((kal_uintptr)1u << 12) /* kal_fs_dir_attenuate
+                                                            * is answered here.
+                                                            * 0.23 */
+#define KAL_FS_PROP_READ_ONLY      ((kal_uintptr)1u << 13) /* THIS HANDLE was
+                                                            * attenuated read-only
+                                                            * (KAL_DIR_READ_ONLY).
+                                                            * 0.23 */
+#define KAL_FS_PROP_UNCHANGING     ((kal_uintptr)1u << 14) /* THIS HANDLE carries
+                                                            * KAL_DIR_UNCHANGING.
+                                                            * 0.23 */
+#define KAL_FS_PROP_LIST_INFO      ((kal_uintptr)1u << 15) /* a listing gives an
+                                                            * entry's size, time and
+                                                            * identity without a
+                                                            * further enquiry. 0.23 */
 
 /* Positions in the flags word of kal_fs_open. */
 #define KAL_OPEN_READ      ((kal_uintptr)1u << 0)
@@ -588,7 +602,9 @@ kal_intptr kal_fs_resolved_name(struct kal_dir base, const char* name, kal_uintp
 
 /* Enumeration. The iterator is owned and is released by reading past the end or
  * by closing the directory that produced it. The end is reported by the
- * iterator becoming zero.
+ * iterator becoming zero, with kal_ok and a name of length zero (stated in
+ * 0.23: one implementation reported kal_err_not_found there, and a caller that
+ * treated every other answer as a failure failed at the end of every listing).
  *
  * AN ITERATOR IS PASSED WITH THE DIRECTORY THAT PRODUCED IT, and a closed
  * directory is a released handle (clause 6.7): kal_fs_list_next given one
@@ -606,6 +622,100 @@ int kal_fs_list_begin(struct kal_dir, kal_uintptr* iter);
 int kal_fs_list_next (struct kal_dir, kal_uintptr* iter,
                       char* name_out, kal_uintptr name_cap,
                       kal_uintptr* name_len, int* kind);
+
+/* kal_fs_list_next, and what the listing told of the entry. Version 0.23.
+ *
+ * `info->self_size' is set by the caller, as for kal_fs_info. Of the fields
+ * `wanted' names, those the environment gave with the entry are filled and
+ * stated in `info->present'; `kind' always is, and is the entry's own kind, as
+ * kal_fs_list_next reports it. A field it did not give is not filled, and a
+ * caller that needs it asks kal_fs_info. Where the directory's volume states
+ * KAL_FS_PROP_LIST_INFO, a listing gives size, modified time and identity:
+ * one environment returns a batch of entries with all of their attributes in
+ * one request, where asking of each entry is a request each.
+ *
+ * ONE CROSSING FOR A COMMON QUESTION. A program that lists a directory and asks
+ * of each entry what it is --- a build tool that decides what is out of date, a
+ * language server that scans a tree --- crossed this interface twice for each
+ * entry. Where the interface is a call that costs nothing that is nothing; where
+ * it is the boundary of a kernel that implements openkal, it is the cost the
+ * environment's own batched listing exists to avoid. */
+int kal_fs_list_next_info(struct kal_dir, kal_uintptr* iter,
+                          char* name_out, kal_uintptr name_cap,
+                          kal_uintptr* name_len, kal_u32 wanted,
+                          struct kal_node_info* info);
+
+/* ATTENUATION: a directory handle with less than another (version 0.23).
+ *
+ * A handle is a capability: what it names is what its holder reaches. A holder
+ * may derive from it a handle that reaches the same directory with fewer
+ * rights, or with a statement attached, and give that away --- to a program it
+ * starts (kal_spawn.grants), to a library it calls --- while keeping its own.
+ *
+ *   KAL_DIR_READ_ONLY    nothing beneath is created, written, removed, renamed,
+ *                        linked or marked: such an operation through the handle,
+ *                        or through a directory opened beneath it, reports
+ *                        kal_err_permission. Opening for reading, enquiring,
+ *                        listing and starting a program found beneath are not
+ *                        affected.
+ *   KAL_DIR_UNCHANGING   the holder states that nothing beneath changes while a
+ *                        handle derived from this one lives. An implementation
+ *                        may answer an enquiry from what it has read before ---
+ *                        that a name is absent from a directory it has listed,
+ *                        what a node it has asked about is --- and does not ask
+ *                        the environment again. A change made all the same is
+ *                        not seen; nothing else is affected.
+ *   KAL_DIR_RECORDED     each name reached beneath, and what was found, is
+ *                        appended to `record' (below).
+ *
+ * The handle written to `out' is a new handle, released by kal_fs_close_dir,
+ * whose rights are those of `d' less what `rights' withdraws and whose
+ * statements are those of `d' and those `rights' adds: attenuation only takes
+ * away. A directory opened beneath it has its rights and statements.
+ * kal_fs_props of it states KAL_FS_PROP_READ_ONLY and KAL_FS_PROP_UNCHANGING
+ * as they hold.
+ *
+ * THE RECORD. With KAL_DIR_RECORDED, `rights->record' is a file opened for
+ * writing; the implementation appends to it, for each distinct name and kind
+ * once in the program, `<kind><name>\0', the name relative to the attenuated
+ * directory and the kind one byte:
+ *
+ *   r  opened for reading            w  written, created, removed or renamed
+ *   s  asked about, and present      a  asked about or opened, and absent
+ *   l  listed
+ *
+ * and, when the program ends, `e\0'. Entries are appended in batches, each in
+ * one write, so that the programs that hold handles on one record --- a program
+ * and those it starts with the handle granted --- interleave whole entries. A
+ * batch is written when it fills, when the last handle derived from the
+ * attenuated one is closed, and when the program ends. A record without an `e'
+ * for each program that held a handle on it is of a program that did not end
+ * normally, and is not complete. The file is the holder's; the implementation
+ * does not close it.
+ *
+ * WHY A CAPABILITY AND NOT A RUNNER'S INTERCEPTION. Whether a tree may be
+ * written, whether it changes, and what a program reached of it are questions
+ * the environment answers --- an implementation in a program's process today,
+ * a kernel that implements openkal tomorrow --- and the answer belongs to the
+ * handle through which the program reaches the tree, whatever runs it.
+ *
+ * kal_err_invalid for an unknown position in `rights->flags', a `self_size'
+ * smaller than the fields before `record', or KAL_DIR_RECORDED without a
+ * writable `record'; kal_err_not_supported where the volume does not state
+ * KAL_FS_PROP_ATTENUATE. In each, nothing is written to `out'. */
+struct kal_dir_rights {
+    kal_u32         self_size;   /* set by the caller (clause 5.3) */
+    kal_u32         reserved;    /* zero */
+    kal_uintptr     flags;       /* KAL_DIR_* */
+    struct kal_file record;      /* KAL_DIR_RECORDED */
+};
+
+#define KAL_DIR_READ_ONLY  ((kal_uintptr)1u << 0)
+#define KAL_DIR_UNCHANGING ((kal_uintptr)1u << 1)
+#define KAL_DIR_RECORDED   ((kal_uintptr)1u << 2)
+
+int kal_fs_dir_attenuate(struct kal_dir d, const struct kal_dir_rights* rights,
+                         struct kal_dir* out);
 
 #ifdef __cplusplus
 }

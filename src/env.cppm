@@ -25,6 +25,7 @@ export using ::kal_env_var_at;
 export using ::kal_env_image;
 export using ::kal_env_loader;
 export using ::kal_env_system;
+export using ::kal_env_resources;
 
 export namespace kal::env {
 
@@ -33,6 +34,14 @@ export namespace kal::env {
 // done in one call; a caller that wants to size first passes a capacity of
 // zero; a caller whose buffer was too small learns it by comparing. Nothing is
 // truncated silently.
+// The resource preference this program was started with (0.23).
+enum class resources : int {
+    balanced = KAL_RESOURCES_BALANCED,
+    performance = KAL_RESOURCES_PERFORMANCE,
+    economy = KAL_RESOURCES_ECONOMY,
+};
+inline resources resource_preference() { return static_cast<resources>(kal_env_resources()); }
+
 inline kal_uintptr arg_count() { return kal_env_arg_count(); }
 inline kal_intptr  arg(kal_uintptr i, char* out, kal_uintptr cap) {
     return kal_env_arg(i, out, cap);

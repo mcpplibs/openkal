@@ -97,6 +97,9 @@ struct kal_preopen {
 /* KAL_SPAWN_NULL_IN, KAL_SPAWN_NULL_OUT and KAL_SPAWN_NULL_ERR are answered
  * here. Version 0.22. */
 #define KAL_PROCESS_PROP_NULL_STREAMS   ((kal_uintptr)1u << 13)
+/* KAL_SPAWN_CONFINE is honoured: the environment holds a started program to
+ * its grants. Version 0.23. */
+#define KAL_PROCESS_PROP_CONFINE        ((kal_uintptr)1u << 14)
 
 /* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -263,6 +266,35 @@ struct kal_spawn {
 #define KAL_SPAWN_NULL_IN  ((kal_uintptr)1u << 2)
 #define KAL_SPAWN_NULL_OUT ((kal_uintptr)1u << 3)
 #define KAL_SPAWN_NULL_ERR ((kal_uintptr)1u << 4)
+
+/* The environment holds the started program to its grants and their rights
+ * (kal_fs_dir_attenuate), even where the program reaches files without this
+ * interface. Version 0.23, where KAL_PROCESS_PROP_CONFINE is set; elsewhere
+ * kal_err_not_supported, and nothing is started.
+ *
+ * A grant confines a program that uses only its preopens (clause 7.13); this
+ * flag asks the environment to confine one that does not --- a program whose
+ * C library reaches the file system directly, or one that has been made to.
+ * It is the caller's request and not a consequence of granting, because a
+ * program built for its environment needs directories it was not granted (the
+ * environment's own libraries, for one dynamically linked), and only a caller
+ * that knows what it starts can say that nothing else is needed. A language
+ * server's caller asks it of the engine it starts: one subverted by a source
+ * file it was given reaches the project, its toolchain and its caches, and
+ * nothing else of the user's. */
+#define KAL_SPAWN_CONFINE ((kal_uintptr)1u << 5)
+
+/* THE RESOURCE PREFERENCE of the started program (version 0.23): balanced,
+ * space spent for time (performance), or time spent for space (economy). None
+ * of the three, and the started program has the caller's; more than one is
+ * kal_err_invalid. The program reads it with kal_env_resources (env.h), and
+ * each layer acts on it within itself: a loader's caches, a C library's
+ * allocator, an implementation's caches and the environment's memory policy.
+ * A request about cost and not about meaning: no operation answers otherwise
+ * for it. */
+#define KAL_SPAWN_RESOURCES_BALANCED    ((kal_uintptr)1u << 6)
+#define KAL_SPAWN_RESOURCES_PERFORMANCE ((kal_uintptr)1u << 7)
+#define KAL_SPAWN_RESOURCES_ECONOMY     ((kal_uintptr)1u << 8)
 
 /* A set of started programs that end together --- see `kal_spawn.job'. One
  * machine word, as every handle here is. */
@@ -470,6 +502,14 @@ int kal_process_end_as_requested(void);
  * same measure each time; and that the peak never falls. It is a guard against
  * a program growing without bound, not an account of what it cost.
  *
+ * PAGE FAULTS, APPENDED IN 0.23. `faults_minor' is how many times the program
+ * touched a page the environment then made present without reading a device,
+ * and `faults_major' how many it had to read; one environment counts only the
+ * sum, which it reports in `faults_minor' with KAL_PINFO_MAJOR absent from
+ * `present'. A loader and a measurement read them before and after a phase:
+ * where page faults cost most --- a virtual machine, a first start --- they,
+ * and not the processor time, are what a phase of starting a program spends.
+ *
  * PROCESSOR TIME AFTER THE END, 0.21. Of a started program that has ended,
  * `cpu_ns' is the processor time it used, and remains, as the peak does, for as
  * long as the caller holds its handle; a C library's `wait4' reports it beside
@@ -485,6 +525,8 @@ struct kal_program_info {
     kal_u32 reserved;
     kal_u64 memory_bytes;        /* 0.20 */
     kal_u64 memory_peak_bytes;   /* 0.20 */
+    kal_u64 faults_minor;        /* 0.23 */
+    kal_u64 faults_major;        /* 0.23 */
 };
 
 /* Positions in `wanted' and `present'. */
@@ -493,8 +535,10 @@ struct kal_program_info {
 #define KAL_PINFO_CPU     ((kal_u32)1u << 2)
 #define KAL_PINFO_ENDED   ((kal_u32)1u << 3)
 #define KAL_PINFO_MEMORY  ((kal_u32)1u << 4)   /* memory_bytes, memory_peak_bytes; 0.20 */
+#define KAL_PINFO_FAULTS  ((kal_u32)1u << 5)   /* faults_minor; faults_major where stated; 0.23 */
+#define KAL_PINFO_MAJOR   ((kal_u32)1u << 6)   /* faults_major is the environment's own count; 0.23 */
 #define KAL_PINFO_ALL     (KAL_PINFO_ID | KAL_PINFO_STARTED | KAL_PINFO_CPU | KAL_PINFO_ENDED \
-                           | KAL_PINFO_MEMORY)
+                           | KAL_PINFO_MEMORY | KAL_PINFO_FAULTS | KAL_PINFO_MAJOR)
 
 /* A handle to THIS program, owned and released by kal_process_close. It may be
  * asked about with kal_process_info, and is refused by kal_process_wait and by

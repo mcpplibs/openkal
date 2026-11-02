@@ -6,6 +6,7 @@ import openkal.stream;   // the channel is read and written through it
 import openkal.fs;
 import openkal.env;
 import openkal.time;
+import openkal.memory;
 import okc.report;
 import okc.spec;
 import okc.child;
@@ -399,7 +400,8 @@ void run() {
                                     | kal::process::job_usage
                                     | kal::process::job_limit_hard
                                     | kal::process::job_limit_supervised
-                                    | kal::process::null_streams).bits;
+                                    | kal::process::null_streams
+                                    | kal::process::confine).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),
@@ -604,6 +606,99 @@ void run() {
                                             nullptr, nullptr, 0, nullptr, &p);
             observe(kind::behaviour, e == kal_err_not_supported,
                     "a grant this implementation cannot convey is refused, not ignored");
+        }
+    }
+
+    // THE RESOURCE PREFERENCE (0.23): the started program reads what it was
+    // started with, the caller's where nothing was said, and two at once are
+    // refused.
+    {
+        const kal_spawn_streams inherit{ {0}, {0}, {0} };
+        auto reported = [&](kal_uintptr flags, int& spawned) {
+            int status = -1, terminated = -1;
+            spawned = -1;
+            const bool ran = start_copy_with(argument_for(errand::report_resources), flags, inherit,
+                                             spawned, status, terminated);
+            return ran && spawned == kal_ok && terminated == 0 ? status - 40 : -1;
+        };
+        int spawned = -1;
+        observe(kind::behaviour, reported(kal::process::economy_flag.bits, spawned) == 2,
+                "a program started for economy reads economy");
+        observe(kind::behaviour, reported(kal::process::performance_flag.bits, spawned) == 1,
+                "a program started for performance reads performance");
+        observe(kind::behaviour, reported(kal::process::balanced_flag.bits, spawned) == 0,
+                "a program started balanced reads balanced");
+        observe(kind::behaviour, reported(0, spawned) == kal_env_resources(),
+                "a program started without a preference has its caller's");
+        reported((kal::process::economy_flag | kal::process::performance_flag).bits, spawned);
+        observe(kind::behaviour, spawned == kal_err_invalid, "two preferences at once are refused");
+    }
+
+    // CONFINEMENT (0.23): refused where the environment cannot hold a program
+    // to its grants; where it can, a program granted a read-only directory and
+    // confined cannot create a file in it.
+    {
+        const kal_spawn_streams inherit{ {0}, {0}, {0} };
+        int spawned = -1, status = -1, terminated = -1;
+        if (!kal::process::has(kal::process::confine)) {
+            start_copy_with(argument_for(errand::exit_with_33), kal::process::confine_flag.bits, inherit,
+                            spawned, status, terminated);
+            observe(kind::behaviour, spawned == kal_err_not_supported,
+                    "confinement this environment cannot give is refused, not ignored");
+        } else if ((kal_fs_props(kal::fs::working()) & kal::fs::attenuate.bits) != 0) {
+            // Every directory this program was given, read-only, the working
+            // one first: a program of the environment reads what it needs to
+            // start --- its loader, its libraries --- and writes nowhere.
+            kal_dir_rights r{};
+            r.self_size = sizeof r;
+            r.flags = kal::fs::dir_read_only.bits;
+            kal_preopen grants[16];
+            char names[16][256];
+            kal_uintptr n = 0;
+            const kal_uintptr count = kal_fs_preopen_count();
+            for (kal_uintptr i = 0; i < count && n < 16; ++i) {
+                kal_dir d{}; kal_uintptr len = 0;
+                if (kal_fs_preopen(i, &d, names[n], sizeof names[n], &len) != kal_ok || len > sizeof names[n]) continue;
+                kal_dir ro{};
+                if (kal_fs_dir_attenuate(d, &r, &ro) != kal_ok) continue;
+                grants[n] = kal_preopen{ ro, names[n], len };
+                ++n;
+            }
+            if (n > 0) {
+                const bool ran = start_copy_granting_with(argument_for(errand::write_in_first_grant), grants, n,
+                                                          kal::process::confine_flag.bits, inherit,
+                                                          spawned, status, terminated);
+                observe(kind::behaviour, ran && spawned == kal_ok && terminated == 0 && status == 70,
+                        "a confined program granted read-only directories cannot create a file in them");
+            }
+            for (kal_uintptr i = 0; i < n; ++i) kal_fs_close_dir(grants[i].dir);
+        } else {
+            unobserved(kind::behaviour, "a confined program granted read-only directories cannot create a file in them",
+                       "the volume does not attenuate");
+        }
+    }
+
+    // PAGE FAULTS (0.23): a program that touches pages it had not is counted
+    // for them.
+    {
+        kal_process self{};
+        if (kal_process_self(&self) == kal_ok) {
+            kal_program_info before{}, after{};
+            before.self_size = after.self_size = sizeof before;
+            const int a = kal_process_info(self, kal::process::info::faults, &before);
+            constexpr kal_uintptr pages = 256, page = 4096;
+            auto* p = static_cast<volatile unsigned char*>(kal_alloc(pages * page, page));
+            if (p) for (kal_uintptr i = 0; i < pages; ++i) p[i * page] = 1;
+            const int b = kal_process_info(self, kal::process::info::faults, &after);
+            if (a == kal_ok && b == kal_ok && (before.present & kal::process::info::faults)) {
+                observe(kind::behaviour, after.faults_minor >= before.faults_minor + pages / 8,
+                        "a program is counted for the pages it touches");
+            } else {
+                unobserved(kind::behaviour, "a program is counted for the pages it touches",
+                           "the implementation does not report KAL_PINFO_FAULTS");
+            }
+            if (p) kal_free(const_cast<unsigned char*>(p), pages * page, page);
+            kal_process_close(self);
         }
     }
 

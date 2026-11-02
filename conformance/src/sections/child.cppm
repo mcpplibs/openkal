@@ -32,6 +32,11 @@ enum class errand {
                          // itself with 77 after twenty seconds (0.20)
     read_and_write_null, // reads the end of input and writes in full at its three
                          // positions, given the null device there (0.22)
+    report_resources,    // ends with 40 + kal_env_resources() (0.23)
+    fault,               // writes through a null pointer, so that what ends it
+                         // reports the fault (0.23)
+    write_in_first_grant,    // creates a file in its first preopen: 70 refused
+                             // as read-only, 71 created, 72 anything else (0.23)
 };
 
 // The names the starter grants and the copy expects, in order, and the marker
@@ -86,5 +91,11 @@ bool start_copy_granting(const char* errand_argument, const kal_preopen* grants,
 bool start_copy_with(const char* errand_argument, kal_uintptr flags,
                      const kal_spawn_streams& streams, int& spawned,
                      int& status, int& terminated);
+
+// The same, granting `count' directories, with the given flags and streams
+// (0.23: an attenuated grant, KAL_SPAWN_CONFINE).
+bool start_copy_granting_with(const char* errand_argument, const kal_preopen* grants,
+                              kal_uintptr count, kal_uintptr flags, const kal_spawn_streams& streams,
+                              int& spawned, int& status, int& terminated);
 
 }  // namespace okc

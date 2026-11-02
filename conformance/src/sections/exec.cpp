@@ -108,6 +108,46 @@ void at_an_address() {
     }
 }
 
+// A REGION IS ZERO WHEN IT IS RETURNED, AND A PART OF IT IS SEALED READ-ONLY
+// (0.23): what it held stays readable; sealed for ever, it is not published or
+// sealed again.
+void zero_and_sealed() {
+    const kal_uintptr g = kal_exec_granularity();
+    const kal_uintptr size = 4 * g;
+    void* r = kal_exec_alloc(size);
+    if (r == nullptr || g == 0) {
+        unobserved(kind::behaviour, "a region is zero when it is returned", "no region could be reserved");
+        return;
+    }
+    auto* c = static_cast<unsigned char*>(r);
+    bool zero = true;
+    for (kal_uintptr at = 0; at < size; at += 509) if (c[at] != 0) zero = false;
+    observe(kind::behaviour, zero, "a region is zero when it is returned");
+    observe(kind::behaviour, kal_exec_seal_part(r, 1, g, 0) == kal_err_invalid,
+            "a part to seal that is not at a multiple of the granularity is refused");
+    observe(kind::behaviour, kal_exec_seal_part(r, g, g, kal_uintptr{1} << 9) == kal_err_invalid,
+            "a position of the sealing flags this version does not assign is refused");
+    c[g] = 11;
+    c[g + g - 1] = 12;
+    observe(kind::behaviour, kal_exec_seal_part(r, g, g, 0) == kal_ok && c[g] == 11 && c[g + g - 1] == 12,
+            "a part is sealed read-only, and holds what it held");
+    c[2 * g] = 13;
+    const int forever = kal_exec_seal_part(r, 2 * g, g, kal::exec::forever.bits);
+    observe(kind::behaviour, forever == kal_ok && c[2 * g] == 13, "a part is sealed for the life of the program");
+    if (kal::exec::has(kal::exec::seal_forever)) {
+        observe(kind::behaviour, kal_exec_publish_part(r, 2 * g, g) == kal_err_permission
+                                 && kal_exec_seal_part(r, 2 * g, g, 0) == kal_err_permission,
+                "a part sealed for ever is neither published nor sealed again");
+        // The region keeps a part sealed for ever, and is not released.
+    } else {
+        unobserved(kind::behaviour, "a part sealed for ever is neither published nor sealed again",
+                   "the implementation does not state KAL_EXEC_PROP_SEAL_FOREVER");
+        c[3 * g] = 14;
+        observe(kind::behaviour, c[3 * g] == 14, "the rest of the region is still writable");
+        kal_exec_free(r, size);
+    }
+}
+
 void from_a_file() {
     const kal_uintptr g = kal_exec_granularity();
     if (g == 0 || kAlign % g != 0) {
@@ -153,8 +193,10 @@ void from_a_file() {
         observe(kind::behaviour, kal_exec_map_part(r, 0, kAlign, f, 0, kal_uintptr{1} << 9) == kal_err_invalid,
                 "a position of `how' this version does not assign is refused");
 
-        observe(kind::behaviour, kal_exec_map_part(r, 0, kAlign, f, 0, kal::exec::read.bits) == kal_ok,
-                "part of a region is made a file's bytes, to be read");
+        observe(kind::behaviour,
+                kal_exec_map_part(r, 0, kAlign, f, 0, (kal::exec::read | kal::exec::prefetch | kal::exec::bti_marked).bits)
+                    == kal_ok,
+                "part of a region is made a file's bytes, to be read, and read in now");
         observe(kind::behaviour, kal_exec_map_part(r, kAlign, kAlign, f, kAlign, kal::exec::execute.bits) == kal_ok,
                 "part of a region is made a file's bytes, to be executed");
         // The handle may go: the parts outlive it.
@@ -192,7 +234,8 @@ void run() {
 
     claim("kal_exec_props()", kal_exec_props());
     observe(kind::abi,
-            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available | kal::exec::file | kal::exec::place).bits) == 0,
+            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available | kal::exec::file | kal::exec::place
+                                  | kal::exec::seal_forever | kal::exec::bti).bits) == 0,
             "no position the specification has not assigned is reported");
 
     // WHETHER THE INTERFACE CAN BE EXERCISED BY THIS ARTIFACT IS READ BEFORE
@@ -325,7 +368,10 @@ void run() {
 
     claim("KAL_EXEC_PROP_FILE", kal_exec_props() & kal::exec::file.bits);
     claim("KAL_EXEC_PROP_PLACE", kal_exec_props() & kal::exec::place.bits);
+    claim("KAL_EXEC_PROP_SEAL_FOREVER", kal_exec_props() & kal::exec::seal_forever.bits);
+    claim("KAL_EXEC_PROP_BTI", kal_exec_props() & kal::exec::bti.bits);
     at_an_address();
+    zero_and_sealed();
 #if defined(MCPP_FEATURE_FS)
     from_a_file();
 #else
