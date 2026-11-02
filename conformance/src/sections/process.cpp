@@ -175,9 +175,14 @@ void run() {
             kal_process_wait(child, &status, &terminated);
             kal_program_info info{};
             info.self_size = sizeof info;
-            const int e = kal_process_info(child, kal::process::info::ended, &info);
+            const int e = kal_process_info(child, kal::process::info::ended | kal::process::info::cpu, &info);
             observe(kind::behaviour, e == kal_ok && ((info.present & kal::process::info::ended) == 0 || info.ended != 0),
                     "a started program that was awaited is reported as ended");
+            // Version 0.21: what it used remains while its handle is held. The
+            // value is not compared: a program that only ends may be charged
+            // less than an environment's clock tick.
+            observe(kind::behaviour, e == kal_ok && (info.present & kal::process::info::cpu) != 0,
+                    "an ended program's processor time remains until its handle is released");
             kal_process_close(child);
         }
 #endif

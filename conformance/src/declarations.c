@@ -47,6 +47,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_exec_alloc);
     (void)sizeof(&kal_exec_free);
     (void)sizeof(&kal_exec_granularity);
+    (void)sizeof(&kal_exec_map_part);
     (void)sizeof(&kal_exec_props);
     (void)sizeof(&kal_exec_publish);
     (void)sizeof(&kal_exec_publish_part);

@@ -448,7 +448,13 @@ int kal_process_end_as_requested(void);
  * committed in a third --- and an implementation states which it reports. What
  * holds everywhere is the unit, a byte; that one implementation reports the
  * same measure each time; and that the peak never falls. It is a guard against
- * a program growing without bound, not an account of what it cost. */
+ * a program growing without bound, not an account of what it cost.
+ *
+ * PROCESSOR TIME AFTER THE END, 0.21. Of a started program that has ended,
+ * `cpu_ns' is the processor time it used, and remains, as the peak does, for as
+ * long as the caller holds its handle; a C library's `wait4' reports it beside
+ * the peak. Every environment keeps it in the record it keeps of the ended
+ * program until that record is collected. */
 struct kal_program_info {
     kal_u32 self_size;
     kal_u32 present;

@@ -37,7 +37,9 @@ export import openkal.types;
 export namespace kal::macros {
 inline constexpr kal_uintptr KAL_DGRAM_PROP_BROADCAST_M         = (kal_uintptr)(KAL_DGRAM_PROP_BROADCAST);
 inline constexpr kal_uintptr KAL_DGRAM_PROP_IPV6_M              = (kal_uintptr)(KAL_DGRAM_PROP_IPV6);
+inline constexpr kal_uintptr KAL_EXEC_MAP_EXECUTE_M             = (kal_uintptr)(KAL_EXEC_MAP_EXECUTE);
 inline constexpr kal_uintptr KAL_EXEC_PROP_AVAILABLE_M          = (kal_uintptr)(KAL_EXEC_PROP_AVAILABLE);
+inline constexpr kal_uintptr KAL_EXEC_PROP_FILE_M               = (kal_uintptr)(KAL_EXEC_PROP_FILE);
 inline constexpr kal_uintptr KAL_EXEC_PROP_REPUBLISH_M          = (kal_uintptr)(KAL_EXEC_PROP_REPUBLISH);
 inline constexpr kal_uintptr KAL_FS_LINK_DIRECTORY_M            = (kal_uintptr)(KAL_FS_LINK_DIRECTORY);
 inline constexpr kal_uintptr KAL_FS_NO_RESOLVE_M                = (kal_uintptr)(KAL_FS_NO_RESOLVE);
