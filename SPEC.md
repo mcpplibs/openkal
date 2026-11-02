@@ -1958,8 +1958,9 @@ makes each segment that no relocation writes the file's bytes
 (`kal_exec_map_part`) rather than a copy of them: the instructions executed and
 the read-only data read. A program then starts as a program of its environment
 does, paying for the pages it touches; a loader copies where the position is
-zero, where the image is not a file of its own (a member of an archive), and
-where a relocation writes the segment.
+zero, where the image's bytes are not a file's at a multiple of
+`KAL_MAP_ALIGNMENT` (an image a program carries in its own bytes), and where a
+relocation writes the segment.
 
 Where an environment's own convention differs from the image's --- on x86-64,
 one environment passes arguments in other registers --- the loader presents each
