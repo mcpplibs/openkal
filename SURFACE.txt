@@ -1,4 +1,4 @@
-# The C surface of openkal 0.20.0, one name per line.
+# The C surface of openkal 0.21.0, one name per line.
 #
 # This file is normative and is the single source consulted by clause 9. A
 # conforming implementation exports the names of the interfaces it provides
@@ -117,6 +117,7 @@ kal_task_yield
 kal_exec_alloc
 kal_exec_free
 kal_exec_granularity
+kal_exec_map_part
 kal_exec_props
 kal_exec_publish
 kal_exec_publish_part

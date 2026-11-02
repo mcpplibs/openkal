@@ -1,4 +1,4 @@
-# openkal Specification, version 0.20
+# openkal Specification, version 0.21
 
 ## 1. Scope
 
@@ -92,7 +92,7 @@ provides an interface in whole or not at all.
 
 Version 0.15 specifies the core and optional interfaces, version 0.18 adds
 `openkal.map` (clause 11, entry 40), and version 0.20 adds `openkal.region`,
-`openkal.prof` and `openkal.debug` (entries 44 and 45). The reserved row is not specified, and its
+`openkal.prof` and `openkal.debug` (entries 44 and 45); version 0.21 adds no interface. The reserved row is not specified, and its
 name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1860,6 +1860,28 @@ The following are recorded so that they are not mistaken for oversights.
     A cycle counter was considered for `openkal.prof` and not adopted: it would
     be a second time base beside `kal_time_monotonic`, which a measurement
     already has.
+46. **Instructions from a file.** **Specified in 0.21**, as
+    `kal_exec_map_part`, `KAL_EXEC_MAP_EXECUTE` and `KAL_EXEC_PROP_FILE` in
+    `openkal.exec` (`exec.h`). A loader copied every segment of an image into the
+    region it reserved, so each start of a program wrote and made resident the
+    whole of its instructions and read-only data: measured for a language
+    server, 54 MB and about 17 ms before its first instruction, paid again by each
+    of the 176 programs a build of its modules starts, where a program of the
+    environment maps its file and pays for the pages it touches. An image's
+    instructions and read-only data are the file's bytes unchanged (clause 12.2
+    allows no text relocation). It is an operation of `openkal.exec` and not a
+    region of `openkal.map` that may be executed, because instructions run only
+    from memory `openkal.exec` provides (entry 40): it is a second way to obtain
+    that memory, and a part made a file's is never writable, so no part of a
+    region is both. It is a part of a reserved region and not a region of its
+    own because an image's segments lie at fixed distances (entry 28). It is a
+    position and not required, because one environment makes a part of a
+    reservation a file's view only where the reservation was made of
+    placeholders, which would make every region a table of pieces (clause 7.1).
+    With it, the processor time of an ended program is stated to remain while
+    its handle is held (`kal_program_info`), as its peak memory does since 0.20:
+    every environment keeps it in the record of the ended program, and a C
+    library's `wait4` reports the two together.
 
 ## 12. Images
 
@@ -1890,15 +1912,15 @@ it and starts it the same way.
 
 Nothing else is environment-specific. An image calls only `kal_*`, so it needs
 from the loader only what this specification already declares, together with
-three operations a loader needs and a program could not otherwise reach
-(clause 11, entries 28 and 30).
+the operations a loader needs and a program could not otherwise reach
+(clause 11, entries 28, 30 and 46).
 
 ### 12.2 The image
 
 | Item | Requirement |
 | --- | --- |
 | container | ELF, position-independent (`ET_DYN`), little-endian, of the architecture's class; no text relocation |
-| alignment | every loadable segment aligned to at least 65536 bytes, which is the largest protection or reservation granularity among the environments this specification targets; a loader publishes each executable segment with `kal_exec_publish_part` |
+| alignment | every loadable segment aligned to at least 65536 bytes, which is the largest protection or reservation granularity among the environments this specification targets, and `KAL_MAP_ALIGNMENT`; a loader publishes each executable segment with `kal_exec_publish_part`, or makes it the file's with `kal_exec_map_part` |
 | relocations | only the architecture's relative, absolute, global-data and procedure-linkage relocations, and the packed relative form; a loader refuses any other |
 | imports | only names this specification declares, and names other images export; a name of a C library or of an environment is refused. A weak import is optional: it is bound when the implementation or an image the image needs provides it, and is zero otherwise |
 | entry | an executable image's ELF entry is a function of no parameters returning `int`, in the image's convention; its value is the image's status. An image that another loads has no entry |
@@ -1930,6 +1952,15 @@ returned (`kal_exit`). The image's
 them after its own, `kal_env_image` the image's name, and `kal_env_loader` the
 loader's own, so that the program can be started again (a loader, then an
 image).
+
+Where the implementation sets `KAL_EXEC_PROP_FILE` (version 0.21), a loader
+makes each segment that no relocation writes the file's bytes
+(`kal_exec_map_part`) rather than a copy of them: the instructions executed and
+the read-only data read. A program then starts as a program of its environment
+does, paying for the pages it touches; a loader copies where the position is
+zero, where the image's bytes are not a file's at a multiple of
+`KAL_MAP_ALIGNMENT` (an image a program carries in its own bytes), and where a
+relocation writes the segment.
 
 Where an environment's own convention differs from the image's --- on x86-64,
 one environment passes arguments in other registers --- the loader presents each

@@ -2,6 +2,8 @@ module okc.exec;
 
 import openkal.types;
 import openkal.exec;
+import openkal.macros;
+import openkal.stream;
 import okc.report;
 import okc.spec;
 
@@ -35,6 +37,107 @@ constexpr unsigned long kReturns42Size = sizeof(kReturns42);
 
 using fn = int (*)(void);
 
+#if defined(MCPP_FEATURE_FS)
+fn as_function(void* p) {
+    fn f = nullptr;
+    auto* d = reinterpret_cast<unsigned char*>(&f);
+    const auto* b = reinterpret_cast<const unsigned char*>(&p);
+    for (unsigned long i = 0; i < sizeof f; ++i) d[i] = b[i];
+    return f;
+}
+
+// INSTRUCTIONS FROM A FILE (version 0.21). The file is two alignments long: the
+// first holds a pattern, the second begins with the function and continues
+// with the pattern.
+constexpr char kFile[] = "okc-conformance-exec.tmp";
+constexpr kal_uintptr kAlign = static_cast<kal_uintptr>(kal::macros::KAL_MAP_ALIGNMENT_M);
+
+unsigned char pattern(kal_uintptr i) { return static_cast<unsigned char>((i * 13 + 5) % 251 + 1); }
+
+bool make_file() {
+    kal_file f{};
+    const auto flags = kal::fs::open::write | kal::fs::open::create | kal::fs::open::truncate;
+    if (kal::fs::open_file(kal::fs::working(), kFile, sizeof kFile - 1, flags, &f) != kal_ok) return false;
+    unsigned char block[4096];
+    bool ok = true;
+    for (kal_uintptr at = 0; ok && at < 2 * kAlign; at += sizeof block) {
+        for (kal_uintptr i = 0; i < sizeof block; ++i) block[i] = pattern(at + i);
+        if (at == kAlign)
+            for (unsigned long i = 0; i < kReturns42Size; ++i) block[i] = kReturns42[i];
+        ok = kal_stream_write(kal_fs_stream(f), block, sizeof block) == static_cast<kal_intptr>(sizeof block);
+    }
+    kal_fs_close_file(f);
+    return ok;
+}
+
+void from_a_file() {
+    const kal_uintptr g = kal_exec_granularity();
+    if (g == 0 || kAlign % g != 0) {
+        unobserved(kind::behaviour, "part of a region is made a file's",
+                   "the protection granularity does not divide KAL_MAP_ALIGNMENT");
+        return;
+    }
+    if (!make_file()) {
+        unobserved(kind::behaviour, "part of a region is made a file's", "a file could not be written");
+        return;
+    }
+    kal_file f{};
+    if (kal::fs::open_file(kal::fs::working(), kFile, sizeof kFile - 1, kal::fs::open::read, &f) != kal_ok) {
+        unobserved(kind::behaviour, "part of a region is made a file's", "the file could not be opened");
+        kal_fs_remove(kal::fs::working(), kFile, sizeof kFile - 1);
+        return;
+    }
+    void* r = kal_exec_alloc(3 * kAlign);
+    if (r == nullptr) {
+        kal_fs_close_file(f);
+        kal_fs_remove(kal::fs::working(), kFile, sizeof kFile - 1);
+        return;
+    }
+    auto* c = static_cast<unsigned char*>(r);
+    if (!kal::exec::has(kal::exec::file)) {
+        c[0] = 9;
+        observe(kind::behaviour,
+                kal_exec_map_part(r, 0, kAlign, f, 0, 0) == kal_err_not_supported && c[0] == 9,
+                "an implementation that does not report instructions from a file refuses them,"
+                " and the region is unchanged");
+        unobserved(kind::behaviour, "instructions in a file are executed from a part of a region",
+                   "the implementation does not report KAL_EXEC_PROP_FILE");
+    } else {
+        // The arguments the operation refuses, each leaving the region as it was.
+        c[0] = 9;
+        observe(kind::behaviour, kal_exec_map_part(r, 0, kAlign, f, 1, 0) == kal_err_invalid && c[0] == 9,
+                "an offset into the file that is not a multiple of KAL_MAP_ALIGNMENT is refused");
+        observe(kind::behaviour, kal_exec_map_part(r, 0, 2 * kAlign, f, kAlign, 0) == kal_err_invalid && c[0] == 9,
+                "a part that reaches beyond the end of the file is refused");
+        if (g > 1)
+            observe(kind::behaviour, kal_exec_map_part(r, 0, g / 2, f, 0, 0) == kal_err_invalid && c[0] == 9,
+                    "a part that is not a multiple of the granularity is refused");
+        observe(kind::behaviour, kal_exec_map_part(r, 0, kAlign, f, 0, kal_uintptr{1} << 9) == kal_err_invalid,
+                "a position of `how' this version does not assign is refused");
+
+        observe(kind::behaviour, kal_exec_map_part(r, 0, kAlign, f, 0, kal::exec::read.bits) == kal_ok,
+                "part of a region is made a file's bytes, to be read");
+        observe(kind::behaviour, kal_exec_map_part(r, kAlign, kAlign, f, kAlign, kal::exec::execute.bits) == kal_ok,
+                "part of a region is made a file's bytes, to be executed");
+        // The handle may go: the parts outlive it.
+        kal_fs_close_file(f);
+        f = kal_file{};
+        bool same = true;
+        for (kal_uintptr i = 0; i < kAlign; i += 997)
+            if (c[i] != pattern(i)) same = false;
+        observe(kind::behaviour, same, "the part read holds the file's bytes, after the file's handle is closed");
+        observe(kind::behaviour, as_function(c + kAlign)() == 42,
+                "instructions in a file are executed from a part of a region");
+        c[2 * kAlign] = 7;
+        c[2 * kAlign + 1] = static_cast<unsigned char>(c[2 * kAlign] + 1);
+        observe(kind::behaviour, c[2 * kAlign + 1] == 8, "the rest of the region is still writable");
+    }
+    kal_exec_free(r, 3 * kAlign);
+    if (f.h) kal_fs_close_file(f);
+    kal_fs_remove(kal::fs::working(), kFile, sizeof kFile - 1);
+}
+#endif
+
 }  // namespace
 
 void run() {
@@ -51,7 +154,7 @@ void run() {
 
     claim("kal_exec_props()", kal_exec_props());
     observe(kind::abi,
-            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available).bits) == 0,
+            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available | kal::exec::file).bits) == 0,
             "no position the specification has not assigned is reported");
 
     // WHETHER THE INTERFACE CAN BE EXERCISED BY THIS ARTIFACT IS READ BEFORE
@@ -181,6 +284,13 @@ void run() {
             kal_exec_free(r, 2 * g);
         }
     }
+
+    claim("KAL_EXEC_PROP_FILE", kal_exec_props() & kal::exec::file.bits);
+#if defined(MCPP_FEATURE_FS)
+    from_a_file();
+#else
+    unobserved(kind::behaviour, "part of a region is made a file's", "the fs interface was not selected");
+#endif
 #endif
 }
 

@@ -19,8 +19,9 @@
  * a table from handles to views --- the compatibility layer clause 7.1 names.
  *
  * NO REGION OF A FILE IS EXECUTABLE. Instructions are executed only from memory
- * `openkal.exec' published, which is where this specification keeps the rule
- * that no region is both writable and executable.
+ * of `openkal.exec' --- published, or made a file's by kal_exec_map_part
+ * (version 0.21) --- which is where this specification keeps the rule that no
+ * region is both writable and executable.
  *
  * Clause 4.4: S, L and X. The region lies in the caller's address space and is
  * the caller's storage, not the implementation's, as an allocation is; an

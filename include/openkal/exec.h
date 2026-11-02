@@ -20,6 +20,7 @@
 #ifndef OPENKAL_EXEC_H
 #define OPENKAL_EXEC_H
 #include "types.h"
+#include "fs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,6 +75,42 @@ int kal_exec_publish_part(void* region, kal_uintptr offset, kal_uintptr size);
  * run upon (clause 12) is published unchanged on each. */
 kal_uintptr kal_exec_granularity(void);
 
+/* Makes PART of a region obtained from kal_exec_alloc the bytes of a file:
+ * `size' bytes of `file' from `at', read, and executed as well where `how'
+ * holds KAL_EXEC_MAP_EXECUTE. Version 0.21, where KAL_EXEC_PROP_FILE is set;
+ * otherwise kal_err_not_supported, and the region is unchanged.
+ *
+ * A loader needs it. An image's instructions and read-only data are the bytes
+ * of its file, unchanged (clause 12.2 allows no text relocation), and a loader
+ * that copies them into the region writes and makes resident the whole of
+ * them each time a program starts, where a program of the environment maps
+ * them and pays for the pages it touches. A part that is a file's is never
+ * writable, so no part of a region is both writable and executable here
+ * either.
+ *
+ * `offset' and `size' are measured from the start of the region and are
+ * multiples of kal_exec_granularity; `at' is a multiple of KAL_MAP_ALIGNMENT
+ * (map.h); `size' is not zero; and `at' + `size' does not exceed the length of
+ * the file at the call. Otherwise, and for a position in `how' this version
+ * does not assign, kal_err_invalid. A file not opened with KAL_OPEN_READ is
+ * kal_err_permission. A file whose volume cannot be mapped, or does not let its
+ * files be executed, reports kal_err_not_supported, a property of the resource
+ * as for kal_map_file. In each of these the region is unchanged.
+ *
+ * What the part held before is gone. A part may be made a file's once, and is
+ * neither published nor written afterwards; the rest of the region is as it
+ * was. The part outlives the file's handle and is released with the region by
+ * kal_exec_free. Whether a change to the file appears in the part is not
+ * specified, as for a private region of openkal.map. An architecture with a
+ * separate instruction cache needs nothing of the caller here: the bytes reach
+ * the part through the environment, not through the caller's data path. */
+int kal_exec_map_part(void* region, kal_uintptr offset, kal_uintptr size,
+                      struct kal_file file, kal_u64 at, kal_uintptr how);
+
+/* Positions in the `how' argument of kal_exec_map_part. Absent, the part is
+ * read and not executed. */
+#define KAL_EXEC_MAP_EXECUTE ((kal_uintptr)1u << 0)
+
 /* Releases a region obtained from kal_exec_alloc, published or not. The size is
  * the one passed to the reservation. */
 void kal_exec_free(void* p, kal_uintptr size);
@@ -109,6 +146,17 @@ void kal_exec_free(void* p, kal_uintptr size);
  * position both ways, which is the only way the unavailable path is exercised
  * at all. */
 #define KAL_EXEC_PROP_AVAILABLE ((kal_uintptr)1u << 1)
+
+/* kal_exec_map_part makes part of a region a file's, read or executed. Version
+ * 0.21. Where the position is zero, a loader copies the file's bytes into the
+ * region, as before.
+ *
+ * A POSITION AND NOT AN INTERFACE, because it is a second way to obtain what
+ * this interface provides and not a resource of its own; and not required,
+ * because one environment makes a part of a reservation a file's view only
+ * where the reservation was made of placeholders, which would make every
+ * region a table of pieces (clause 7.1). */
+#define KAL_EXEC_PROP_FILE ((kal_uintptr)1u << 2)
 
 kal_uintptr kal_exec_props(void);
 

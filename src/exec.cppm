@@ -19,6 +19,7 @@ module;
 
 export module openkal.exec;
 export import openkal.types;
+export import openkal.fs;
 
 export using ::kal_exec_alloc;
 export using ::kal_exec_publish;
@@ -26,6 +27,7 @@ export using ::kal_exec_free;
 export using ::kal_exec_props;
 export using ::kal_exec_publish_part;
 export using ::kal_exec_granularity;
+export using ::kal_exec_map_part;
 
 export namespace kal::exec {
 
@@ -44,6 +46,18 @@ inline constexpr props republish{KAL_EXEC_PROP_REPUBLISH};
 // no answer at all for one produced once and run in many.
 inline constexpr props available{KAL_EXEC_PROP_AVAILABLE};
 
+// Part of a region may be made a file's, read or executed (version 0.21). Where
+// the position is zero, a loader copies the file's bytes into the region.
+inline constexpr props file{KAL_EXEC_PROP_FILE};
+
+// How a part is made a file's, in its own kind for the reason
+// `kal::map::how' is in one.
+struct map_how_tag;
+using map_how = kal::props<map_how_tag>;
+
+inline constexpr map_how read   {0};
+inline constexpr map_how execute{KAL_EXEC_MAP_EXECUTE};
+
 inline props properties() { return props{kal_exec_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
@@ -53,6 +67,10 @@ inline int   publish_part(void* region, kal_uintptr offset, kal_uintptr size) {
     return kal_exec_publish_part(region, offset, size);
 }
 inline kal_uintptr granularity() { return kal_exec_granularity(); }
+inline int   map_part(void* region, kal_uintptr offset, kal_uintptr size, kal_file f, kal_u64 at,
+                      map_how h) {
+    return kal_exec_map_part(region, offset, size, f, at, h.bits);
+}
 inline void  free(void* p, kal_uintptr size) { kal_exec_free(p, size); }
 
 }
