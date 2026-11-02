@@ -63,6 +63,7 @@ export using ::kal_fs_props;
 export using ::kal_fs_max_name;
 export using ::kal_fs_link_create;
 export using ::kal_fs_link_read;
+export using ::kal_fs_resolved_name;
 
 static_assert(sizeof(kal_dir)  == sizeof(kal_uintptr), "clause 7.2");
 static_assert(sizeof(kal_file) == sizeof(kal_uintptr), "clause 7.2");
@@ -125,6 +126,8 @@ inline constexpr props local_endpoint{KAL_FS_PROP_LOCAL_ENDPOINT};
 // A name is removed at once although a file of that name is open (clause
 // 7.14). Version 0.17.
 inline constexpr props remove_open{KAL_FS_PROP_REMOVE_OPEN};
+// kal_fs_resolved_name is answered on this volume. Version 0.23.
+inline constexpr props resolved_name{KAL_FS_PROP_RESOLVED_NAME};
 
 struct rename_flag_tag;
 using rename_flags = kal::props<rename_flag_tag>;

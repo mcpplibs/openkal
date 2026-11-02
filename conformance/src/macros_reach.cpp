@@ -45,5 +45,7 @@ static_assert(kal::macros::KAL_SPAWN_NULL_IN_M == 4u);
 static_assert(kal::macros::KAL_SPAWN_NULL_OUT_M == 8u);
 static_assert(kal::macros::KAL_SPAWN_NULL_ERR_M == 16u);
 static_assert(kal::macros::KAL_PROCESS_PROP_NULL_STREAMS_M == 8192u);
+static_assert(kal::macros::KAL_EXEC_PROP_PLACE_M == 8u);
+static_assert(kal::macros::KAL_FS_PROP_RESOLVED_NAME_M == 2048u);
 
 }  // namespace

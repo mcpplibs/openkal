@@ -22,6 +22,7 @@ export import openkal.types;
 export import openkal.fs;
 
 export using ::kal_exec_alloc;
+export using ::kal_exec_alloc_at;
 export using ::kal_exec_publish;
 export using ::kal_exec_free;
 export using ::kal_exec_props;
@@ -50,6 +51,11 @@ inline constexpr props available{KAL_EXEC_PROP_AVAILABLE};
 // the position is zero, a loader copies the file's bytes into the region.
 inline constexpr props file{KAL_EXEC_PROP_FILE};
 
+// A region may be reserved at the address asked for, where nothing is there
+// (version 0.23). Where the position is zero, kal_exec_alloc_at answers with a
+// null pointer.
+inline constexpr props place{KAL_EXEC_PROP_PLACE};
+
 // How a part is made a file's, in its own kind for the reason
 // `kal::map::how' is in one.
 struct map_how_tag;
@@ -62,6 +68,7 @@ inline props properties() { return props{kal_exec_props()}; }
 inline bool  has(props p) { return properties().has(p); }
 
 inline void* alloc(kal_uintptr size) { return kal_exec_alloc(size); }
+inline void* alloc_at(void* at, kal_uintptr size) { return kal_exec_alloc_at(at, size); }
 inline int   publish(void* p, kal_uintptr size) { return kal_exec_publish(p, size); }
 inline int   publish_part(void* region, kal_uintptr offset, kal_uintptr size) {
     return kal_exec_publish_part(region, offset, size);

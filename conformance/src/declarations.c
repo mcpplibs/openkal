@@ -45,6 +45,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_env_var_at);
     (void)sizeof(&kal_env_var_count);
     (void)sizeof(&kal_exec_alloc);
+    (void)sizeof(&kal_exec_alloc_at);
     (void)sizeof(&kal_exec_free);
     (void)sizeof(&kal_exec_granularity);
     (void)sizeof(&kal_exec_map_part);
@@ -60,6 +61,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_fs_info);
     (void)sizeof(&kal_fs_link_create);
     (void)sizeof(&kal_fs_link_read);
+    (void)sizeof(&kal_fs_resolved_name);
     (void)sizeof(&kal_fs_list_begin);
     (void)sizeof(&kal_fs_list_next);
     (void)sizeof(&kal_fs_lock);

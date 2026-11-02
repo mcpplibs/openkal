@@ -40,6 +40,29 @@ extern "C" {
  * environment protects at, and a caller cannot usefully ask for less. */
 void* kal_exec_alloc(kal_uintptr size);
 
+/* Reserves the region at `at', as kal_exec_alloc reserves one, where nothing
+ * is reserved there and the environment lets a program place memory there.
+ * Returns `at', or a null pointer with nothing reserved. Version 0.23, where
+ * KAL_EXEC_PROP_PLACE is set; otherwise a null pointer.
+ *
+ * A loader needs it. An image's writable segments hold the addresses its
+ * relative relocations compute from where the image is placed, and a loader
+ * that places it anywhere writes every such address on every start --- measured
+ * for a language server's image, 164 000 of them over two mebibytes, made
+ * resident in each of the 176 programs a build of its modules starts, where a
+ * program of the environment linked for one address writes none. An image may
+ * carry its writable segments computed for one address (clause 12.4); a loader
+ * that is given that address maps or copies them and writes only what names an
+ * import.
+ *
+ * `at' is a multiple of kal_memory_granularity, and `size' is not zero;
+ * otherwise a null pointer. The region is released by kal_exec_free, and is in
+ * every other respect one kal_exec_alloc returned. The address is a request: an
+ * environment that has placed something there, or does not let a program choose
+ * where its memory lies, answers with a null pointer, and the caller reserves
+ * one with kal_exec_alloc instead. */
+void* kal_exec_alloc_at(void* at, kal_uintptr size);
+
 /* Makes a region obtained from kal_exec_alloc executable and no longer
  * writable. Returns kal_ok, or an error if the environment refuses.
  *
@@ -157,6 +180,13 @@ void kal_exec_free(void* p, kal_uintptr size);
  * where the reservation was made of placeholders, which would make every
  * region a table of pieces (clause 7.1). */
 #define KAL_EXEC_PROP_FILE ((kal_uintptr)1u << 2)
+
+/* kal_exec_alloc_at reserves a region at the address asked for, where nothing
+ * is there. Version 0.23. Where the position is zero, kal_exec_alloc_at answers
+ * with a null pointer and a loader places an image where kal_exec_alloc does.
+ * A position and not required, because an environment may decide where every
+ * program's memory lies. */
+#define KAL_EXEC_PROP_PLACE ((kal_uintptr)1u << 3)
 
 kal_uintptr kal_exec_props(void);
 

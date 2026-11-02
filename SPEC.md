@@ -1,4 +1,4 @@
-# openkal Specification, version 0.22
+# openkal Specification, version 0.23
 
 ## 1. Scope
 
@@ -92,7 +92,7 @@ provides an interface in whole or not at all.
 
 Version 0.15 specifies the core and optional interfaces, version 0.18 adds
 `openkal.map` (clause 11, entry 40), and version 0.20 adds `openkal.region`,
-`openkal.prof` and `openkal.debug` (entries 44 and 45); versions 0.21 and 0.22 add no interface. The reserved row is not specified, and its
+`openkal.prof` and `openkal.debug` (entries 44 and 45); versions 0.21 to 0.23 add no interface. The reserved row is not specified, and its
 name shall not be used for other purposes.
 
 The S, L and X columns state which boundaries an interface's declarations can
@@ -1920,6 +1920,35 @@ The following are recorded so that they are not mistaken for oversights.
     writes the device itself is served by its C library without the
     environment. It is a position and not required, because an environment
     that starts no programs has nothing to give it to.
+48. **An image placed at its base.** **Specified in 0.23**, as
+    `kal_exec_alloc_at` and `KAL_EXEC_PROP_PLACE` in `openkal.exec`
+    (`exec.h`), with the placement note (clause 12.4, version 1.1) and its use
+    by a loader (clause 12.3). An image is position-independent (12.2), so a
+    loader wrote, on every start, each address its relative relocations
+    compute: measured for a language server's image, 164 000 relocations over
+    two mebibytes of read-only-after-relocation data, made resident in each of
+    the 176 programs a build of its modules starts --- about 900 page faults a
+    program more than the same server built for its environment at one
+    address, which on a virtual machine of a continuous-integration service
+    cost a fifth of the build's processor time. An image computed once for one
+    base and placed there is the file's pages, as such a program is. The
+    reservation at an address is an operation and not a hint to
+    `kal_exec_alloc`, because a loader that is refused must know it before it
+    writes anything; it is a position, because an environment may decide where
+    every program's memory lies; and the address is the image's, chosen when it
+    is sealed, not the environment's.
+49. **A name with every link followed.** **Specified in 0.23**, as
+    `kal_fs_resolved_name` and `KAL_FS_PROP_RESOLVED_NAME` in `openkal.fs`
+    (`fs.h`). A C library's `realpath` asked about each component of a name in
+    turn whether it is a link: measured in a language server's session run as
+    an image, half a million enquiries, where the program of its environment
+    asked the environment once for each file it opened (`/proc/self/fd` on one
+    system, `F_GETPATH` on another). Every environment that keeps links answers
+    the question for a name it has resolved, and nothing above it can compose
+    the enquiries into one. The name is absolute and in the environment's
+    spelling, as `kal_env_image` states one: a C library maps it onto its own
+    names as it maps that one. It is a position of the volume, as the other
+    operations of names are.
 
 ## 12. Images
 
@@ -2000,6 +2029,19 @@ zero, where the image's bytes are not a file's at a multiple of
 `KAL_MAP_ALIGNMENT` (an image a program carries in its own bytes), and where a
 relocation writes the segment.
 
+Where the implementation sets `KAL_EXEC_PROP_PLACE` (version 0.23) and the image
+carries a placement note (12.4), a loader asks for the image's span at the
+note's base (`kal_exec_alloc_at`). Given it, the loader takes each stored
+segment's bytes instead of the file's and applies only the relocations that
+name a symbol: a part of a stored segment that is read-only after relocation
+(the image's `PT_GNU_RELRO`) and that no such relocation writes is the file's
+bytes (`kal_exec_map_part`) where `KAL_EXEC_PROP_FILE` is set, and the rest is
+copied. Refused, or where the position is zero, the loader reserves the span
+anywhere and relocates the file's segments as before. The program observes the
+same memory either way; what differs is that a program placed at its base writes
+no address its relative relocations compute, as a program of its environment
+linked for one address does not.
+
 Where an environment's own convention differs from the image's --- on x86-64,
 one environment passes arguments in other registers --- the loader presents each
 entry in the image's convention, and a function the image passes to the
@@ -2028,10 +2070,13 @@ An image carries notes whose owner is `OPENKAL`, in a section `.note.openkal`:
 
 | type | descriptor |
 | --- | --- |
-| 1, requirements | `kal_u32` major and `kal_u32` minor version of this clause (1 and 0), then a `kal_u64` of `KAL_IFACE_*` positions: **the interfaces the image requires**, derived from the names it imports other than weakly |
+| 1, requirements | `kal_u32` major and `kal_u32` minor version of this clause (1 and 1; 1 and 0 before version 0.23 added the placement note), then a `kal_u64` of `KAL_IFACE_*` positions: **the interfaces the image requires**, derived from the names it imports other than weakly |
 | 2, signature | 32 bytes of an Ed25519 public key, then 64 bytes of the signature, over the whole file with these 96 bytes read as zero |
+| 3, placement | a `kal_u64` base, a multiple of 65536; a `kal_u32` count and a `kal_u32` zero; then, for each of `count` writable loadable segments that have bytes in the file, in ascending order of address, three `kal_u64`: the segment's address in the image, the file offset of its stored bytes, congruent to that address modulo 65536, and their length, the segment's size in the file. The stored bytes are the segment's file bytes with each relative relocation, and each of the packed relative form, applied for `base`; a relocation that names a symbol is not applied. Version 1.1 of this clause |
 
-The first is required and the second is not. A loader compares the required interfaces with `kal_interfaces` and
+The first is required and the others are not. A count of zero states no
+placement, and a loader reads a placement note only after the requirements note
+states version 1.1 or higher. A loader compares the required interfaces with `kal_interfaces` and
 refuses to load an image that requires one the implementation does not provide,
 naming the interface. That is clause 6.1 in this arrangement: the loader binds
 at load what a linker binds at link, so it reports at load what a linker reports

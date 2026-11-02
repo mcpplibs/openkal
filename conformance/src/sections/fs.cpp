@@ -403,6 +403,46 @@ void run() {
                    "the volume does not claim KAL_FS_PROP_REMOVE_OPEN");
     }
 
+    // THE NAME WITH EVERY LINK FOLLOWED (0.23): absolute, the same for a file
+    // reached through a link as reached directly, and absent for a name that is
+    // not there; refused on a volume that does not claim it.
+    {
+        const char* kResolvedLink = "okc-conformance-resolved.tmp";
+        const char* kMissing      = "okc-conformance-missing.tmp";
+        char a[4096], b[4096];
+        if ((kal_fs_props(here()) & kal::fs::resolved_name.bits) != 0) {
+            put_file(kName, "x");
+            const kal_intptr na = kal_fs_resolved_name(here(), kName, length(kName), a, sizeof a);
+            observe(kind::behaviour, na > 0 && na < static_cast<kal_intptr>(sizeof a),
+                    "a file's name with every link followed is given");
+            const bool absolute = na > 0 && (a[0] == '/' || a[0] == '\\' || (na > 2 && a[1] == ':'));
+            bool ends = na >= static_cast<kal_intptr>(length(kName));
+            for (kal_uintptr i = 0; ends && i < length(kName); ++i)
+                ends = a[na - static_cast<kal_intptr>(length(kName)) + static_cast<kal_intptr>(i)] == kName[i];
+            observe(kind::behaviour, absolute && ends, "and it is absolute, and ends with the file's own name");
+            if ((kal_fs_props(here()) & kal::fs::make_links.bits) != 0) {
+                kal_fs_remove(here(), kResolvedLink, length(kResolvedLink));
+                if (kal_fs_link_create(here(), kResolvedLink, length(kResolvedLink), kName, length(kName), 0) == kal_ok) {
+                    const kal_intptr nb = kal_fs_resolved_name(here(), kResolvedLink, length(kResolvedLink), b, sizeof b);
+                    bool same = nb == na;
+                    for (kal_intptr i = 0; same && i < na; ++i) same = a[i] == b[i];
+                    observe(kind::behaviour, same, "a link to the file is given the file's name");
+                    kal_fs_remove(here(), kResolvedLink, length(kResolvedLink));
+                }
+            } else {
+                unobserved(kind::behaviour, "a link to the file is given the file's name",
+                           "the volume does not make links");
+            }
+            observe(kind::behaviour,
+                    kal_fs_resolved_name(here(), kMissing, length(kMissing), a, sizeof a) == -kal_err_not_found,
+                    "a name that is not there is absent");
+        } else {
+            observe(kind::behaviour,
+                    kal_fs_resolved_name(here(), kName, length(kName), a, sizeof a) == -kal_err_not_supported,
+                    "a resolved name is refused on a volume that does not claim it");
+        }
+    }
+
     // Renaming, and that the old name is then absent.
     {
         put_file(kName, "x");
@@ -818,7 +858,8 @@ void run() {
                                     | kal::fs::make_links
                                     | kal::fs::locks | kal::fs::capacity
                                     | kal::fs::executable | kal::fs::rename_no_replace
-                                    | kal::fs::local_endpoint | kal::fs::remove_open).bits;
+                                    | kal::fs::local_endpoint | kal::fs::remove_open
+                                    | kal::fs::resolved_name).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 

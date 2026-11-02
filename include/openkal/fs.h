@@ -173,6 +173,9 @@ struct kal_node_info {
                                                             * once although a file
                                                             * of that name is open.
                                                             * 0.17 */
+#define KAL_FS_PROP_RESOLVED_NAME  ((kal_uintptr)1u << 11) /* kal_fs_resolved_name
+                                                            * is answered here.
+                                                            * 0.23 */
 
 /* Positions in the flags word of kal_fs_open. */
 #define KAL_OPEN_READ      ((kal_uintptr)1u << 0)
@@ -565,6 +568,23 @@ int        kal_fs_link_create(struct kal_dir base, const char* name, kal_uintptr
                               kal_uintptr flags);
 kal_intptr kal_fs_link_read  (struct kal_dir base, const char* name, kal_uintptr len,
                               char* out, kal_uintptr cap);
+
+/* The name `name' refers to with every link in it followed: absolute, in the
+ * environment's spelling, as kal_env_image states a name. Writes min(cap,
+ * length) bytes at `out' and returns the length, or the negated error:
+ * kal_err_not_found where nothing is there. Version 0.23, where kal_fs_props of
+ * `base' holds KAL_FS_PROP_RESOLVED_NAME; otherwise kal_err_not_supported,
+ * negated.
+ *
+ * A C library needs it for `realpath', which resolved a name by asking about
+ * each of its components in turn whether it is a link (kal_fs_info with
+ * KAL_FS_NO_RESOLVE) --- measured in a language server's session, half a
+ * million enquiries where the program of the environment asked the environment
+ * once for each file it opened. Every environment that keeps links answers the
+ * question for a name it has resolved, and only it can; the enquiries cannot
+ * be composed into one by anything above it. */
+kal_intptr kal_fs_resolved_name(struct kal_dir base, const char* name, kal_uintptr len,
+                                char* out, kal_uintptr cap);
 
 /* Enumeration. The iterator is owned and is released by reading past the end or
  * by closing the directory that produced it. The end is reported by the

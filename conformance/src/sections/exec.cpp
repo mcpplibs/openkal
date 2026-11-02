@@ -2,6 +2,7 @@ module okc.exec;
 
 import openkal.types;
 import openkal.exec;
+import openkal.memory;
 import openkal.macros;
 import openkal.stream;
 import okc.report;
@@ -68,6 +69,43 @@ bool make_file() {
     }
     kal_fs_close_file(f);
     return ok;
+}
+
+// A region at the address asked for (0.23): an address just released is given
+// again, and one a region holds is refused with nothing reserved; where the
+// position is zero, every request is refused. An address that is not a multiple
+// of the reservation quantum is refused either way.
+void at_an_address() {
+    const kal_uintptr q = kal_memory_granularity();
+    const kal_uintptr size = 4 * q;
+    void* r = kal_exec_alloc(size);
+    if (r == nullptr) {
+        unobserved(kind::behaviour, "a region is reserved at the address asked for",
+                   "no region could be reserved to find a free address");
+        return;
+    }
+    auto* bytes = static_cast<unsigned char*>(r);
+    observe(kind::behaviour, kal_exec_alloc_at(bytes + 1, size) == nullptr,
+            "an address that is not a multiple of the reservation quantum is refused");
+    if (!kal::exec::has(kal::exec::place)) {
+        kal_exec_free(r, size);
+        observe(kind::behaviour, kal_exec_alloc_at(r, size) == nullptr,
+                "a region at an address is refused where the implementation does not claim it");
+        return;
+    }
+    observe(kind::behaviour, kal_exec_alloc_at(r, size) == nullptr,
+            "an address a region holds is refused");
+    bytes[0] = 5;
+    observe(kind::behaviour, bytes[0] == 5, "and the region there is as it was");
+    kal_exec_free(r, size);
+    void* again = kal_exec_alloc_at(r, size);
+    observe(kind::behaviour, again == r, "a region is reserved at an address just released");
+    if (again == r) {
+        auto* b = static_cast<unsigned char*>(again);
+        b[size - 1] = 6;
+        observe(kind::behaviour, b[size - 1] == 6, "and is written as a region kal_exec_alloc returned");
+        kal_exec_free(again, size);
+    }
 }
 
 void from_a_file() {
@@ -154,7 +192,7 @@ void run() {
 
     claim("kal_exec_props()", kal_exec_props());
     observe(kind::abi,
-            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available | kal::exec::file).bits) == 0,
+            (kal_exec_props() & ~(kal::exec::republish | kal::exec::available | kal::exec::file | kal::exec::place).bits) == 0,
             "no position the specification has not assigned is reported");
 
     // WHETHER THE INTERFACE CAN BE EXERCISED BY THIS ARTIFACT IS READ BEFORE
@@ -286,6 +324,8 @@ void run() {
     }
 
     claim("KAL_EXEC_PROP_FILE", kal_exec_props() & kal::exec::file.bits);
+    claim("KAL_EXEC_PROP_PLACE", kal_exec_props() & kal::exec::place.bits);
+    at_an_address();
 #if defined(MCPP_FEATURE_FS)
     from_a_file();
 #else
