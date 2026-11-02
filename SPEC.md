@@ -1038,17 +1038,19 @@ it the environment's null device: at that position the started program reads
 the end of input, and every write is accepted in full and discarded. An
 implementation claims the three with `KAL_PROCESS_PROP_NULL_STREAMS`; one that
 does not reports `kal_err_not_supported` and starts nothing. A flag beside a
-non-zero stream at the same position is `kal_err_invalid`.
+non-zero stream at the same position is `kal_err_invalid`. The device occupies
+its position and is not a further handle (clause 7.13), and an implementation
+that opens it for the start leaves the caller holding nothing of it.
 
 The device is a resource of every environment that starts programs, and each
 names it in its own spelling: `/dev/null` on Linux and macOS, `NUL` on Windows.
 This specification names nothing outside the directories it supplies, so the
 device is reached by the position it is given at and not by a name; a C library
 maps its own spelling of the device onto the flags. A library cannot compose the
-device from what precedes it: a placed stream is a channel or a file, and a
-channel's far end either ends the started program's writes with an error once
-its reader is released, or keeps a reader in the caller for as long as the
-program runs.
+device from what precedes it: a placed stream is a file's or a channel's end; a
+file keeps what is written, and a channel's far end either ends the started
+program's writes with an error once its reader is released, or keeps a reader in
+the caller for as long as the program runs.
 
 ## 8. Evolution
 
