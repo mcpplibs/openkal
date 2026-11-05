@@ -159,13 +159,23 @@ void windows_case(const fs::path& root, bool bound, bool normal) {
             if (!bound) {
                 // Query before opening even a process handle in this observer:
                 // no retained controller/worker handle may mask name lifetime.
-                report("named_job_survives_without_observer_process_handles", observe(name) == observation::occupied);
+                const auto first = observe(name);
+                const auto query_error = GetLastError();
                 child.value = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
                 require(child.value != nullptr && same_birth(created(child.value), worker_birth), "hold_orphan_process_identity");
-                report("writer_survives_unbound_controller", WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT);
-                report("named_job_remains_observable_without_controller_handle", observe(name) == observation::occupied);
+                const bool writer_alive = WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT;
+                std::cout << "{\"post_controller_state\":" << static_cast<int>(first)
+                          << ",\"query_error\":" << query_error
+                          << ",\"writer_alive\":" << (writer_alive ? "true" : "false") << "}\n";
                 put(root / "worker.release", "go");
-                require(until([&] { return fs::exists(root / "late.write"); }), "late_writer_output");
+                require(until([&] { return fs::exists(root / "late.write")
+                    || WaitForSingleObject(child.value, 0) == WAIT_OBJECT_0; }), "post_controller_writer_outcome");
+                const bool wrote_late = fs::exists(root / "late.write");
+                std::cout << "{\"writer_completed_after_controller_loss\":" << (wrote_late ? "true" : "false") << "}\n";
+                report("missing_job_does_not_hide_later_output_write", first != observation::empty || !wrote_late);
+                report("named_job_survives_without_observer_process_handles", first == observation::occupied);
+                report("writer_survives_unbound_controller", writer_alive);
+                require(wrote_late, "late_writer_output");
             }
         }
         bool false_empty = false;
@@ -268,9 +278,10 @@ std::size_t members(pid_t group) {
     return result;
 #else
     pid_t ids[2048]{};
-    const int bytes = proc_listpgrppids(static_cast<std::uint32_t>(group), ids, sizeof ids);
-    require(bytes > 0, "list_private_group_members");
-    return static_cast<std::size_t>(bytes) / sizeof(pid_t);
+    // proc_listpgrppids already converts proc_listpids' byte count to a PID count.
+    const int count = proc_listpgrppids(group, ids, sizeof ids);
+    require(count > 0, "list_private_group_members");
+    return static_cast<std::size_t>(count);
 #endif
 }
 void posix_case(const fs::path& root, bool normal) {
