@@ -33,10 +33,11 @@
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
 void require(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
+int failed_checks = 0;
 void report(const char* name, bool value) {
     std::cout << "{\"check\":\"" << name << "\",\"ok\":" << (value ? "true" : "false") << "}\n";
     std::cout.flush();
-    require(value, name);
+    if (!value) ++failed_checks;
 }
 template<class Predicate> bool until(Predicate predicate, std::chrono::milliseconds bound = 5000ms) {
     const auto end = std::chrono::steady_clock::now() + bound;
@@ -138,6 +139,8 @@ void windows_case(const fs::path& root, bool bound, bool normal) {
     try {
         require(until([&] { return fs::exists(root / "controller.ready"); }), "controller_ready");
         report("private_job_contains_helper_and_writer", text(root / "controller.ready") == "2");
+        std::cout << "{\"bound_lifetime\":" << (bound ? "true" : "false")
+                  << ",\"normal_completion\":" << (normal ? "true" : "false") << "}\n";
         const auto pid = static_cast<DWORD>(std::stoul(text(root / "worker.ready")));
         worker_id = pid;
         child.value = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
@@ -177,6 +180,17 @@ void windows_case(const fs::path& root, bool bound, bool normal) {
                 report("writer_survives_unbound_controller", writer_alive);
                 require(wrote_late, "late_writer_output");
             }
+        }
+        if (bound && !normal) {
+            const auto state = observe(name);
+            const bool live = WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT;
+            put(root / "worker.release", "go");
+            require(until([&] { return fs::exists(root / "late.write")
+                || WaitForSingleObject(child.value, 0) == WAIT_OBJECT_0; }), "bound_writer_outcome");
+            std::cout << "{\"bound_post_controller_state\":" << static_cast<int>(state)
+                      << ",\"writer_was_alive\":" << (live ? "true" : "false")
+                      << ",\"writer_completed_after_close\":" << (fs::exists(root / "late.write") ? "true" : "false") << "}\n";
+            report("bound_close_prevents_later_write", !fs::exists(root / "late.write"));
         }
         bool false_empty = false;
         require(until([&] {
@@ -318,7 +332,7 @@ void posix_case(const fs::path& root, bool normal) {
         kill(-owner, SIGKILL); kill(owner, SIGKILL); wait_reap(owner); reap(); throw;
     }
 }
-void stderr_intervals(bool external_sleep) {
+void stderr_intervals(bool external_sleep, bool absolute = false) {
     int channel[2]; require(pipe(channel) == 0, "producer_pipe");
     const auto child = fork(); require(child >= 0, "producer_fork");
     if (child == 0) {
@@ -327,14 +341,17 @@ void stderr_intervals(bool external_sleep) {
             execl("/bin/sh", "sh", "-c", "for i in 1 2 3 4 5 6 7 8; do printf x >&2; sleep .03; done; exit 7", nullptr);
             _exit(97);
         }
+        auto next = std::chrono::steady_clock::now();
         for (int i = 0; i < 24; ++i) {
             if (write(2, "x", 1) != 1) _exit(98);
-            std::this_thread::sleep_for(30ms);
+            if (absolute) { next += 30ms; std::this_thread::sleep_until(next); }
+            else std::this_thread::sleep_for(30ms);
         }
         _exit(7);
     }
     close(channel[1]);
-    auto previous = std::chrono::steady_clock::now();
+    const auto start = std::chrono::steady_clock::now();
+    auto previous = start;
     std::chrono::nanoseconds longest{0}; std::size_t bytes = 0;
     try {
         for (;;) {
@@ -352,8 +369,9 @@ void stderr_intervals(bool external_sleep) {
         }
         close(channel[0]); wait_reap(child);
         require(bytes == (external_sleep ? 8u : 24u), "all_stderr_ticks_observed");
-        std::cout << "{\"producer\":\"" << (external_sleep ? "shell_with_external_sleep" : "one_process_ticks")
-                  << "\",\"max_observed_gap_ns\":" << longest.count() << ",\"bytes\":" << bytes << "}\n";
+        std::cout << "{\"producer\":\"" << (external_sleep ? "shell_with_external_sleep" : absolute ? "one_process_absolute_ticks" : "one_process_ticks")
+                  << "\",\"max_observed_gap_ns\":" << longest.count() << ",\"bytes\":" << bytes
+                  << ",\"elapsed_ns\":" << std::chrono::duration_cast<std::chrono::nanoseconds>(previous - start).count() << "}\n";
     } catch (...) { close(channel[0]); kill(-child, SIGKILL); wait_reap(child); throw; }
 }
 #ifdef __linux__
@@ -393,7 +411,7 @@ int main(int argc, char** argv) {
         if (argc > 4 && std::string(argv[1]) == "controller") return controller(argv[2], argv[3], std::string(argv[4]) == "1");
 #else
 #ifdef __linux__
-        if (argc > 1 && std::string(argv[1]) == "--pid-reuse") { reuse_case(); return 0; }
+        if (argc > 1 && std::string(argv[1]) == "--pid-reuse") { reuse_case(); return failed_checks ? 1 : 0; }
         require(prctl(PR_SET_CHILD_SUBREAPER, 1) == 0, "test_harness_reaps_orphans");
 #endif
 #endif
@@ -410,10 +428,11 @@ int main(int argc, char** argv) {
             posix_case(root / "owner-lost", false);
             for (int repeat = 0; repeat < 5; ++repeat) stderr_intervals(true);
             stderr_intervals(false);
+            stderr_intervals(false, true);
 #endif
         } catch (...) { fs::remove_all(root); throw; }
         fs::remove_all(root);
-        return 0;
+        return failed_checks ? 1 : 0;
     } catch (const std::exception& error) {
         std::cerr << "unit probe failed: " << error.what() << '\n'; return 1;
     }
