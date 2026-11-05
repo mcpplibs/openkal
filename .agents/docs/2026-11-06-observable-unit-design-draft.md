@@ -109,10 +109,30 @@ of further writes are different observations; the native experiment records
 these separately before a production completion contract is selected.
 
 The prototype measures its startup acknowledgement and repeated original-job
-queries. Its file acknowledgement uses a five-millisecond polling interval;
-this is an experiment parameter, not an accepted production mechanism or cost.
-A final design must account for both steady-state build overhead and tail
-latency, including any added thread, polling and handshake.
+queries. In eight Windows pairs using the same nested-job arrangement, median
+startup through descendant readiness was 60.393 ms without acknowledgement and
+76.437 ms with it. Original-job queries took a median 1.00 microsecond each,
+measured in batches of 1000. These are small controlled samples rather than a
+build benchmark. The file acknowledgement polls at five milliseconds and adds
+approximately 16 ms to median startup in this experiment; it is not an accepted
+production transport. The native prototype adds no background thread. A final
+design must measure its actual notification mechanism, any added thread, normal
+and cached builds, and tail latency before release.
+
+Linux and macOS controls establish that a retired helper retains its original
+identity while the kernel reports its former group empty. Linux also exercises
+actual group-identifier reuse in a separate PID namespace. Windows retains the
+negative name-loss controls; the hypothesis that unit emptiness always follows
+the final process-handle signal is disproved and is not used as a completion
+contract. An original job's active membership, final process signaling and
+subsequent output commits remain distinct observations.
+
+The relevant native contracts are [job accounting](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information),
+[process termination](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess)
+and [job termination](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-terminatejobobject).
+Termination requests do not themselves certify completion. A retained original
+job and a closed admission boundary are required for a job-wide completion
+query; a missing name cannot supply either.
 
 ## Core transaction and permit protocol
 
