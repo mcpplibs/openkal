@@ -75,9 +75,12 @@ Candidate backend implementations require experiments before approval:
 - Windows: a job name alone is insufficient. The native experiment observes
   `ERROR_FILE_NOT_FOUND` after the controller closes its last handle while a
   writer is still alive. Without a lifetime limit, that writer subsequently
-  commits output. With `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, a live writer is
-  still observable after the name disappears, so asynchronous termination is
-  not an emptiness proof either. The pinned backend deliberately leaves this
+  commits output. With `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, a retained writer
+  process handle can remain nonsignaled after the name disappears. These
+  samples do not establish that the terminating writer can commit more output;
+  a process's final signal and job association accounting are recorded as
+  separate observations. Name absence still cannot identify or query the
+  original job. The pinned backend deliberately leaves this
   flag unset for `own_unit`; `bound_lifetime` instead creates a separate nested
   job with the flag. The experiment compares these arrangements with a compiler
   driver and descendant writer. A retained native handle can query the original

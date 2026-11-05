@@ -185,8 +185,10 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
     try {
         require(until([&] { return fs::exists(root / "controller.ready"); }), "controller_ready");
         report("private_job_contains_helper_driver_and_writer", text(root / "controller.ready") == "3");
-        if (retain) std::cout << "{\"startup_through_ack_ns\":"
-            << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - attempt_start).count() << "}\n";
+        std::cout << "{\"startup_to_writer_ready_ns\":"
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - attempt_start).count()
+            << ",\"retained_observer\":" << (retain ? "true" : "false")
+            << ",\"lifetime_policy\":" << policy << "}\n";
         std::cout << "{\"lifetime_policy\":" << policy << ",\"bound_lifetime\":" << (bound ? "true" : "false")
                   << ",\"retained_observer\":" << (retain ? "true" : "false")
                   << ",\"normal_completion\":" << (normal ? "true" : "false") << "}\n";
@@ -246,7 +248,7 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
                       << ",\"membership_query_known\":" << (membership_known ? "true" : "false")
                       << ",\"writer_still_associated\":" << (associated ? "true" : "false")
                       << ",\"writer_exit_code\":" << exit_code
-                      << ",\"writer_was_alive\":" << (live ? "true" : "false")
+                      << ",\"writer_handle_not_signaled\":" << (live ? "true" : "false")
                       << ",\"writer_completed_after_close\":" << (fs::exists(root / "late.write") ? "true" : "false") << "}\n";
             report("bound_close_prevents_later_write", !fs::exists(root / "late.write"));
         }
@@ -256,7 +258,7 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
             if (state == observation::empty && !ended) false_empty = true;
             return ended && state == observation::empty;
         }), "whole_job_empty_after_writer_exit");
-        report("missing_named_job_never_precedes_live_writer", !false_empty);
+        report("unit_empty_does_not_precede_process_signal", !false_empty);
         report("complete_job_is_empty", observe_unit() == observation::empty);
     } catch (...) {
         if (owner.value) TerminateProcess(owner.value, 137);
@@ -491,10 +493,10 @@ int main(int argc, char** argv) {
             windows_case(root / "owner-lost", 0, false);
             windows_case(root / "retained-normal", 0, true, true);
             windows_case(root / "retained-owner-lost", 0, false, true);
-            windows_case(root / "retained-nested-bound-owner-lost", 2, false, true);
             for (int repeat = 0; repeat < 8; ++repeat) {
                 windows_case(root / ("bound-owner-lost-" + std::to_string(repeat)), 1, false);
                 windows_case(root / ("nested-bound-owner-lost-" + std::to_string(repeat)), 2, false);
+                windows_case(root / ("retained-nested-bound-owner-lost-" + std::to_string(repeat)), 2, false, true);
             }
 #else
             posix_case(root / "normal", true);
