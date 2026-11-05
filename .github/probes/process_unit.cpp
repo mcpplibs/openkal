@@ -47,7 +47,11 @@ template<class Predicate> bool until(Predicate predicate, std::chrono::milliseco
 std::string text(const fs::path& path) {
     std::ifstream input(path); return {std::istreambuf_iterator<char>(input), {}};
 }
-void put(const fs::path& path, std::string_view value) { std::ofstream out(path); out << value; out.flush(); require(bool(out), "write_control_record"); }
+void put(const fs::path& path, std::string_view value) {
+    const auto pending = fs::path(path.string() + ".pending");
+    { std::ofstream out(pending); out << value; out.flush(); require(bool(out), "write_control_record"); }
+    fs::rename(pending, path);
+}
 enum class observation { empty, occupied, unknown };
 
 #ifdef _WIN32
@@ -356,7 +360,8 @@ void reuse_case() {
     require(kill(-first, SIGKILL) == 0, "end_old_group"); wait_reap(first);
     report("old_group_proven_empty", observe(old) == observation::empty);
     std::this_thread::sleep_for(30ms);
-    put("/proc/sys/kernel/ns_last_pid", std::to_string(first - 1));
+    { std::ofstream allocator("/proc/sys/kernel/ns_last_pid");
+      allocator << first - 1; allocator.flush(); require(bool(allocator), "private_pid_allocator_write"); }
     const auto next = make();
     try {
         report("native_group_identifier_actually_reused", next == first);
