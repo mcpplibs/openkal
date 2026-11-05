@@ -18,6 +18,7 @@
 #include <cerrno>
 #include <csignal>
 #include <sys/wait.h>
+#include <poll.h>
 #include <unistd.h>
 #ifdef __linux__
 #include <sys/prctl.h>
@@ -300,6 +301,43 @@ void posix_case(const fs::path& root, bool normal) {
         kill(-owner, SIGKILL); kill(owner, SIGKILL); wait_reap(owner); reap(); throw;
     }
 }
+void stderr_intervals(bool external_sleep) {
+    int channel[2]; require(pipe(channel) == 0, "producer_pipe");
+    const auto child = fork(); require(child >= 0, "producer_fork");
+    if (child == 0) {
+        setpgid(0, 0); close(channel[0]); dup2(channel[1], 2); close(channel[1]); close(1);
+        if (external_sleep) {
+            execl("/bin/sh", "sh", "-c", "for i in 1 2 3 4 5 6 7 8; do printf x >&2; sleep .03; done; exit 7", nullptr);
+            _exit(97);
+        }
+        for (int i = 0; i < 24; ++i) {
+            write(2, "x", 1); std::this_thread::sleep_for(30ms);
+        }
+        _exit(7);
+    }
+    close(channel[1]);
+    auto previous = std::chrono::steady_clock::now();
+    std::chrono::nanoseconds longest{0}; std::size_t bytes = 0;
+    try {
+        for (;;) {
+            pollfd ready{channel[0], POLLIN, 0};
+            const auto waited = poll(&ready, 1, 5000);
+            if (waited < 0 && errno == EINTR) continue;
+            require(waited > 0, "stderr_progress_observed");
+            char buffer[128]; const auto n = read(channel[0], buffer, sizeof buffer);
+            require(n >= 0, "stderr_read");
+            const auto now = std::chrono::steady_clock::now();
+            longest = std::max(longest, std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous));
+            previous = now;
+            if (n == 0) break;
+            bytes += static_cast<std::size_t>(n);
+        }
+        close(channel[0]); wait_reap(child);
+        require(bytes == (external_sleep ? 8u : 24u), "all_stderr_ticks_observed");
+        std::cout << "{\"producer\":\"" << (external_sleep ? "shell_with_external_sleep" : "one_process_ticks")
+                  << "\",\"max_observed_gap_ns\":" << longest.count() << ",\"bytes\":" << bytes << "}\n";
+    } catch (...) { close(channel[0]); kill(-child, SIGKILL); wait_reap(child); throw; }
+}
 #ifdef __linux__
 void reuse_case() {
     require(getpid() == 1, "private_pid_namespace_required");
@@ -351,6 +389,8 @@ int main(int argc, char** argv) {
 #else
             posix_case(root / "normal", true);
             posix_case(root / "owner-lost", false);
+            for (int repeat = 0; repeat < 5; ++repeat) stderr_intervals(true);
+            stderr_intervals(false);
 #endif
         } catch (...) { fs::remove_all(root); throw; }
         fs::remove_all(root);
