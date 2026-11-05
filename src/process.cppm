@@ -21,6 +21,7 @@ export import openkal.fs;
 export import openkal.stream;
 
 export using ::kal_process;
+export using ::kal_program_identity;
 export using ::kal_spawn_streams;
 export using ::kal_spawn;
 export using ::kal_job;
@@ -51,6 +52,8 @@ export using ::kal_process_open_id;
 export using ::kal_process_info;
 
 static_assert(sizeof(kal_process) == sizeof(kal_uintptr), "clause 7.2");
+static_assert(sizeof(kal_program_identity) == 16, "clause 5.3");
+static_assert(__builtin_offsetof(kal_program_identity, started_ns) == 8, "clause 5.3");
 static_assert(sizeof(kal_spawn_streams) == 3 * sizeof(kal_uintptr), "clause 5.3");
 static_assert(sizeof(kal_preopen) == 3 * sizeof(kal_uintptr), "clause 5.3");
 // kal_program_info grows by appending, as kal_node_info does; the offsets of

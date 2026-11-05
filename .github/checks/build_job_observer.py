@@ -41,4 +41,11 @@ subprocess.run(command, check=True)
 with (out / 'job-observer.jsonl').open('w') as log:
     result = subprocess.run([str(binary)], stdout=log, stderr=subprocess.STDOUT, timeout=30)
 print((out / 'job-observer.jsonl').read_text())
+
+if result.returncode == 0 and sys.platform == 'linux':
+    boundary = out / 'retire-boundary'
+    subprocess.run(['c++', '-std=c++17', '-O2', '-pthread', '-I' + str(include),
+                    str(root / '.github/checks/retire_boundary.cpp'), *objects, '-o', str(boundary)], check=True)
+    subprocess.run([sys.executable, str(root / '.github/checks/retire_boundaries.py'), str(boundary)], check=True, timeout=30)
+
 raise SystemExit(result.returncode)

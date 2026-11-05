@@ -217,3 +217,34 @@ and platform rows used by core's openkal-target CI must be included in that
 version group. A source-only host success does not qualify those image rows.
 Plugin sidecar work remains prepared independently and receives the final public
 core pin only after this release is actually available.
+
+## 2026-11-06 continuation and observer contract correction
+
+The continuation is an explicit program identity containing both the id and
+birth value reported by the process API. A saved former process group is not
+a sufficient continuation: the BMI publisher may exit before its compiler
+helper retires. The helper instead uses the still-live build owner as its
+anchor. Retirement validates that same identity before and after migration,
+and that the destination remains within the native scope it can join. A dead,
+reused or inaccessible anchor, or an anchor in another session, yields unknown.
+There is no fallback to a previous numeric group. On Windows the original
+anchor process handle is retained through the original-job membership query.
+
+Retirement seals admission into the declared unit. Joining the anchor's unit
+conveys neither admission nor termination authority over that unit. A native
+unit already led by the declaring helper may be adopted; observation includes
+its existing members. The original unit alone remains the termination target.
+
+A C job returned by `job_open` has an observe/close precondition. POSIX numeric
+groups do not become kernel-enforced read-only capabilities. The OS observer
+type hides the native job and exposes no admission or termination operations.
+An intentional negative compile consumer verifies these absent control paths.
+
+The actual Linux backend consumer covers normal retirement, a forged birth, an
+already-ended anchor and another session. A separate syscall-boundary control
+kills the anchor at `setpgid` entry and immediately after its successful exit;
+both yield unknown. Normal retirement followed by termination of the original
+unit preserves the live anchor. These Linux results do not qualify the native
+macOS/Windows continuation path; the three source consumers run independently
+in native CI. A dedicated control also reaps the ephemeral publisher before
+the helper retires against its live owner.

@@ -14,15 +14,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04, implementation: openkal-linux }
-          - { os: macos-15, implementation: openkal-macos }
-          - { os: windows-2025, implementation: openkal-windows }
+          - { os: ubuntu-24.04, implementation: openkal-linux, revision: 5d2217424c25f072eb7bb8a7f6c2ea95b4bfa0df }
+          - { os: macos-15, implementation: openkal-macos, revision: 0ad90826b6097c806bc7db7b0c3579acd231b3b7 }
+          - { os: windows-2025, implementation: openkal-windows, revision: 664628d0a01a38d028f59fd8c660891efa218679 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: mcpplibs/${{ matrix.implementation }}
-          ref: feat/observable-process-units
+          ref: ${{ matrix.revision }}
           path: backend
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
@@ -33,4 +33,6 @@ jobs:
         if: always()
         with:
           name: declared-unit-${{ matrix.os }}
-          path: unit-api-build/*.jsonl
+          path: |
+            unit-api-build/*.jsonl
+            unit-api-build/retire-boundaries.json

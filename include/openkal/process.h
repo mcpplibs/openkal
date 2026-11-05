@@ -14,6 +14,10 @@
 
 struct kal_process { kal_uintptr h; };
 
+/* A program's full identity, copied from kal_process_info's id/started_ns.
+ * Neither field is a native process identifier a caller may interpret. */
+struct kal_program_identity { kal_u64 id; kal_u64 started_ns; };
+
 /* How a started program's standard streams are supplied. A stream handle of
  * zero denotes that the program inherits the corresponding stream of its
  * parent, which is what an environment without a general mechanism for
@@ -615,10 +619,14 @@ int kal_process_job_terminate(struct kal_job);
 void kal_process_job_close(struct kal_job);
 
 /* AN OBSERVABLE UNIT (0.24). The unit is declared before any program is
- * started in it. `create' puts the caller in a fresh private unit and writes
+ * started in it. `create' declares the caller's private unit and writes
  * an opaque reference into `reference'; `used' is its byte count. A buffer
  * smaller than the implementation requires is kal_err_no_space and leaves
  * the caller outside a new unit. No terminator is included in the count.
+ *
+ * The caller declares the unit before starting its external members. A
+ * native unit already led by this caller may be adopted; existing members
+ * are not excluded from observation.
  *
  * The reference is a value, not a handle: it can be retained and carried to
  * another invocation. Its bytes shall not be interpreted or manufactured by
@@ -628,8 +636,13 @@ void kal_process_job_close(struct kal_job);
  * emptiness. It reports UNKNOWN. Neither a dead leader nor a stale reference
  * proves that the unit's other programs have ended.
  *
- * An observer does not convey a right to terminate a replacement unit that
- * reused a native identifier. `observe' validates the supplied reference and
+ * A job obtained by `open' shall be passed only to `observe' and `close',
+ * never to spawn, enter, terminate, limit or another control operation. This
+ * is a caller precondition: an environment whose job is a numeric group does
+ * not turn that number into a kernel-enforced read-only capability. The C++
+ * library above this ABI can enforce the distinction through its observer type.
+ * Such an observer conveys no right to control a replacement unit that reused
+ * a native identifier. `observe' validates the supplied reference and
  * reports exactly one of the three states. Unsupported observation, identity
  * ambiguity, an inaccessible unit or an expired native reference is UNKNOWN,
  * never EMPTY. A positively empty unit has no remaining active member.
@@ -638,8 +651,14 @@ void kal_process_job_close(struct kal_job);
  * one start, with the declared unit stated by its caller. Before `retire',
  * the caller shall cease all admission into that unit, including its own
  * concurrent spawns. `retire' establishes that no member except the caller
- * remains; where membership can be left it may leave the unit first. The
- * caller is still alive and may complete its own bookkeeping afterwards.
+ * remains. `continuation' names the same still-live program that supplied
+ * its id and birth through kal_process_info. Where membership can be left,
+ * the caller joins that program's unit before observing its former unit. A
+ * dead/reused continuation or one outside the native scope the caller can
+ * join yields UNKNOWN; no former numeric unit is guessed as a fallback.
+ * The continuation conveys no right to terminate or admit into its unit,
+ * and moving there does not reopen admission to the retired unit. The caller
+ * remains alive and may complete its own bookkeeping afterwards.
  * OCCUPIED and UNKNOWN can be retried. Retirement is idempotent, and after
  * asking to retire the caller shall not admit another program to the unit.
  * A library above this ABI enforces that rule through its owned unit object.
@@ -659,7 +678,8 @@ int kal_process_job_open(const char* reference, kal_uintptr length,
 int kal_process_job_observe(struct kal_job, const char* reference,
                             kal_uintptr length, kal_u32* state);
 int kal_process_job_retire(struct kal_job, const char* reference,
-                           kal_uintptr length, kal_u32* state);
+                           kal_uintptr length, const struct kal_program_identity* continuation,
+                           kal_u32* state);
 
 /* WHAT A UNIT USES. Version 0.20, clause 11 entry 43.
  *

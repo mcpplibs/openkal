@@ -21,6 +21,7 @@ void require(bool value,const char* name) {
     std::fflush(stdout); if(!value) throw std::runtime_error(name);
 }
 std::string image, relative_image;
+kal_program_identity root_identity{};
 kal_spawn place() {
     kal_spawn how{};
     for(kal_uintptr i=0;i<kal_fs_preopen_count();++i) {
@@ -91,11 +92,12 @@ void await_empty(kal_job job,const std::string& ref) {
         std::this_thread::sleep_for(1ms);
     }
 }
-int helper(const std::string& mode,const fs::path& output) {
+int helper(const std::string& mode,const fs::path& output,const kal_program_identity& continuation,
+           const kal_program_identity* expired=nullptr) {
     kal_job job{};char bytes[512]{};kal_uintptr used=0;
     if(kal_process_job_create(&job,bytes,sizeof bytes,&used))return 41;
     const std::string ref(bytes,used);
-    send_line(kal_stdout(),ref);
+    send_line(mode=="launcher"?kal_stderr():kal_stdout(),ref);
     if(read_line(kal_stdin())!="ACK")return 42;
     kal_stream read{},write{};
     if(kal_process_channel(&read,&write))return 43;
@@ -103,7 +105,10 @@ int helper(const std::string& mode,const fs::path& output) {
     auto driver=start({"driver",output.string()},&job,&streams);
     kal_process_channel_close(read);
     kal_u32 retired=KAL_JOB_UNKNOWN;
-    if(kal_process_job_retire(job,ref.data(),ref.size(),&retired)||retired!=KAL_JOB_OCCUPIED)return 44;
+    if(expired&&(kal_process_job_retire(job,ref.data(),ref.size(),expired,&retired)||retired!=KAL_JOB_UNKNOWN))return 54;
+    auto wrong=continuation;++wrong.started_ns;
+    if(kal_process_job_retire(job,ref.data(),ref.size(),&wrong,&retired)||retired!=KAL_JOB_UNKNOWN)return 49;
+    if(kal_process_job_retire(job,ref.data(),ref.size(),&continuation,&retired)||retired!=KAL_JOB_OCCUPIED)return 44;
     if(mode=="kill") {
         send_line(kal_stdout(),"BUSY");
         // Only the parent owns the acknowledgement's write end. Hard death
@@ -112,17 +117,21 @@ int helper(const std::string& mode,const fs::path& output) {
     }
     if(kal_stream_write(write,"R",1)!=1)return 46;
     kal_process_channel_close(write);wait(driver);
-    if(kal_process_job_retire(job,ref.data(),ref.size(),&retired)||retired!=KAL_JOB_EMPTY)return 47;
-    if(kal_process_job_retire(job,ref.data(),ref.size(),&retired)||retired!=KAL_JOB_EMPTY)return 48;
+    if(kal_process_job_retire(job,ref.data(),ref.size(),&continuation,&retired)||retired!=KAL_JOB_EMPTY)return 47;
+    if(kal_process_job_retire(job,ref.data(),ref.size(),&continuation,&retired)||retired!=KAL_JOB_EMPTY)return 48;
     send_line(kal_stdout(),"DONE");kal_process_job_close(job);return 0;
 }
 void exercise(const fs::path& root,const std::string& mode) {
     kal_stream input{},gate{},results{},output{};
     if(kal_process_channel(&input,&gate)||kal_process_channel(&results,&output))throw std::runtime_error("actual_channels");
     kal_spawn_streams streams{input,output,{}};
-    auto child=start({"helper",mode,(root/(mode+".object")).string()},nullptr,&streams);
+    auto child=start({mode=="retire-parent"?"launcher":"helper",mode,(root/(mode+".object")).string(),
+        std::to_string(root_identity.id),std::to_string(root_identity.started_ns)},nullptr,&streams);
     kal_process_channel_close(input);kal_process_channel_close(output);
     const auto ref=read_line(results);kal_job observed{};
+    if(mode=="retire-parent") {
+        require(wait(child)==0,"original_caller_unit_ends_before_retirement");child.h=0;
+    }
     require(kal_process_job_open(ref.data(),ref.size(),&observed)==kal_ok,"original_unit_retained_before_admission");
     require(state(observed,ref)==KAL_JOB_OCCUPIED,"unstarted_helper_is_occupied");
     auto bad=ref;bad[0]='?';require(state(observed,bad)!=KAL_JOB_EMPTY,"malformed_reference_never_grants_quiet");
@@ -138,7 +147,7 @@ void exercise(const fs::path& root,const std::string& mode) {
             kal_process_channel_close(gate);(void)wait(child,false);
         } else {
             require(read_line(results)=="DONE","external_members_quiet_before_completion");
-            kal_process_channel_close(gate);wait(child);
+            kal_process_channel_close(gate);if(child.h)wait(child);
         }
     }
     await_empty(observed,ref);
@@ -162,13 +171,34 @@ int main(int argc,char** argv) {
             std::ofstream out(argv[2]);out<<"actual declared unit descendant\n";return out?0:51;
         }
         if(argc>2&&std::string(argv[1])=="driver") {return wait(start({"writer",argv[2]}));}
-        if(argc>3&&std::string(argv[1])=="helper")return helper(argv[2],argv[3]);
+        if(argc>5&&std::string(argv[1])=="helper") {
+            const kal_program_identity anchor{std::stoull(argv[4]),std::stoull(argv[5])};
+            kal_program_identity expired{};
+            if(argc>7)expired={std::stoull(argv[6]),std::stoull(argv[7])};
+            return helper(argv[2],argv[3],anchor,argc>7?&expired:nullptr);
+        }
+        if(argc>5&&std::string(argv[1])=="launcher") {
+            kal_job caller{};if(kal_process_job_enter(&caller))return 52;
+            kal_stream report{},published{};if(kal_process_channel(&report,&published))return 53;
+            kal_spawn_streams child_streams{{},{},published};
+            kal_process self{};kal_program_info own{};own.self_size=sizeof own;
+            if(kal_process_self(&self)||kal_process_info(self,KAL_PINFO_ID|KAL_PINFO_STARTED,&own))return 55;
+            (void)start({"helper","launcher",argv[3],argv[4],argv[5],std::to_string(own.id),std::to_string(own.started_ns)},nullptr,&child_streams);
+            kal_process_channel_close(published);
+            send_line(kal_stdout(),read_line(report));
+            kal_process_channel_close(report);return 0;
+        }
+        kal_process self{};kal_program_info who{};who.self_size=sizeof who;
+        require(kal_process_self(&self)==kal_ok
+            &&kal_process_info(self,KAL_PINFO_ID|KAL_PINFO_STARTED,&who)==kal_ok
+            &&(who.present&(KAL_PINFO_ID|KAL_PINFO_STARTED))==(KAL_PINFO_ID|KAL_PINFO_STARTED),"full_owner_identity_observed");
+        root_identity={who.id,who.started_ns};kal_process_close(self);
 #ifdef __linux__
         require(prctl(PR_SET_CHILD_SUBREAPER,1)==0,"native_harness_reaps_fault_orphans");
 #endif
         const auto root=fs::temp_directory_path()/("job-api-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         fs::create_directories(root);
-        try {exercise(root,"normal");exercise(root,"before");exercise(root,"kill");}
+        try {exercise(root,"normal");exercise(root,"before");exercise(root,"kill");exercise(root,"retire-parent");}
         catch(...){fs::remove_all(root);throw;}
         fs::remove_all(root);return 0;
     }catch(const std::exception& e){std::fprintf(stderr,"job observer API: %s\n",e.what());return 1;}
