@@ -14,9 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04, implementation: openkal-linux, revision: 0e9f3ccd7a1f473a2aeb399f727efec7196bae46 }
-          - { os: macos-15, implementation: openkal-macos, revision: e1534d674c980ed839903bf4be880efee1a55e3a }
-          - { os: windows-2025, implementation: openkal-windows, revision: d09f316a35814c0cbde3a2add793659ea439c6a0 }
+          - { os: ubuntu-24.04, implementation: openkal-linux, revision: b429bac4368d1a3960efd6d9dd93c02f229fbeda }
+          - { os: macos-15, implementation: openkal-macos, revision: 5cad63b22b61df2af38d632ff1590f8cbb527130 }
+          - { os: windows-2025, implementation: openkal-windows, revision: 07994ed5d8f7741474b42aa83bcda0256fc71bcc }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
