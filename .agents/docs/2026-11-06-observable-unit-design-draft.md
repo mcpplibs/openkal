@@ -88,6 +88,29 @@ Candidate backend implementations require experiments before approval:
 The existing job_usage operation can supply live-owner statistics. It cannot
 on its own provide the missing persistent observation guarantee.
 
+A possible composition uses the existing top-level owner and compiler helper,
+without another keeper. Before compiler start, the helper publishes its unit;
+the top-level owner opens and retains that original unit and acknowledges the
+publication. The helper may then start the compiler. Loss of either holder is
+observable through the other. Loss of both holders is a distinct boundary:
+Windows name absence remains `unknown`, and admission fails within its bound
+while retaining the reservation. This case is not automatic recovery.
+
+The helper also needs a normal-completion barrier. On POSIX it may stop
+admitting children, move into a known surviving caller unit and ask the kernel
+whether its former group is empty. Its own still-live identity prevents that
+former identifier from being reused during this check. On Windows it cannot
+leave a job; the original retained job must establish that no external members
+remain. Process accounting, a process handle becoming signaled and the absence
+of further writes are different observations; the native experiment records
+these separately before a production completion contract is selected.
+
+The prototype measures its startup acknowledgement and repeated original-job
+queries. Its file acknowledgement uses a five-millisecond polling interval;
+this is an experiment parameter, not an accepted production mechanism or cost.
+A final design must account for both steady-state build overhead and tail
+latency, including any added thread, polling and handshake.
+
 ## Core transaction and permit protocol
 
 The generation and actor barrier remain runtime state outside build identity.

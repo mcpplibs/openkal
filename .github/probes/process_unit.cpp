@@ -156,6 +156,7 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
     const bool bound = policy != 0;
     bool false_empty = false;
     fs::create_directories(root);
+    const auto attempt_start = std::chrono::steady_clock::now();
     const auto suffix = std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64())
         + "-" + std::to_string(policy) + "-" + std::to_string(normal);
     const auto name = "Global\\openkal-unit-probe-" + suffix;
@@ -166,6 +167,12 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
         retained.value = OpenJobObjectA(JOB_OBJECT_QUERY | JOB_OBJECT_TERMINATE, FALSE, name.c_str());
         require(retained.value != nullptr, "retain_actual_unit_before_ack");
         report("compiler_waits_for_observer_ack", !fs::exists(root / "worker.ready"));
+        const auto query_start = std::chrono::steady_clock::now();
+        for (int repeat = 0; repeat < 1000; ++repeat) require(members(retained.value) == 1, "prepared_unit_has_only_helper");
+        std::cout << "{\"unit_query_samples\":1000,\"unit_query_elapsed_ns\":"
+                  << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - query_start).count()
+                  << ",\"pre_spawn_ack_ns\":"
+                  << std::chrono::duration_cast<std::chrono::nanoseconds>(query_start - attempt_start).count() << "}\n";
         put(root / "observer.ready", "retained");
     }
     const auto observe_unit = [&] {
@@ -178,6 +185,8 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
     try {
         require(until([&] { return fs::exists(root / "controller.ready"); }), "controller_ready");
         report("private_job_contains_helper_driver_and_writer", text(root / "controller.ready") == "3");
+        if (retain) std::cout << "{\"startup_through_ack_ns\":"
+            << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - attempt_start).count() << "}\n";
         std::cout << "{\"lifetime_policy\":" << policy << ",\"bound_lifetime\":" << (bound ? "true" : "false")
                   << ",\"retained_observer\":" << (retain ? "true" : "false")
                   << ",\"normal_completion\":" << (normal ? "true" : "false") << "}\n";
@@ -226,10 +235,17 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
             const auto state = observe_unit();
             const bool live = WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT;
             false_empty = state == observation::empty && live;
+            BOOL associated = FALSE; DWORD exit_code = 0;
+            const bool membership_known = !retained.value || IsProcessInJob(child.value, retained.value, &associated);
+            require(GetExitCodeProcess(child.value, &exit_code), "writer_exit_code");
             put(root / "worker.release", "go");
             require(until([&] { return fs::exists(root / "late.write")
                 || WaitForSingleObject(child.value, 0) == WAIT_OBJECT_0; }), "bound_writer_outcome");
             std::cout << "{\"bound_post_controller_state\":" << static_cast<int>(state)
+                      << ",\"retained_job_members\":" << (retained.value ? members(retained.value) : 0)
+                      << ",\"membership_query_known\":" << (membership_known ? "true" : "false")
+                      << ",\"writer_still_associated\":" << (associated ? "true" : "false")
+                      << ",\"writer_exit_code\":" << exit_code
                       << ",\"writer_was_alive\":" << (live ? "true" : "false")
                       << ",\"writer_completed_after_close\":" << (fs::exists(root / "late.write") ? "true" : "false") << "}\n";
             report("bound_close_prevents_later_write", !fs::exists(root / "late.write"));
@@ -290,6 +306,7 @@ void wait_reap(pid_t pid) {
     while (waitpid(pid, nullptr, 0) < 0 && errno == EINTR) {}
 }
 pid_t launch(const fs::path& root) {
+    const auto previous_group = getpgrp();
     const auto owner = fork(); require(owner >= 0, "fork_controller");
     if (owner != 0) return owner;
     if (setpgid(0, 0)) _exit(90);
@@ -309,10 +326,14 @@ pid_t launch(const fs::path& root) {
         wait_reap(writer); _exit(0);
     }
     put(root / "controller.ready", std::to_string(getpid()));
-    bool reaped = false;
+    bool reaped = false, retired = false;
     if (!until([&] {
         if (!reaped && waitpid(driver, nullptr, WNOHANG) == driver) {
             reaped = true; put(root / "owner.only", "ready");
+        }
+        if (reaped && !retired && fs::exists(root / "retire.request")) {
+            if (setpgid(0, previous_group)) _exit(99);
+            retired = true; put(root / "owner.retired", "ready");
         }
         return fs::exists(root / "owner.release");
     }, 20000ms)) _exit(95);
@@ -358,6 +379,10 @@ void posix_case(const fs::path& root, bool normal) {
             require(until([&] { return fs::exists(root / "owner.only"); }), "normal_owner_only_ready");
             report("normal_completion_counts_helper_separately", members(owner) == 1);
             report("live_helper_does_not_mean_empty", observe(ref) == observation::occupied);
+            put(root / "retire.request", "go");
+            require(until([&] { return fs::exists(root / "owner.retired"); }), "helper_retired_from_original_unit");
+            report("retired_helper_still_has_original_identity", born(owner) == ref.owner_born);
+            report("retired_helper_cannot_hide_original_unit_writer", observe(ref) == observation::empty);
             put(root / "owner.release", "go");
         } else {
             require(kill(owner, SIGKILL) == 0, "kill_controller"); wait_reap(owner);
