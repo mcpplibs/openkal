@@ -1,6 +1,7 @@
 // Native experiments for an observable execution unit. This is not a new
 // OpenKal API or a capability claim; it records the kernel facts an API needs.
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -101,6 +102,7 @@ int worker(const fs::path& root) {
     return 0;
 }
 int controller(const fs::path& root, const std::string& name, bool bound) {
+    SetLastError(ERROR_SUCCESS);
     handle job(CreateJobObjectA(nullptr, name.c_str()));
     require(job.value && GetLastError() != ERROR_ALREADY_EXISTS, "new_named_job");
     if (bound) {
@@ -311,7 +313,8 @@ void stderr_intervals(bool external_sleep) {
             _exit(97);
         }
         for (int i = 0; i < 24; ++i) {
-            write(2, "x", 1); std::this_thread::sleep_for(30ms);
+            if (write(2, "x", 1) != 1) _exit(98);
+            std::this_thread::sleep_for(30ms);
         }
         _exit(7);
     }
