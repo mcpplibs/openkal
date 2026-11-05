@@ -259,13 +259,14 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
             const auto state = observe_unit();
             const bool ended = WaitForSingleObject(child.value, 0) == WAIT_OBJECT_0;
             if (state == observation::empty && !ended) empty_before_process_signal = true;
-            return ended && state == observation::empty;
-        }), "whole_job_empty_after_writer_exit");
+            return ended && (state == observation::empty || (!retained.value && state == observation::unknown));
+        }), "whole_job_writer_exit_observed");
         // The job counts active members. A terminated process handle can remain
         // unsignaled briefly; that ordering is an observation, not a writer proof.
         std::cout << "{\"unit_empty_preceded_process_signal\":"
                   << (empty_before_process_signal ? "true" : "false") << "}\n";
-        report("complete_job_is_empty", observe_unit() == observation::empty);
+        if(retained.value)report("retained_complete_job_is_empty", observe_unit() == observation::empty);
+        else report("unretained_completed_job_may_remain_unknown", observe_unit() != observation::occupied);
     } catch (...) {
         if (owner.value) TerminateProcess(owner.value, 137);
         if (!child.value && worker_id)

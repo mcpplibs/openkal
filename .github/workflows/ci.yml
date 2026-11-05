@@ -250,10 +250,8 @@ jobs:
           [package]
           name    = "abi"
           version = "0.1.0"
-          EOF
-          cat > .abi-probe/build.mcpp <<'EOF'
-          import mcpp;
-          int main() { mcpp::include_dir("../include"); return 0; }
+          [build]
+          include_dirs = ["../include"]
           EOF
           cat > .abi-probe/src/main.cpp <<'EOF'
           #include <openkal/types.h>
