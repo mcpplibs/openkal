@@ -101,7 +101,8 @@ DWORD members(HANDLE job) {
 observation observe(const std::string& name) {
     handle job(OpenJobObjectA(JOB_OBJECT_QUERY, FALSE, name.c_str()));
     if (!job.value) {
-        return GetLastError() == ERROR_FILE_NOT_FOUND ? observation::empty : observation::unknown;
+        // A missing name can coexist with a live writer after the last handle closes.
+        return observation::unknown;
     }
     return members(job.value) == 0 ? observation::empty : observation::occupied;
 }
@@ -154,7 +155,7 @@ int controller(const fs::path& root, const std::string& name, unsigned policy, b
 }
 void windows_case(const fs::path& root, unsigned policy, bool normal, bool retain = false) {
     const bool bound = policy != 0;
-    bool false_empty = false;
+    bool empty_before_process_signal = false;
     fs::create_directories(root);
     const auto attempt_start = std::chrono::steady_clock::now();
     const auto suffix = std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64())
@@ -218,7 +219,7 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
                 child.value = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
                 require(child.value != nullptr && same_birth(created(child.value), worker_birth), "hold_orphan_process_identity");
                 const bool writer_alive = WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT;
-                false_empty = first == observation::empty && writer_alive;
+                empty_before_process_signal = first == observation::empty && writer_alive;
                 std::cout << "{\"post_controller_state\":" << static_cast<int>(first)
                           << ",\"query_error\":" << query_error
                           << ",\"writer_alive\":" << (writer_alive ? "true" : "false") << "}\n";
@@ -228,7 +229,9 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
                 const bool wrote_late = fs::exists(root / "late.write");
                 std::cout << "{\"writer_completed_after_controller_loss\":" << (wrote_late ? "true" : "false") << "}\n";
                 report("missing_job_does_not_hide_later_output_write", first != observation::empty || !wrote_late);
-                report("named_job_survives_without_observer_process_handles", first == observation::occupied);
+                report("unretained_reference_does_not_claim_empty", first != observation::empty);
+                std::cout << "{\"legacy_missing_name_would_claim_empty\":"
+                          << (query_error == ERROR_FILE_NOT_FOUND && wrote_late ? "true" : "false") << "}\n";
                 report("writer_survives_unbound_controller", writer_alive);
                 require(wrote_late, "late_writer_output");
             }
@@ -236,7 +239,7 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
         if (bound && !normal) {
             const auto state = observe_unit();
             const bool live = WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT;
-            false_empty = state == observation::empty && live;
+            empty_before_process_signal = state == observation::empty && live;
             BOOL associated = FALSE; DWORD exit_code = 0;
             const bool membership_known = !retained.value || IsProcessInJob(child.value, retained.value, &associated);
             require(GetExitCodeProcess(child.value, &exit_code), "writer_exit_code");
@@ -255,10 +258,13 @@ void windows_case(const fs::path& root, unsigned policy, bool normal, bool retai
         require(until([&] {
             const auto state = observe_unit();
             const bool ended = WaitForSingleObject(child.value, 0) == WAIT_OBJECT_0;
-            if (state == observation::empty && !ended) false_empty = true;
+            if (state == observation::empty && !ended) empty_before_process_signal = true;
             return ended && state == observation::empty;
         }), "whole_job_empty_after_writer_exit");
-        report("unit_empty_does_not_precede_process_signal", !false_empty);
+        // The job counts active members. A terminated process handle can remain
+        // unsignaled briefly; that ordering is an observation, not a writer proof.
+        std::cout << "{\"unit_empty_preceded_process_signal\":"
+                  << (empty_before_process_signal ? "true" : "false") << "}\n";
         report("complete_job_is_empty", observe_unit() == observation::empty);
     } catch (...) {
         if (owner.value) TerminateProcess(owner.value, 137);

@@ -78,3 +78,9 @@ static_assert(kal::macros::KAL_PROF_PROP_TOUCHES_M == 2u);
 static_assert(kal::macros::KAL_PROF_SAMPLE_DEPTH_M == 64u);
 
 }  // namespace
+
+// OpenKal 0.24: observation is distinct from process/job control.
+static_assert(kal::macros::KAL_PROCESS_PROP_JOB_OBSERVE_M == 32768u);
+static_assert(kal::macros::KAL_JOB_UNKNOWN_M == 0u);
+static_assert(kal::macros::KAL_JOB_OCCUPIED_M == 1u);
+static_assert(kal::macros::KAL_JOB_EMPTY_M == 2u);
