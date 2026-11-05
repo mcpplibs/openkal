@@ -52,9 +52,11 @@ The names below describe requirements rather than an approved public spelling.
 4. Actual compiler processes inherit that explicitly created private unit. This
    is a deliberate composition of a declared unit and its child, not an
    unqualified switch to sharing Ninja's unit.
-5. Unit observation counts remaining writers after the leader exits. It remains
-   usable after the controller dies. Closing an observer does not itself claim
-   that the unit has stopped.
+5. Unit observation counts remaining writers after the leader exits. A
+   controller's death must not manufacture an empty result. A surviving
+   observer may retain the actual kernel reference; if no observer can prove
+   that the original unit has ended, recovery remains `unknown`. Closing an
+   observer does not itself claim that the unit has stopped.
 
 Creating the private unit inside the existing compiler helper avoids an unknown
 spawn-identity window: its reference and output record are committed before the
@@ -70,10 +72,18 @@ Candidate backend implementations require experiments before approval:
   emptiness without sending a terminating signal or treating an absent leader
   as an empty group. Identifier reuse and incomplete process enumeration must
   yield conservative results. Native details remain in the backend.
-- Windows: an observable named job is a candidate. Verify native lifetime of its
-  name and membership after the last controller handle closes, including nested
-  jobs and termination in progress. Never serialize a HANDLE for another
-  process to use.
+- Windows: a job name alone is insufficient. The native experiment observes
+  `ERROR_FILE_NOT_FOUND` after the controller closes its last handle while a
+  writer is still alive. Without a lifetime limit, that writer subsequently
+  commits output. With `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, a live writer is
+  still observable after the name disappears, so asynchronous termination is
+  not an emptiness proof either. The pinned backend deliberately leaves this
+  flag unset for `own_unit`; `bound_lifetime` instead creates a separate nested
+  job with the flag. The experiment compares these arrangements with a compiler
+  driver and descendant writer. A retained native handle can query the original
+  job; a recovered name that cannot be opened remains `unknown`. Never
+  serialize a HANDLE for another process to use, and include loss of every
+  proposed handle holder in the fault matrix.
 
 The existing job_usage operation can supply live-owner statistics. It cannot
 on its own provide the missing persistent observation guarantee.

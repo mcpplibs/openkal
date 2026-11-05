@@ -70,13 +70,18 @@ std::string executable() {
     char path[32768]; const auto size = GetModuleFileNameA(nullptr, path, sizeof path);
     require(size > 0 && size < sizeof path, "self_executable"); return {path, size};
 }
-HANDLE start(const std::vector<std::string>& args) {
+HANDLE start(const std::vector<std::string>& args, HANDLE bind_job = nullptr) {
     std::string command = quote(executable());
     for (const auto& arg : args) command += " " + quote(arg);
     STARTUPINFOA startup{}; startup.cb = sizeof startup;
     PROCESS_INFORMATION child{};
-    require(CreateProcessA(nullptr, command.data(), nullptr, nullptr, FALSE, 0,
+    require(CreateProcessA(nullptr, command.data(), nullptr, nullptr, FALSE,
+                           bind_job ? CREATE_SUSPENDED : 0,
                            nullptr, nullptr, &startup, &child), "start_native_process");
+    if (bind_job) {
+        require(AssignProcessToJobObject(bind_job, child.hProcess), "bind_writer_job_before_start");
+        require(ResumeThread(child.hThread) != static_cast<DWORD>(-1), "start_bound_writer");
+    }
     CloseHandle(child.hThread); return child.hProcess;
 }
 FILETIME created(HANDLE process) {
@@ -106,19 +111,35 @@ int worker(const fs::path& root) {
     put(root / "late.write", "writer finished");
     return 0;
 }
-int controller(const fs::path& root, const std::string& name, bool bound) {
+int driver(const fs::path& root) {
+    handle child(start({"worker", root.string()}));
+    require(until([&] { return fs::exists(root / "worker.ready"); }), "descendant_writer_ready");
+    put(root / "driver.ready", std::to_string(GetCurrentProcessId()));
+    require(WaitForSingleObject(child.value, 25000) == WAIT_OBJECT_0, "descendant_writer_exit");
+    return 0;
+}
+int controller(const fs::path& root, const std::string& name, unsigned policy) {
     SetLastError(ERROR_SUCCESS);
     handle job(CreateJobObjectA(nullptr, name.c_str()));
     require(job.value && GetLastError() != ERROR_ALREADY_EXISTS, "new_named_job");
-    if (bound) {
+    if (policy == 1) {
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limit{};
         limit.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         require(SetInformationJobObject(job.value, JobObjectExtendedLimitInformation,
                     &limit, sizeof limit), "set_bound_job");
     }
     require(AssignProcessToJobObject(job.value, GetCurrentProcess()), "enter_private_job");
-    handle child(start({"worker", root.string()}));
-    require(until([&] { return fs::exists(root / "worker.ready"); }), "worker_ready");
+    handle nested;
+    if (policy == 2) {
+        nested.value = CreateJobObjectA(nullptr, nullptr);
+        require(nested.value != nullptr, "create_nested_bound_job");
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limit{};
+        limit.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        require(SetInformationJobObject(nested.value, JobObjectExtendedLimitInformation,
+                    &limit, sizeof limit), "bind_nested_writer_lifetime");
+    }
+    handle child(start({"driver", root.string()}, nested.value));
+    require(until([&] { return fs::exists(root / "worker.ready") && fs::exists(root / "driver.ready"); }), "worker_ready");
     put(root / "controller.ready", std::to_string(members(job.value)));
     if (until([&] { return fs::exists(root / "normal.release"); }, 20000ms)) {
         require(WaitForSingleObject(child.value, 5000) == WAIT_OBJECT_0, "normal_worker_exit");
@@ -127,19 +148,21 @@ int controller(const fs::path& root, const std::string& name, bool bound) {
     }
     return 0;
 }
-void windows_case(const fs::path& root, bool bound, bool normal) {
+void windows_case(const fs::path& root, unsigned policy, bool normal) {
+    const bool bound = policy != 0;
+    bool false_empty = false;
     fs::create_directories(root);
     const auto suffix = std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64())
-        + "-" + std::to_string(bound) + "-" + std::to_string(normal);
+        + "-" + std::to_string(policy) + "-" + std::to_string(normal);
     const auto name = "Global\\openkal-unit-probe-" + suffix;
-    handle owner(start({"controller", root.string(), name, bound ? "1" : "0"}));
+    handle owner(start({"controller", root.string(), name, std::to_string(policy)}));
     handle child;
     DWORD worker_id = 0;
     FILETIME worker_birth{};
     try {
         require(until([&] { return fs::exists(root / "controller.ready"); }), "controller_ready");
-        report("private_job_contains_helper_and_writer", text(root / "controller.ready") == "2");
-        std::cout << "{\"bound_lifetime\":" << (bound ? "true" : "false")
+        report("private_job_contains_helper_driver_and_writer", text(root / "controller.ready") == "3");
+        std::cout << "{\"lifetime_policy\":" << policy << ",\"bound_lifetime\":" << (bound ? "true" : "false")
                   << ",\"normal_completion\":" << (normal ? "true" : "false") << "}\n";
         const auto pid = static_cast<DWORD>(std::stoul(text(root / "worker.ready")));
         worker_id = pid;
@@ -167,6 +190,7 @@ void windows_case(const fs::path& root, bool bound, bool normal) {
                 child.value = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
                 require(child.value != nullptr && same_birth(created(child.value), worker_birth), "hold_orphan_process_identity");
                 const bool writer_alive = WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT;
+                false_empty = first == observation::empty && writer_alive;
                 std::cout << "{\"post_controller_state\":" << static_cast<int>(first)
                           << ",\"query_error\":" << query_error
                           << ",\"writer_alive\":" << (writer_alive ? "true" : "false") << "}\n";
@@ -184,6 +208,7 @@ void windows_case(const fs::path& root, bool bound, bool normal) {
         if (bound && !normal) {
             const auto state = observe(name);
             const bool live = WaitForSingleObject(child.value, 0) == WAIT_TIMEOUT;
+            false_empty = state == observation::empty && live;
             put(root / "worker.release", "go");
             require(until([&] { return fs::exists(root / "late.write")
                 || WaitForSingleObject(child.value, 0) == WAIT_OBJECT_0; }), "bound_writer_outcome");
@@ -192,7 +217,6 @@ void windows_case(const fs::path& root, bool bound, bool normal) {
                       << ",\"writer_completed_after_close\":" << (fs::exists(root / "late.write") ? "true" : "false") << "}\n";
             report("bound_close_prevents_later_write", !fs::exists(root / "late.write"));
         }
-        bool false_empty = false;
         require(until([&] {
             const auto state = observe(name);
             const bool ended = WaitForSingleObject(child.value, 0) == WAIT_OBJECT_0;
@@ -408,7 +432,8 @@ int main(int argc, char** argv) {
     try {
 #ifdef _WIN32
         if (argc > 2 && std::string(argv[1]) == "worker") return worker(argv[2]);
-        if (argc > 4 && std::string(argv[1]) == "controller") return controller(argv[2], argv[3], std::string(argv[4]) == "1");
+        if (argc > 2 && std::string(argv[1]) == "driver") return driver(argv[2]);
+        if (argc > 4 && std::string(argv[1]) == "controller") return controller(argv[2], argv[3], static_cast<unsigned>(std::stoul(argv[4])));
 #else
 #ifdef __linux__
         if (argc > 1 && std::string(argv[1]) == "--pid-reuse") { reuse_case(); return failed_checks ? 1 : 0; }
@@ -420,9 +445,12 @@ int main(int argc, char** argv) {
         fs::create_directories(root);
         try {
 #ifdef _WIN32
-            windows_case(root / "normal", false, true);
-            windows_case(root / "owner-lost", false, false);
-            windows_case(root / "bound-owner-lost", true, false);
+            windows_case(root / "normal", 0, true);
+            windows_case(root / "owner-lost", 0, false);
+            for (int repeat = 0; repeat < 8; ++repeat) {
+                windows_case(root / ("bound-owner-lost-" + std::to_string(repeat)), 1, false);
+                windows_case(root / ("nested-bound-owner-lost-" + std::to_string(repeat)), 2, false);
+            }
 #else
             posix_case(root / "normal", true);
             posix_case(root / "owner-lost", false);
