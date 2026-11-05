@@ -1,0 +1,36 @@
+name: declared process unit API
+on:
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: unit-api-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: implemented unit API (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, implementation: openkal-linux }
+          - { os: macos-15, implementation: openkal-macos }
+          - { os: windows-2025, implementation: openkal-windows }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mcpplibs/${{ matrix.implementation }}
+          ref: feat/observable-process-units
+          path: backend
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Run the implemented ABI against its actual native backend
+        shell: bash
+        run: python .github/checks/build_job_observer.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: declared-unit-${{ matrix.os }}
+          path: unit-api-build/*.jsonl

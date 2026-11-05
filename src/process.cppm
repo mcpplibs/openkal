@@ -36,6 +36,10 @@ export using ::kal_process_job_enter;
 export using ::kal_process_job_terminate;
 export using ::kal_process_job_close;
 export using ::kal_process_job_usage;
+export using ::kal_process_job_create;
+export using ::kal_process_job_open;
+export using ::kal_process_job_observe;
+export using ::kal_process_job_retire;
 export using ::kal_process_job_limit;
 export using ::kal_job_usage;
 export using ::kal_process_stop_requested;
@@ -86,6 +90,12 @@ inline constexpr props job_limit_hard{KAL_PROCESS_PROP_JOB_LIMIT_HARD};         
 inline constexpr props job_limit_supervised{KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISED}; // 0.20
 inline constexpr props null_streams  {KAL_PROCESS_PROP_NULL_STREAMS};  // 0.22
 inline constexpr props confine       {KAL_PROCESS_PROP_CONFINE};       // 0.23
+inline constexpr props job_observe   {KAL_PROCESS_PROP_JOB_OBSERVE};   // 0.24
+namespace job_state {
+inline constexpr kal_u32 unknown = KAL_JOB_UNKNOWN;
+inline constexpr kal_u32 occupied = KAL_JOB_OCCUPIED;
+inline constexpr kal_u32 empty = KAL_JOB_EMPTY;
+}
 
 // The fields of kal_program_info, for `wanted' and `present' (0.17).
 namespace info {
