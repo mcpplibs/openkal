@@ -14,6 +14,10 @@
 
 struct kal_process { kal_uintptr h; };
 
+/* A program's full identity, copied from kal_process_info's id/started_ns.
+ * Neither field is a native process identifier a caller may interpret. */
+struct kal_program_identity { kal_u64 id; kal_u64 started_ns; };
+
 /* How a started program's standard streams are supplied. A stream handle of
  * zero denotes that the program inherits the corresponding stream of its
  * parent, which is what an environment without a general mechanism for
@@ -100,6 +104,8 @@ struct kal_preopen {
 /* KAL_SPAWN_CONFINE is honoured: the environment holds a started program to
  * its grants. Version 0.23. */
 #define KAL_PROCESS_PROP_CONFINE        ((kal_uintptr)1u << 14)
+/* Declared units, portable references and retirement. Version 0.24. */
+#define KAL_PROCESS_PROP_JOB_OBSERVE    ((kal_uintptr)1u << 15)
 
 /* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.
@@ -611,6 +617,69 @@ int kal_process_job_terminate(struct kal_job);
  * means where the unit is a process group and closing is releasing a number.
  * Terminating is `kal_process_job_terminate' and nothing else is. */
 void kal_process_job_close(struct kal_job);
+
+/* AN OBSERVABLE UNIT (0.24). The unit is declared before any program is
+ * started in it. `create' declares the caller's private unit and writes
+ * an opaque reference into `reference'; `used' is its byte count. A buffer
+ * smaller than the implementation requires is kal_err_no_space and leaves
+ * the caller outside a new unit. No terminator is included in the count.
+ *
+ * The caller declares the unit before starting its external members. A
+ * native unit already led by this caller may be adopted; existing members
+ * are not excluded from observation.
+ *
+ * The reference is a value, not a handle: it can be retained and carried to
+ * another invocation. Its bytes shall not be interpreted or manufactured by
+ * a caller. `open' obtains an observation reference to the original unit;
+ * closing it ends nothing. An environment that cannot retain a native unit
+ * identity after its last observer is lost shall not report name absence as
+ * emptiness. It reports UNKNOWN. Neither a dead leader nor a stale reference
+ * proves that the unit's other programs have ended.
+ *
+ * A job obtained by `open' shall be passed only to `observe' and `close',
+ * never to spawn, enter, terminate, limit or another control operation. This
+ * is a caller precondition: an environment whose job is a numeric group does
+ * not turn that number into a kernel-enforced read-only capability. The C++
+ * library above this ABI can enforce the distinction through its observer type.
+ * Such an observer conveys no right to control a replacement unit that reused
+ * a native identifier. `observe' validates the supplied reference and
+ * reports exactly one of the three states. Unsupported observation, identity
+ * ambiguity, an inaccessible unit or an expired native reference is UNKNOWN,
+ * never EMPTY. A positively empty unit has no remaining active member.
+ *
+ * The job returned by `create' is the job supplied to the EXISTING spawn:
+ * one start, with the declared unit stated by its caller. Before `retire',
+ * the caller shall cease all admission into that unit, including its own
+ * concurrent spawns. `retire' establishes that no member except the caller
+ * remains. `continuation' names the same still-live program that supplied
+ * its id and birth through kal_process_info. Where membership can be left,
+ * the caller joins that program's unit before observing its former unit. A
+ * dead/reused continuation or one outside the native scope the caller can
+ * join yields UNKNOWN; no former numeric unit is guessed as a fallback.
+ * The continuation conveys no right to terminate or admit into its unit,
+ * and moving there does not reopen admission to the retired unit. The caller
+ * remains alive and may complete its own bookkeeping afterwards.
+ * OCCUPIED and UNKNOWN can be retried. Retirement is idempotent, and after
+ * asking to retire the caller shall not admit another program to the unit.
+ * A library above this ABI enforces that rule through its owned unit object.
+ *
+ * These operations neither install a monitor nor reconstruct a registry.
+ * The reference is sufficient to validate the environment's own native unit;
+ * a retained job holds whatever native reference the environment supplies.
+ * An implementation not claiming JOB_OBSERVE reports kal_err_not_supported.
+ */
+#define KAL_JOB_UNKNOWN  0u
+#define KAL_JOB_OCCUPIED 1u
+#define KAL_JOB_EMPTY    2u
+int kal_process_job_create(struct kal_job* out, char* reference,
+                           kal_uintptr capacity, kal_uintptr* used);
+int kal_process_job_open(const char* reference, kal_uintptr length,
+                         struct kal_job* out);
+int kal_process_job_observe(struct kal_job, const char* reference,
+                            kal_uintptr length, kal_u32* state);
+int kal_process_job_retire(struct kal_job, const char* reference,
+                           kal_uintptr length, const struct kal_program_identity* continuation,
+                           kal_u32* state);
 
 /* WHAT A UNIT USES. Version 0.20, clause 11 entry 43.
  *

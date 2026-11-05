@@ -1,4 +1,4 @@
-# openkal Specification, version 0.23
+# openkal Specification, version 0.24
 
 ## 1. Scope
 
@@ -1088,6 +1088,29 @@ environment applies its own policy for memory where it has one. A balanced
 program sizes what it keeps by what `kal_memory_info` reports available.
 Clause 11, entry 57.
 
+### 7.18 Observable process units
+
+An implementation claiming `KAL_PROCESS_PROP_JOB_OBSERVE` shall provide a
+caller-owned unit before its external members start, an opaque observation
+reference, and the three states `unknown`, `occupied` and `empty`.
+`kal_process_job_create` adopts or establishes the caller's private unit;
+subsequent starts use the existing `kal_spawn.job` field. Observation shall
+validate the original native identity. A dead leader, a missing name or the
+loss of every native reference is not evidence that all members have ended.
+
+`kal_process_job_open` obtains observation and close authority only. This is a
+caller precondition where the native handle is numeric; it does not convert a
+reusable numeric identifier into a kernel-enforced read-only capability.
+
+Before `kal_process_job_retire`, the caller shall close admission, including
+concurrent starts. Retirement proves that no external member remains and,
+where necessary, leaves the original unit for the unit of the same live
+program identified by `continuation`. Its identifier and birth are verified
+before and after that transition. An inaccessible, dead, reused or unreachable
+continuation yields `unknown`. Retirement conveys no admission or termination
+authority over the continuation's unit and never reopens the original unit.
+The caller may remain alive to finish its own bookkeeping. Clause 11, entry 58.
+
 ## 8. Evolution
 
 Each interface is versioned independently. A revision may add declarations and
@@ -2074,6 +2097,18 @@ The following are recorded so that they are not mistaken for oversights.
     a program is for states it once; a balanced program adapts to what is
     available. It is a preference and not a limit, and no operation answers
     differently for it, as `kal_task_set_priority` changes no result.
+
+58. **A declared unit whose external writers have ended.** **Specified in
+    0.24**, as `kal_process_job_create`, `kal_process_job_open`,
+    `kal_process_job_observe` and `kal_process_job_retire` (clause 7.18).
+    Termination of one program does not establish termination of its
+    descendants. A retained native reference can establish the original
+    unit's state without a process registry; when the environment cannot
+    establish that identity, the answer is `unknown`. A helper is itself a
+    member, so successful retirement first excludes external members and
+    then leaves its original unit where the environment requires it. A live
+    continuation names the surviving program, not a remembered numeric group.
+    The existing spawn form and immutable structure layouts remain unchanged.
 
 ## 12. Images
 

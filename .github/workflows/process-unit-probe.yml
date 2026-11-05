@@ -1,0 +1,46 @@
+name: process unit observer experiments
+on:
+  pull_request:
+    paths:
+      - '.github/probes/process_unit.cpp'
+      - '.github/workflows/process-unit-probe.yml'
+  workflow_dispatch:
+concurrency:
+  group: unit-probe-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: native unit lifetime (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Compile native experiment (Unix)
+        if: runner.os != 'Windows'
+        run: c++ -std=c++17 -O2 -pthread .github/probes/process_unit.cpp -o unit-probe
+      - name: Compile native experiment (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: cl /nologo /std:c++17 /EHsc /O2 .github\probes\process_unit.cpp /Fe:unit-probe.exe
+      - name: Observe real unit lifetime
+        shell: bash
+        run: |
+          set -o pipefail
+          ./unit-probe | tee unit-probe.jsonl
+      - name: Reuse a native identifier inside an isolated PID namespace
+        if: runner.os == 'Linux'
+        run: |
+          set -o pipefail
+          export PROBE_OUTER_PID_NAMESPACE=$(readlink /proc/self/ns/pid)
+          sudo --preserve-env=PROBE_OUTER_PID_NAMESPACE unshare --pid --fork --mount-proc ./unit-probe --pid-reuse | tee unit-reuse.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: process-unit-${{ matrix.os }}
+          path: unit-*.jsonl

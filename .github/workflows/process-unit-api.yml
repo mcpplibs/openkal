@@ -1,0 +1,38 @@
+name: declared process unit API
+on:
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: unit-api-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: implemented unit API (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, implementation: openkal-linux, revision: b429bac4368d1a3960efd6d9dd93c02f229fbeda }
+          - { os: macos-15, implementation: openkal-macos, revision: 5cad63b22b61df2af38d632ff1590f8cbb527130 }
+          - { os: windows-2025, implementation: openkal-windows, revision: 07994ed5d8f7741474b42aa83bcda0256fc71bcc }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: mcpplibs/${{ matrix.implementation }}
+          ref: ${{ matrix.revision }}
+          path: backend
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Run the implemented ABI against its actual native backend
+        shell: bash
+        run: python .github/checks/build_job_observer.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: declared-unit-${{ matrix.os }}
+          path: |
+            unit-api-build/*.jsonl
+            unit-api-build/retire-boundaries.json

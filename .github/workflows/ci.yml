@@ -33,8 +33,8 @@ env:
   # A version verified to build these packages, not a measured minimum. The pin
   # exists for reproducibility rather than because an older mcpp is known to
   # fail.
-  MCPP_VERSION: 2026.8.27.1
-  XLINGS_VERSION: v2026.8.17.2
+  MCPP_VERSION: 2026.11.5.1
+  XLINGS_VERSION: v2026.10.26.1
   XLINGS_NON_INTERACTIVE: '1'
 
 jobs:
@@ -250,10 +250,8 @@ jobs:
           [package]
           name    = "abi"
           version = "0.1.0"
-          EOF
-          cat > .abi-probe/build.mcpp <<'EOF'
-          import mcpp;
-          int main() { mcpp::include_dir("../include"); return 0; }
+          [build]
+          include_dirs = ["../include"]
           EOF
           cat > .abi-probe/src/main.cpp <<'EOF'
           #include <openkal/types.h>

@@ -114,8 +114,12 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_process_end_as_requested);
     (void)sizeof(&kal_process_info);
     (void)sizeof(&kal_process_job_close);
+    (void)sizeof(&kal_process_job_create);
     (void)sizeof(&kal_process_job_enter);
     (void)sizeof(&kal_process_job_limit);
+    (void)sizeof(&kal_process_job_observe);
+    (void)sizeof(&kal_process_job_open);
+    (void)sizeof(&kal_process_job_retire);
     (void)sizeof(&kal_process_job_terminate);
     (void)sizeof(&kal_process_job_usage);
     (void)sizeof(&kal_process_open_id);

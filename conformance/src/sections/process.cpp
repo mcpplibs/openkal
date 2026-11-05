@@ -401,7 +401,7 @@ void run() {
                                     | kal::process::job_limit_hard
                                     | kal::process::job_limit_supervised
                                     | kal::process::null_streams
-                                    | kal::process::confine).bits;
+                                    | kal::process::confine | kal::process::job_observe).bits;
         observe(kind::abi, sizeof(kal_preopen) == 3 * sizeof(kal_uintptr),
                 "a directory grant occupies three machine words");
         observe(kind::abi, sizeof(kal_spawn) == 6 * sizeof(kal_uintptr),

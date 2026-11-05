@@ -69,6 +69,16 @@ words become types that cannot be mixed.
 The header includes nothing. openkal must be usable on a freestanding target,
 and a consumer compiled with `-nostdinc` has nothing to include.
 
+## Observable process units
+
+OpenKal 0.24 declares a private process unit before its external members start.
+The existing spawn record admits members to it. An opaque observation reference
+reports `occupied`, positively established `empty`, or `unknown`; a dead leader
+or a missing native name does not establish emptiness. Retirement closes
+admission and permits a helper to finish its bookkeeping after the unit's
+external members have ended. The caller requirements are stated in
+[SPEC clause 7.18](SPEC.md#718-observable-process-units) and `openkal/process.h`.
+
 ## How a program uses openkal
 
 A program declares two dependencies. The first fixes the version of the contract
@@ -77,16 +87,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.23.0"
+openkal = "0.24.0"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.24.0"
+openkal-linux = "0.25.0"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.21.0"
+openkal-macos = "0.22.0"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.19.0"
+openkal-windows = "0.20.0"
 ```
 
 The program imports the interface and names no implementation.
