@@ -42,7 +42,7 @@
  * for the reason tools/check-readme-versions.sh exists --- the one fact a
  * consumer actually asks for was checked by nobody. */
 #define KAL_VERSION_MAJOR 0u
-#define KAL_VERSION_MINOR 23u
+#define KAL_VERSION_MINOR 24u
 #define KAL_VERSION_PATCH 0u
 
 #define KAL_VERSION_MAKE(major, minor, patch)             \

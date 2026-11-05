@@ -248,3 +248,14 @@ unit preserves the live anchor. These Linux results do not qualify the native
 macOS/Windows continuation path; the three source consumers run independently
 in native CI. A dedicated control also reaps the ephemeral publisher before
 the helper retires against its live owner.
+
+## 2026-11-06 publication-scope correction
+
+The earlier phrases "durable reservation" and "durable stage record" describe
+records that remain visible to another invocation after a process ends. They
+do not establish power-loss durability. Core's accepted recovery contract
+covers process loss while the filesystem continues operating. Runtime records
+use complete checked write/close followed by same-directory atomic rename;
+publication and acknowledgement occur afterwards. The OS library's durable
+write operation retains its existing contract. Native unit observation and
+the all-reference-holders-lost unknown boundary are unchanged.
