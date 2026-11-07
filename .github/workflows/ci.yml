@@ -694,6 +694,10 @@ jobs:
           #
           #   openkal = "0.5.2"            a released version. The question is
           #                                whether it is this one.
+          #   openkal = "^0.24.0"          a compatible range (a caret: the
+          #                                same 0.y, or the same major above 0,
+          #                                and not older). The question is
+          #                                whether this version is in it.
           #   openkal = { git = …, branch = … }
           #                                a development line. The version is
           #                                not stated and cannot be; what makes
@@ -705,7 +709,21 @@ jobs:
           # empty string --- which named neither the cause nor the symptom.
           here="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' mcpp.toml | head -1)"
           there="$(sed -n 's/^openkal[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' .impl/mcpp.toml | head -1)"
-          if [ -n "$there" ]; then
+          in_range() {  # in_range VERSION ^FLOOR
+            local v="$1" floor="${2#^}"
+            IFS=. read -r vmaj vmin _ <<<"$v"
+            IFS=. read -r fmaj fmin _ <<<"$floor"
+            [ "$vmaj" = "$fmaj" ] || return 1
+            [ "$fmaj" != 0 ] || [ "$vmin" = "$fmin" ] || return 1
+            [ "$(printf '%s\n%s\n' "$floor" "$v" | sort -V | head -1)" = "$floor" ]
+          }
+          if [ -n "$there" ] && [ "${there#^}" != "$there" ]; then
+            if ! in_range "$here" "$there"; then
+              echo "::error::this is openkal $here and ${{ matrix.implementation }} is written against openkal $there, a range without it. They are not in step." >&2
+              exit 1
+            fi
+            echo "openkal $here is in ${{ matrix.implementation }}'s range $there"
+          elif [ -n "$there" ]; then
             if [ "$here" != "$there" ]; then
               echo "::error::this is openkal $here and ${{ matrix.implementation }} is written against openkal $there. Nothing is wrong with either; they are not in step. Re-run after the implementation's branch has the matching version." >&2
               exit 1
