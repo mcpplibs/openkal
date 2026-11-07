@@ -2152,6 +2152,7 @@ the operations a loader needs and a program could not otherwise reach
 | imports | only names this specification declares, and names other images export; a name of a C library or of an environment is refused. A weak import is optional: it is bound when the implementation or an image the image needs provides it, and is zero otherwise |
 | entry | an executable image's ELF entry is a function of no parameters returning `int`, in the image's convention; its value is the image's status. An image that another loads has no entry |
 | calling convention | the architecture's, fixed for every environment: the System V convention on x86-64, the procedure call standard on AArch64; an implementation whose environment uses another presents entries in this one to the image (12.3) |
+| floating-point state | the convention's at the entry and in each context: on x86-64 the x87 control word `0x037F` (extended precision, every exception masked) and MXCSR `0x1F80`, on AArch64 FPCR zero; an image's C library computes in that state (a `long double` of x86-64 is the x87's extended format) |
 | platform register | an AArch64 image does not use `x18`, which two environments reserve |
 | stack | a frame larger than a page is touched page by page, in order: one environment commits a context's stack as its guard page is touched, and a frame that steps over the guard ends the program |
 | thread-local storage | through the emulated form, in which a variable is found by a function the image itself supplies; an image does not address the thread pointer, which one environment does not let a program set and another does not let it change |
@@ -2206,7 +2207,12 @@ Where an environment's own convention differs from the image's --- on x86-64,
 one environment passes arguments in other registers --- the loader presents each
 entry in the image's convention, and a function the image passes to the
 implementation (`kal_task_start`'s entry, `kal_space_start`'s) is entered in the
-image's convention. The presentation is mechanical and is generated from
+image's convention. The convention includes the floating-point state (12.2): the
+loader establishes it at the entry, for the initialisers and finalisers, and in
+each context the image starts, and a call that a program of the environment makes
+into an image's function is made in it, the caller's own restored after it; one
+environment begins a thread with the x87 at double precision. The presentation is
+mechanical and is generated from
 `SURFACE.txt` and the declarations, so that it cannot omit a name. It is the
 loader's and not the implementation's: an implementation is written in its
 environment's convention, as every program of that environment is, and a
