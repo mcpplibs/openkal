@@ -71,6 +71,27 @@ void endpoint_section() {
               std::memcmp(again.ep.addr, ep.addr, 4) == 0,
               "formatting and parsing are inverses");
     }
+    // EVERY DIGIT OF A PORT (0.3.1). The formatter wrote at most three digits
+    // of each number, which is every digit of an octet and not of a port:
+    // 8080 came out as "080". No port is written as none, and each other one
+    // is written whole and reads back as itself.
+    {
+        struct { kal_u32 port; const char* text; } const ports[] = {
+            { 0,     "127.0.0.1" },
+            { 80,    "127.0.0.1:80" },
+            { 8080,  "127.0.0.1:8080" },
+            { 65535, "127.0.0.1:65535" },
+        };
+        for (const auto& p : ports) {
+            char buf[32] = {};
+            const auto f = format_v4(loopback_v4(p.port), buf, sizeof buf);
+            const kal_uintptr len = std::strlen(p.text);
+            check(f.ok && f.n == len && std::memcmp(buf, p.text, len) == 0,
+                  "a port is written with all its digits");
+            const auto again = parse_v4(buf, f.n);
+            check(again.ok && again.ep.port == p.port, "and reads back as the port it was");
+        }
+    }
     {
         char small[8] = {};
         const auto f = format_v4(loopback_v4(443), small, sizeof small);

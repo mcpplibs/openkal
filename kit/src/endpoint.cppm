@@ -104,10 +104,13 @@ constexpr format_result format_v4(const kal_endpoint& ep, char* out, kal_uintptr
     if (cap < 22) return { 0, false };
 
     kal_uintptr n = 0;
+    // EVERY DIGIT OF THE NUMBER (0.3.1). An octet has at most three and a port
+    // five; written as three, port 8080 came out as "080".
     auto digits = [&](unsigned v) {
-        if (v >= 100) out[n++] = static_cast<char>('0' + (v / 100) % 10);
-        if (v >= 10)  out[n++] = static_cast<char>('0' + (v / 10) % 10);
-        out[n++] = static_cast<char>('0' + v % 10);
+        char reversed[5] = {};
+        int k = 0;
+        do { reversed[k++] = static_cast<char>('0' + v % 10); v /= 10; } while (v != 0 && k < 5);
+        while (k > 0) out[n++] = reversed[--k];
     };
 
     for (int octet = 0; octet < 4; ++octet) {
