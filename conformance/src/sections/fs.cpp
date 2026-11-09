@@ -887,6 +887,68 @@ void run() {
         }
     }
 
+    // --- a second name for a file, version 0.25 ---------------------------
+    //
+    // ASKED FIRST, AS LINKS ARE: whether a node may have several names is a
+    // property of the volume's format. Where it is claimed, both names reach one
+    // file --- one identity, one content, and a file that remains while either
+    // name does; where it is not, the request is refused and copies nothing.
+    {
+        const char* kSecond = "okc-conformance-second-name.tmp";
+        kal_fs_remove(here(), kSecond, length(kSecond));
+        put_file(kName, "0123456789");
+        if ((kal_fs_props(here()) & kal::fs::hard_links.bits) != 0) {
+            const int made = kal_fs_hard_link(here(), kName, length(kName),
+                                              here(), kSecond, length(kSecond));
+            observe(kind::behaviour, made == kal_ok,
+                    "a file is given a second name where the volume claims it");
+            kal_node_info first = fresh(), second = fresh();
+            const int a = kal_fs_info(here(), kName, length(kName), 0, kal::fs::field::all, &first);
+            const int b = kal_fs_info(here(), kSecond, length(kSecond), 0, kal::fs::field::all, &second);
+            if (a == kal_ok && b == kal_ok
+                && (first.present & second.present & kal::fs::field::identity) != 0) {
+                observe(kind::behaviour,
+                        first.identity[0] == second.identity[0] && first.identity[1] == second.identity[1],
+                        "both names reach one node, of one identity");
+            } else {
+                unobserved(kind::behaviour, "both names reach one node, of one identity",
+                           "the implementation does not report an identity for this resource");
+            }
+            observe(kind::behaviour, b == kal_ok && second.kind == kal_node_file && second.size == 10,
+                    "the second name reaches the file's content");
+            observe(kind::behaviour,
+                    kal_fs_hard_link(here(), kName, length(kName), here(), kSecond, length(kSecond))
+                        == kal_err_exists,
+                    "a second name that already names a node is refused");
+            const int removed = kal_fs_remove(here(), kName, length(kName));
+            kal_node_info left = fresh();
+            const int l = kal_fs_info(here(), kSecond, length(kSecond), 0, kal::fs::field::all, &left);
+            observe(kind::behaviour, removed == kal_ok && l == kal_ok && left.kind == kal_node_file && left.size == 10,
+                    "removing one name leaves the file reachable by the other");
+            const char* kNoSuch = "okc-conformance-no-such-file.tmp";
+            observe(kind::behaviour,
+                    kal_fs_hard_link(here(), kNoSuch, length(kNoSuch), here(), kName, length(kName))
+                        == kal_err_not_found,
+                    "a name that names nothing is not given a second");
+            const char* kDir = "okc-conformance-unnamed-dir.tmp";
+            kal_fs_mkdir(here(), kDir, length(kDir));
+            const int d = kal_fs_hard_link(here(), kDir, length(kDir), here(), kName, length(kName));
+            observe(kind::behaviour, d == kal_err_is_directory,
+                    "a directory is not given a second name");
+            kal_fs_remove(here(), kDir, length(kDir));
+            kal_fs_remove(here(), kSecond, length(kSecond));
+            kal_fs_remove(here(), kName, length(kName));
+        } else {
+            unobserved(kind::behaviour, "a file is given a second name",
+                       "this volume does not claim it, which the enquiry reports");
+            observe(kind::behaviour,
+                    kal_fs_hard_link(here(), kName, length(kName), here(), kSecond, length(kSecond)) != kal_ok,
+                    "a second name the enquiry did not claim is refused");
+            kal_fs_remove(here(), kSecond, length(kSecond));
+            kal_fs_remove(here(), kName, length(kName));
+        }
+    }
+
     // --- exclusion upon a range of a file, version 0.10 ---------------------
     //
     // THE OBSERVATION THAT TELLS THE TWO FORMS OF THIS APART NEEDS NO SECOND
@@ -1071,7 +1133,7 @@ void run() {
                                     | kal::fs::local_endpoint | kal::fs::remove_open
                                     | kal::fs::resolved_name | kal::fs::attenuate
                                     | kal::fs::read_only | kal::fs::unchanging
-                                    | kal::fs::list_info).bits;
+                                    | kal::fs::list_info | kal::fs::hard_links).bits;
         observe(kind::abi, (kal_fs_props(here()) & ~assigned) == 0,
                 "the capability word contains no position the specification has not assigned");
 

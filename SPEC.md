@@ -1,4 +1,4 @@
-# openkal Specification, version 0.24
+# openkal Specification, version 0.25
 
 ## 1. Scope
 
@@ -2109,6 +2109,30 @@ The following are recorded so that they are not mistaken for oversights.
     then leaves its original unit where the environment requires it. A live
     continuation names the surviving program, not a remembered numeric group.
     The existing spawn form and immutable structure layouts remain unchanged.
+
+59. **A second name for a file.** **Specified in 0.25**, as `kal_fs_hard_link`
+    and `KAL_FS_PROP_HARD_LINKS` in `openkal.fs`. A C library's `link` and
+    `linkat`, and a C++ library's `std::filesystem::create_hard_link`, could not
+    be written above this interface: no operation gave an existing file a
+    second name, and copying the file is a different file with a different
+    identity. Every environment this specification targets has the operation
+    natively where the volume's format records several names for one node
+    (`linkat`, `CreateHardLinkW`), so it is answered per volume by
+    `kal_fs_props`, as the operations upon links are (entry 7), and a volume
+    that does not claim it refuses the request rather than copying. The name
+    being given another is not resolved, for the reason `kal_fs_remove` and
+    `kal_fs_rename` act upon a name: a program that names a link means the
+    link.
+
+60. **The requests to end, counted.** **Specified in 0.25**, in
+    `kal_process_stop_requested`. The word was set once and never cleared, so a
+    program that took the requests over and went on after the first could not
+    learn of a second: an interactive program to which each interrupt keystroke
+    is a request to abandon the current command observed the first keystroke
+    and none after it. The word now counts the requests, skipping zero when the
+    count wraps, so the earlier statement --- zero until a request, non-zero
+    afterwards, never cleared --- remains true of every implementation of 0.25,
+    and a program written against 0.24 reads it as before.
 
 ## 12. Images
 

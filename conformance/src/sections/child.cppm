@@ -26,6 +26,7 @@ enum class errand {
     report_grants,       // the directories a starter granted are its preopens
     report_no_preopens,  // ... and a count of zero leaves it none (clause 7.13)
     end_as_requested,    // takes the request over, then ends as it would have (0.17)
+    count_requests,      // takes the request over and observes two requests (0.25)
     map_beyond_shortened,    // reads a mapped page its file no longer holds (0.18)
     hold_memory,         // holds 32 MiB written through, then waits to be ended (0.20)
     grow_memory,         // grows by 8 MiB at a time to 512 MiB, then waits; ends
