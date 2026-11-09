@@ -62,6 +62,7 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_fs_close_file);
     (void)sizeof(&kal_fs_dir_attenuate);
     (void)sizeof(&kal_fs_file_info);
+    (void)sizeof(&kal_fs_hard_link);
     (void)sizeof(&kal_fs_info);
     (void)sizeof(&kal_fs_link_create);
     (void)sizeof(&kal_fs_link_read);
