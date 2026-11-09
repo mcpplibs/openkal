@@ -303,9 +303,10 @@ fi
 # passed. Without MTEST the suite runs as it always has and its exit status is
 # the verdict.
 if [ -n "${MTEST:-}" ]; then
+    # bash 3.2 (macOS) treats an empty array as unset under `set -u', hence the +form below.
     under=()
     [ -n "$runner" ] && under=(--run-under "$runner")
-    "$MTEST" run --jobs 1 --group "${MTEST_GROUP:-${GITHUB_RUN_ID:-local}}" "${under[@]}" -- "./$binary"
+    "$MTEST" run --jobs 1 --group "${MTEST_GROUP:-${GITHUB_RUN_ID:-local}}" ${under[@]+"${under[@]}"} -- "./$binary"
 else
     $runner "./$binary"
 fi
