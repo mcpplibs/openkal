@@ -294,4 +294,18 @@ fi
 # The suite's own exit status is the verdict: 0 when every observation held, 1
 # when one did not, 2 when nothing was observed. The last is the one a run that
 # selected no interface would otherwise pass silently.
-$runner "./$binary"
+# BY THE TEST PROTOCOL WHERE A RUNNER IS NAMED (MTEST, an mtest engine). The
+# suite reports each interface as a case of kind `cts' and each observation as
+# a case within it, and the engine keeps the run in its store (`.mtest' here),
+# from which a report is written. One job: the suite is one sequential program
+# whose sections share the working directory's names, so its cases are not
+# divided among processes. The verdict is the engine's: 0 when every case
+# passed. Without MTEST the suite runs as it always has and its exit status is
+# the verdict.
+if [ -n "${MTEST:-}" ]; then
+    under=()
+    [ -n "$runner" ] && under=(--run-under "$runner")
+    "$MTEST" run --jobs 1 --group "${MTEST_GROUP:-${GITHUB_RUN_ID:-local}}" "${under[@]}" -- "./$binary"
+else
+    $runner "./$binary"
+fi

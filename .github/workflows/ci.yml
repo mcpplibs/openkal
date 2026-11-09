@@ -35,6 +35,10 @@ env:
   # fail.
   MCPP_VERSION: 2026.11.5.1
   XLINGS_VERSION: v2026.10.26.1
+  # The mtest engine the conformance suite reports to (tools/run-conformance.sh
+  # with MTEST set): an xlings package, else the release bundle with this hash.
+  MTEST_VERSION: 0.5.2
+  MTEST_SHA256: be443f8c546b3f4628dcd3f1eb6f45b4d698a7f805232f966349faf8250863c6
   XLINGS_NON_INTERACTIVE: '1'
 
 jobs:
@@ -865,9 +869,31 @@ jobs:
       # verdict: 0 when every observation held, 1 when one did not, and 2 when
       # nothing was observed --- the last being the outcome a run that selected
       # no interface would otherwise pass silently.
+      - uses: ./.github/actions/mtest
+
+      # THE SUITE REPORTS BY THE TEST PROTOCOL HERE (MTEST is set): each
+      # interface a case of kind `cts', each observation a case within it, kept
+      # in the engine's store under conformance/.mtest. A failure is explained
+      # in the log, since the engine prints a summary and not the suite's text.
       - name: Every interface, every kind of examination
         run: |
-          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl '${{ matrix.features }}'
+          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl '${{ matrix.features }}' \
+            || { ( cd conformance && "$MTEST" explain ) || true; exit 1; }
+
+      - name: The run, reported
+        if: always()
+        run: |
+          [ -f conformance/.mtest/index.ndjson ] || { echo "the suite kept no run"; exit 0; }
+          ( cd conformance && "$MTEST" report --format md --group "$GITHUB_RUN_ID" ) >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mtest-cts-${{ matrix.implementation }}-${{ strategy.job-index }}
+          path: conformance/.mtest
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
 
       # The suite is composable because openkal is: an implementation provides
       # an interface in whole or not at all, and a suite that examined all eight
@@ -992,7 +1018,8 @@ jobs:
       - name: A selection of three interfaces is examined, not refused
         run: |
           rm -rf conformance/target
-          bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl core,fs,task \
+          # The suite's own text is what this step reads, so no runner is named.
+          MTEST= bash tools/run-conformance.sh '${{ matrix.implementation }}' .impl core,fs,task \
             | tee selected.log
 
           # A report was produced, and nothing in it failed.
@@ -1006,3 +1033,33 @@ jobs:
 
           # And an interface that was selected was examined.
           grep -qE 'held +\[behaviour\].*' selected.log
+
+  # ---------------------------------------------------------------------------
+  # EVERY IMPLEMENTATION'S RUN AS ONE REPORT: each conformance job's store,
+  # taken into one, and reported together as the workflow run's group
+  # (`mtest ci report`): the cases of each interface on each implementation,
+  # the failures, and the measurements of cost.
+  conformance-report:
+    name: conformance (report)
+    needs: conformance
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mtest
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mtest-cts-*
+          path: ${{ runner.temp }}/stores
+      - name: Every implementation's run, reported together
+        run: |
+          set -euo pipefail
+          found=0
+          for store in "$RUNNER_TEMP"/stores/*/; do
+            [ -f "$store/index.ndjson" ] || continue
+            "$MTEST" store import --from "$store"
+            found=1
+          done
+          if [ "$found" = 0 ]; then echo "no conformance job kept a run" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          "$MTEST" ci report --out "$RUNNER_TEMP/conformance.md"

@@ -2,6 +2,7 @@ module okc.suite;
 
 import okc.spec;
 import okc.report;
+import okc.protocol;
 import okc.version;
 import okc.abort;
 import okc.stream;
@@ -25,36 +26,46 @@ import okc.debug;
 
 namespace okc {
 
-int run_all() {
-    write_inventory();
+namespace {
 
-    // The order is clause 3's, so that two runs against different
-    // implementations can be read side by side without either being sorted.
-    // openkal.abort is last among the core interfaces rather than first,
-    // because observing it requires starting a copy and the copy's own report
-    // would otherwise appear before this one's heading.
-    // First, because it is what a consumer asks before it uses anything, and
-    // because it is the one section no arrangement skips.
-    version::run();
-    stream::run();
-    memory::run();
-    env::run();
-    time::run();
-    random::run();
-    fs::run();
-    process::run();
-    task::run();
-    exec::run();
-    terminal::run();
-    net::run();
-    datagram::run();
-    space::run();
-    timeout::run();
-    map::run();
-    region::run();
-    prof::run();
-    debug::run();
-    termination::run();
+// The cases a runner lists and selects (the mtest protocol): one per section,
+// in the order the sections run. A section's case begins at its heading.
+struct section_entry { const char* id; void (*run)(); };
+constexpr section_entry sections[] = {
+    { "openkal.version",  version::run },
+    { "openkal.stream",   stream::run },
+    { "openkal.memory",   memory::run },
+    { "openkal.env",      env::run },
+    { "openkal.time",     time::run },
+    { "openkal.random",   random::run },
+    { "openkal.fs",       fs::run },
+    { "openkal.process",  process::run },
+    { "openkal.task",     task::run },
+    { "openkal.exec",     exec::run },
+    { "openkal.terminal", terminal::run },
+    { "openkal.net",      net::run },
+    { "openkal.datagram", datagram::run },
+    { "openkal.space",    space::run },
+    { "openkal.timeout",  timeout::run },
+    { "openkal.map",      map::run },
+    { "openkal.region",   region::run },
+    { "openkal.prof",     prof::run },
+    { "openkal.debug",    debug::run },
+    { "openkal.abort",    termination::run },
+};
+
+}  // namespace
+
+int run_all() {
+    protocol::begin();
+    if (protocol::listing()) {
+        for (const section_entry& e : sections) protocol::list_case(e.id);
+        return protocol::finish(0, 0, 0);
+    }
+
+    write_inventory();
+    for (const section_entry& e : sections)
+        if (protocol::wanted(e.id)) e.run();
 
     return summarise();
 }

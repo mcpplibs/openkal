@@ -26,6 +26,41 @@ would be a surprising thing for `[dependencies]` to name — and it is reached b
 checking out the specification, which is the package it is the conformance
 procedure for.
 
+## A runner's view: the mtest test protocol
+
+The suite speaks the [mtest test protocol](https://github.com/mcpp-community/mtest/blob/main/spec/protocol.md),
+version 1, at level 2, written without a library as the rest of the suite is. Each
+interface is a case of kind `cts` that names the interface as the clause it covers;
+each observation is a case within it, reported as it runs (protocol P3.4): `pass`,
+`fail`, or `skip` with the reason an observation was not made; each measurement of
+cost is a metric in nanoseconds. A selection may name an interface or an
+observation within one; the second runs its interface. Every case holds the
+resource `serial:openkal-conformance`, because the sections create fixed names in
+the working directory.
+
+The protocol needs `openkal.env` and `openkal.fs`; without them, or without a
+runner, the suite is judged by its exit status alone, as before. With an engine
+named in `MTEST`, `tools/run-conformance.sh` runs the suite through it in one job
+and the run is kept in `.mtest`:
+
+```bash
+MTEST=mtest bash .spec/tools/run-conformance.sh openkal-linux . full,optional
+(cd .spec/conformance && mtest report --format md)
+```
+
+The protocol's variables are not passed to the copies the suite starts: a copy is
+started with the environment the suite gives it, which is empty (P2.2).
+
+## The three statements of an interface set
+
+An implementation states the interfaces it provides three times: its manifest's
+`provides-interfaces` (what a build system checks a program's requirements
+against), `kal_interfaces()` (what a loader checks an image's against), and the
+names it exports. `tools/run-conformance.sh` reads the first and names it to the
+suite as `OPENKAL_CONFORMANCE_PROVIDES`, which compares the second with it; the
+script compares the third. A manifest that states no list is reported and not
+compared.
+
 ## It is composable, because openkal is
 
 An interface is the unit of provision. An implementation provides one in whole
