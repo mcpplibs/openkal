@@ -63,6 +63,7 @@ export using ::kal_fs_props;
 export using ::kal_fs_max_name;
 export using ::kal_fs_link_create;
 export using ::kal_fs_link_read;
+export using ::kal_fs_hard_link;
 export using ::kal_fs_resolved_name;
 export using ::kal_fs_list_next_info;
 export using ::kal_fs_dir_attenuate;
@@ -141,6 +142,8 @@ inline constexpr props attenuate{KAL_FS_PROP_ATTENUATE};
 inline constexpr props read_only{KAL_FS_PROP_READ_ONLY};
 inline constexpr props unchanging{KAL_FS_PROP_UNCHANGING};
 inline constexpr props list_info{KAL_FS_PROP_LIST_INFO};
+// A file may be given a second name (kal_fs_hard_link). Version 0.25.
+inline constexpr props hard_links{KAL_FS_PROP_HARD_LINKS};
 
 // What kal_fs_dir_attenuate takes away or states (0.23).
 struct dir_right_tag;

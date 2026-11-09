@@ -402,6 +402,16 @@ void kal_process_close(struct kal_process);
  * Zero until then, non-zero afterwards, and never cleared. Null where an
  * implementation does not claim KAL_PROCESS_PROP_STOP_REQUESTED.
  *
+ * IT COUNTS THE REQUESTS. Version 0.25. Each request that reaches the program
+ * adds one to the word, and an addition that would make it zero makes it one,
+ * so the word is never zero again once a request has arrived. A program that
+ * survives a request and goes on --- an interactive program to which every
+ * interrupt keystroke is a request to abandon the current command --- compares
+ * the word with the value it last saw and learns of each request, and one that
+ * waits with `kal_task_wait' upon the value it saw is woken by the next. Before
+ * 0.25 the word was set to a non-zero value once, and a second request could
+ * not be told from none. Clause 11 entry 60.
+ *
  * THIS IS NOT A SIGNAL INTERFACE, AND THE DIFFERENCE IS WHY IT CAN EXIST AT
  * ALL. Signals are one environment's mechanism: a numbered set, a disposition per
  * program, a handler that interrupts whatever was running. This system has them;

@@ -79,6 +79,15 @@ admission and permits a helper to finish its bookkeeping after the unit's
 external members have ended. The caller requirements are stated in
 [SPEC clause 7.18](SPEC.md#718-observable-process-units) and `openkal/process.h`.
 
+## Version 0.25
+
+A file may be given a second name with `kal_fs_hard_link`, answered per volume by
+`KAL_FS_PROP_HARD_LINKS` (clause 11 entry 59). The word `kal_process_stop_requested`
+returns counts the requests to end that reach the program, so that each one is
+observed (entry 60). The conformance suite reports to a test runner by the mtest
+protocol, and checks that an implementation's manifest, `kal_interfaces()` and its
+exported names state the same interfaces.
+
 ## How a program uses openkal
 
 A program declares two dependencies. The first fixes the version of the contract
@@ -87,16 +96,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.24.0"
+openkal = "0.25.0"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.25.0"
+openkal-linux = "0.26.0"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.22.0"
+openkal-macos = "0.23.0"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.20.0"
+openkal-windows = "0.21.0"
 ```
 
 The program imports the interface and names no implementation.

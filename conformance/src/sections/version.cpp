@@ -2,6 +2,7 @@ module okc.version;
 
 import openkal.types;
 import openkal.version;
+import openkal.env;
 import okc.report;
 import okc.spec;
 
@@ -82,6 +83,60 @@ void run() {
 #endif
     observe(kind::behaviour, agrees,
             "every interface this suite linked against is reported as present");
+
+    // THE IMPLEMENTATION'S MANIFEST, kal_interfaces() AND ITS EXPORTED NAMES
+    // STATE ONE SET (0.25). A build system checks a program's requirements
+    // against the manifest's `provides-interfaces', and a loader checks an
+    // image's against kal_interfaces(); the two must therefore agree, or a
+    // program accepted by one is refused by the other. The runner reads the
+    // manifest and names its list here (tools/run-conformance.sh); the third
+    // statement, the exported names, is compared with the manifest by the same
+    // script, which can read the program's symbols and this program cannot.
+#ifdef MCPP_FEATURE_ENV
+    {
+        static const char kVar[] = "OPENKAL_CONFORMANCE_PROVIDES";
+        char list[1024];
+        const kal_intptr n = kal_env_var(kVar, sizeof kVar - 1, list, sizeof list);
+        if (n > 0 && static_cast<kal_uintptr>(n) < sizeof list) {
+            struct named { const char* name; kal_u64 bit; };
+            static const named kNames[] = {
+                {"openkal.abort", kal::iface::abort_.bits},     {"openkal.stream", kal::iface::stream.bits},
+                {"openkal.memory", kal::iface::memory.bits},   {"openkal.env", kal::iface::env.bits},
+                {"openkal.time", kal::iface::time.bits},       {"openkal.random", kal::iface::random.bits},
+                {"openkal.fs", kal::iface::fs.bits},           {"openkal.process", kal::iface::process.bits},
+                {"openkal.task", kal::iface::task.bits},       {"openkal.exec", kal::iface::exec.bits},
+                {"openkal.terminal", kal::iface::terminal.bits}, {"openkal.net", kal::iface::net.bits},
+                {"openkal.datagram", kal::iface::datagram.bits}, {"openkal.space", kal::iface::space.bits},
+                {"openkal.timeout", kal::iface::timeout.bits}, {"openkal.map", kal::iface::map.bits},
+                {"openkal.region", kal::iface::region.bits},   {"openkal.prof", kal::iface::prof.bits},
+                {"openkal.debug", kal::iface::debug.bits},
+            };
+            kal_u64 stated = 0;
+            bool known = true;
+            kal_uintptr i = 0;
+            while (i < static_cast<kal_uintptr>(n)) {
+                while (i < static_cast<kal_uintptr>(n) && (list[i] == ';' || list[i] == ' ')) ++i;
+                kal_uintptr b = i;
+                while (i < static_cast<kal_uintptr>(n) && list[i] != ';' && list[i] != ' ') ++i;
+                if (i == b) break;
+                bool found = false;
+                for (const named& e : kNames) {
+                    kal_uintptr k = 0;
+                    while (e.name[k] && b + k < i && e.name[k] == list[b + k]) ++k;
+                    if (e.name[k] == 0 && b + k == i) { stated |= e.bit; found = true; break; }
+                }
+                if (!found) known = false;
+            }
+            observe(kind::behaviour, known,
+                    "every interface the manifest states is one the specification defines");
+            observe(kind::behaviour, stated == present,
+                    "kal_interfaces() states the interfaces the manifest states");
+        } else {
+            unobserved(kind::behaviour, "kal_interfaces() states the interfaces the manifest states",
+                       "the runner named no manifest list (OPENKAL_CONFORMANCE_PROVIDES)");
+        }
+    }
+#endif
 
     if (performs(kind::abi)) {
         observe(kind::abi, kal_version() == v && kal_interfaces() == present,

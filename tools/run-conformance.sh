@@ -259,7 +259,54 @@ export OPENKAL_CONFORMANCE_EMPTY=""
 # so the copy is started by the same mechanism as the original.
 runner="${OPENKAL_CONFORMANCE_RUNNER:-}"
 
+# THE INTERFACES THE IMPLEMENTATION'S MANIFEST STATES (0.25).
+#
+# Three statements of one set exist: the manifest's `provides-interfaces', which
+# a build system checks a program's requirements against; kal_interfaces(),
+# which a loader checks an image's against; and the names the implementation
+# exports. The suite compares the second with the first (it is told the list
+# here, because it cannot read a manifest); this script compares the third with
+# the first, because it can read the program's symbols and the suite cannot.
+# A manifest that states no list is reported and not compared: a provider that
+# states nothing is not one that provides nothing.
+manifest_list="$(awk '
+    /^[[:space:]]*provides-interfaces[[:space:]]*=/ { on = 1 }
+    on { line = line $0; if ($0 ~ /\]/) { on = 0 } }
+    END { gsub(/.*\[/, "", line); gsub(/\].*/, "", line); gsub(/[" \t]/, "", line); gsub(/,/, ";", line); print line }
+' "$implementation/mcpp.toml.orig")"
+if [ -n "$manifest_list" ]; then
+    export OPENKAL_CONFORMANCE_PROVIDES="$manifest_list"
+    exported="$(bash "$here/tools/check-surface.sh" --interfaces "$here/SURFACE.txt" "$binary" 2> /dev/null \
+                | sort -u | tr '\n' ';' | sed 's/;$//' || true)"
+    stated="$(printf '%s' "$manifest_list" | tr ';' '\n' | sort -u | tr '\n' ';' | sed 's/;$//')"
+    if [ -z "$exported" ]; then
+        echo "--- the exported names could not be read here; the manifest's list is not compared with them ---"
+    elif [ "$exported" = "$stated" ]; then
+        echo "  ok  the exported names state the interfaces the manifest states"
+    else
+        echo "  no  the exported names state $exported and the manifest states $stated" >&2
+        exit 1
+    fi
+else
+    echo "--- $package states no provides-interfaces; the three statements are not compared ---"
+fi
+
 # The suite's own exit status is the verdict: 0 when every observation held, 1
 # when one did not, 2 when nothing was observed. The last is the one a run that
 # selected no interface would otherwise pass silently.
-$runner "./$binary"
+# BY THE TEST PROTOCOL WHERE A RUNNER IS NAMED (MTEST, an mtest engine). The
+# suite reports each interface as a case of kind `cts' and each observation as
+# a case within it, and the engine keeps the run in its store (`.mtest' here),
+# from which a report is written. One job: the suite is one sequential program
+# whose sections share the working directory's names, so its cases are not
+# divided among processes. The verdict is the engine's: 0 when every case
+# passed. Without MTEST the suite runs as it always has and its exit status is
+# the verdict.
+if [ -n "${MTEST:-}" ]; then
+    # bash 3.2 (macOS) treats an empty array as unset under `set -u', hence the +form below.
+    under=()
+    [ -n "$runner" ] && under=(--run-under "$runner")
+    "$MTEST" run --jobs 1 --group "${MTEST_GROUP:-${GITHUB_RUN_ID:-local}}" ${under[@]+"${under[@]}"} -- "./$binary"
+else
+    $runner "./$binary"
+fi

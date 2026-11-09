@@ -59,6 +59,7 @@ inline constexpr kal_uintptr KAL_FS_PROP_ATTENUATE_M            = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_FS_PROP_CAPACITY_M             = (kal_uintptr)(KAL_FS_PROP_CAPACITY);
 inline constexpr kal_uintptr KAL_FS_PROP_CASE_SENSITIVE_M       = (kal_uintptr)(KAL_FS_PROP_CASE_SENSITIVE);
 inline constexpr kal_uintptr KAL_FS_PROP_EXECUTABLE_M           = (kal_uintptr)(KAL_FS_PROP_EXECUTABLE);
+inline constexpr kal_uintptr KAL_FS_PROP_HARD_LINKS_M           = (kal_uintptr)(KAL_FS_PROP_HARD_LINKS);
 inline constexpr kal_uintptr KAL_FS_PROP_LINKS_M                = (kal_uintptr)(KAL_FS_PROP_LINKS);
 inline constexpr kal_uintptr KAL_FS_PROP_LIST_INFO_M            = (kal_uintptr)(KAL_FS_PROP_LIST_INFO);
 inline constexpr kal_uintptr KAL_FS_PROP_LOCAL_ENDPOINT_M       = (kal_uintptr)(KAL_FS_PROP_LOCAL_ENDPOINT);

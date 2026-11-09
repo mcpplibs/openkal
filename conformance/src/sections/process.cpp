@@ -115,6 +115,32 @@ void run() {
     }
 #endif
 
+    // EACH REQUEST IS COUNTED (version 0.25). A copy takes the requests over and
+    // is asked to end twice; the word changes at each, and is never zero again.
+#ifdef MCPP_FEATURE_TIME
+    if (kal::process::has(kal::process::stop_requested) && kal::process::has(kal::process::terminate)) {
+        kal_process child{};
+        if (start_copy_running("openkal-conformance-child",
+                               argument_for(errand::count_requests), child)) {
+            kal_time_sleep(300u * 1000u * 1000u);
+            kal_process_terminate(child);
+            kal_time_sleep(300u * 1000u * 1000u);
+            kal_process_terminate(child);
+            int status = 0, terminated = 0;
+            kal_process_wait(child, &status, &terminated);
+            if (terminated != 0 || status == 98)
+                unobserved(kind::behaviour, "each request to end changes the word",
+                           "a request to terminate did not arrive as a request on this environment");
+            else
+                observe(kind::behaviour, status == 40, "each request to end changes the word");
+            kal_process_close(child);
+        }
+    } else {
+        unobserved(kind::behaviour, "each request to end changes the word",
+                   "the implementation does not claim prop_stop_requested and prop_terminate");
+    }
+#endif
+
     // WHAT IS KNOWN OF A RUNNING PROGRAM (version 0.17).
     {
         kal_process self{};

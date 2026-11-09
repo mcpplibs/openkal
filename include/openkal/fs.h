@@ -190,6 +190,8 @@ struct kal_node_info {
                                                             * entry's size, time and
                                                             * identity without a
                                                             * further enquiry. 0.23 */
+#define KAL_FS_PROP_HARD_LINKS     ((kal_uintptr)1u << 16) /* kal_fs_hard_link is
+                                                            * answered here. 0.25 */
 
 /* Positions in the flags word of kal_fs_open. */
 #define KAL_OPEN_READ      ((kal_uintptr)1u << 0)
@@ -582,6 +584,34 @@ int        kal_fs_link_create(struct kal_dir base, const char* name, kal_uintptr
                               kal_uintptr flags);
 kal_intptr kal_fs_link_read  (struct kal_dir base, const char* name, kal_uintptr len,
                               char* out, kal_uintptr cap);
+
+/* A second name for a file. Version 0.25.
+ *
+ * `kal_fs_hard_link' makes `b' in `to' name the node that `a' in `from' names,
+ * so that both names reach one file: the same content, the same identity
+ * (KAL_INFO_IDENTITY), and a file that remains while either name does. It is the
+ * operation `link' and `linkat' perform, and the one `CreateHardLinkW' performs;
+ * a C library's `link' and a C++ library's `create_hard_link' are written above
+ * it. Clause 11 entry 59.
+ *
+ * IT IS AN OPERATION OF THIS INTERFACE FOR THE REASON THE OPERATIONS ON LINKS
+ * ARE: whether a node may have several names is a property of the volume's
+ * format, so kal_fs_props of `to' answers it with KAL_FS_PROP_HARD_LINKS, and a
+ * request upon a volume that does not claim it is kal_err_not_supported and makes
+ * nothing.
+ *
+ * `a' IS NOT RESOLVED: a name that is a link (kal_node_link) receives a second
+ * name itself, as kal_fs_remove and kal_fs_rename act upon the name and not upon
+ * what it leads to. The components before the last are resolved as everywhere.
+ *
+ * Refusals, each of which makes nothing: kal_err_not_found where `a' names
+ * nothing; kal_err_is_directory where it names a directory, which no environment
+ * this specification targets gives a second name; kal_err_exists where `b'
+ * already names a node; kal_err_not_supported where `from' and `to' are on two
+ * volumes, since a name is an entry of one volume's directory and cannot reach a
+ * node of another. */
+int kal_fs_hard_link(struct kal_dir from, const char* a, kal_uintptr alen,
+                     struct kal_dir to,   const char* b, kal_uintptr blen);
 
 /* The name `name' refers to with every link in it followed: absolute, in the
  * environment's spelling, as kal_env_image states a name. Writes min(cap,

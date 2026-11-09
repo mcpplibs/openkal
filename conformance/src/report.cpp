@@ -3,6 +3,7 @@ module okc.report;
 import openkal.types;
 import openkal.stream;
 import okc.spec;
+import okc.protocol;
 
 namespace okc {
 namespace {
@@ -49,6 +50,7 @@ void put_hex(kal_uintptr v) {
 }
 
 void observe(kind k, bool held, const char* what) {
+    protocol::observation(k, what, held, nullptr);
     if (held) { ++g_held;   write("  held         "); }
     else      { ++g_failed; write("  DID NOT HOLD "); }
     write("["); write(name_of(k)); write("] ");
@@ -56,12 +58,14 @@ void observe(kind k, bool held, const char* what) {
 }
 
 void unobserved(kind k, const char* what, const char* because) {
+    protocol::observation(k, what, false, because ? because : "not observed");
     ++g_unobserved;
     write("  not observed ["); write(name_of(k)); write("] ");
     write(what); write(" --- "); write(because); write("\n");
 }
 
 void measure(const char* what, kal_u64 total_ns, int iterations) {
+    protocol::metric(what, iterations ? total_ns / static_cast<unsigned>(iterations) : 0);
     write("  measured     [cost] ");
     write(what);
     write(": ");
@@ -75,7 +79,7 @@ void claim(const char* what, kal_uintptr word) {
     write("  claimed      "); write(what); write(" = "); put_hex(word); write("\n");
 }
 
-void heading(const char* text) { write("\n"); write(text); write("\n"); }
+void heading(const char* text) { protocol::section(text); write("\n"); write(text); write("\n"); }
 void line(const char* text)    { write(text); write("\n"); }
 
 int held_count()       { return g_held; }
@@ -111,6 +115,7 @@ void write_inventory() {
 }
 
 int summarise() {
+    const int verdict = protocol::finish(g_held, g_failed, g_unobserved);
     write("\nobservations: ");
     put_signed(g_held);       write(" held, ");
     put_signed(g_failed);     write(" did not hold, ");
@@ -126,6 +131,7 @@ int summarise() {
     }
     line(g_failed == 0 ? "the implementation conforms in every observation made"
                        : "the implementation does not conform");
+    if (verdict >= 0) return verdict;
     return g_failed == 0 ? 0 : 1;
 }
 

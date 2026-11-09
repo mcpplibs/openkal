@@ -9,7 +9,7 @@ name    = "portable"
 version = "0.1.0"
 
 [dependencies]
-openkal = "0.24.0"
+openkal = "0.25.0"
 
 # AND THE VERSIONS HAVE TO FOLLOW THE SOURCE, which is the reason this example
 # is a criterion rather than an assumption.

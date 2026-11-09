@@ -38,6 +38,7 @@ const char* argument_for(errand e) {
         case errand::report_grants:      return "--child-grants";
         case errand::report_no_preopens: return "--child-no-preopens";
         case errand::end_as_requested:   return "--child-end-as-requested";
+        case errand::count_requests:     return "--child-count-requests";
         case errand::map_beyond_shortened: return "--child-map-beyond-shortened";
         case errand::hold_memory:        return "--child-hold-memory";
         case errand::grow_memory:        return "--child-grow-memory";
@@ -65,6 +66,7 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::report_grants)))      return errand::report_grants;
         if (same(a, len, argument_for(errand::report_no_preopens))) return errand::report_no_preopens;
         if (same(a, len, argument_for(errand::end_as_requested)))   return errand::end_as_requested;
+        if (same(a, len, argument_for(errand::count_requests)))     return errand::count_requests;
         if (same(a, len, argument_for(errand::map_beyond_shortened))) return errand::map_beyond_shortened;
         if (same(a, len, argument_for(errand::hold_memory)))  return errand::hold_memory;
         if (same(a, len, argument_for(errand::grow_memory)))  return errand::grow_memory;
@@ -162,6 +164,23 @@ after g_after;
                 if (*word == 0) kal_exit(98);
                 kal_process_end_as_requested();
                 kal_exit(99);
+            }
+#endif
+            kal_exit(98);
+        case errand::count_requests:
+            // The word is taken over and two requests are awaited, five seconds
+            // in all. 40: each request changed the word and it is non-zero. 41:
+            // the second request left the word as the first had (0.24's word).
+            // 98: no request arrived as one.
+#if defined(MCPP_FEATURE_PROCESS) && defined(MCPP_FEATURE_TIME)
+            if (const kal_u32* word = kal_process_stop_requested()) {
+                kal_stream_write(kal_stdout(), "ARMED\n", 6);
+                for (int i = 0; i < 1000 && *word == 0; ++i) kal_time_sleep(5u * 1000u * 1000u);
+                const kal_u32 first = *word;
+                if (first == 0) kal_exit(98);
+                for (int i = 0; i < 400 && *word == first; ++i) kal_time_sleep(5u * 1000u * 1000u);
+                const kal_u32 second = *word;
+                kal_exit(second != first && second != 0 ? 40 : 41);
             }
 #endif
             kal_exit(98);
