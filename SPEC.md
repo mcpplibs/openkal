@@ -1178,6 +1178,15 @@ Each interface is versioned independently. A revision may add declarations and
 shall not alter existing ones. Structure layouts are immutable as stated in
 clause 5.3.
 
+A patch release (the third number) adds only what an implementation may decline:
+an optional property, an operation an implementation may refuse with
+`kal_err_not_supported`, or text that states what was already required. An
+implementation written against an earlier patch of the same minor version
+conforms to it, and the conformance suite's observations of the addition run only
+where an implementation claims what they observe. A requirement every
+implementation must meet advances the minor version. Version 0.25.1 is the
+first patch release under this rule (clause 11, entries 61 and 62).
+
 A consumer declares a dependency upon the specification package, which is the
 package it imports, and a dependency upon an implementation, which is the
 package that supplies the definitions. The first fixes the version of the
