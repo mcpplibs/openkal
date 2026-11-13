@@ -1,4 +1,4 @@
-# openkal Specification, version 0.25
+# openkal Specification, version 0.25.1
 
 ## 1. Scope
 
@@ -532,6 +532,40 @@ interfaces added in version 0.8 were examined by the same procedure and satisfy
 it also; the count is now one hundred and forty-six.
 
 Clause 9's procedure examines this.
+
+### 5.5 Word width
+
+The declarations are the same on a target whose machine word is thirty-two bits
+wide, and they mean the same. `kal_uintptr` and `kal_intptr` are thirty-two bits
+there; a position in a file, a size of a file, a duration and an instant remain
+`kal_i64` and `kal_u64`, so that a file larger than four gibibytes and a time
+after 2038 are as reachable as elsewhere. Four consequences follow, and each is
+a requirement upon an implementation for such a target rather than a change to a
+declaration.
+
+1. **A count is a word.** An operation that reports a count reports it in
+   `kal_intptr`. A transfer whose length exceeds the largest such value is a
+   partial transfer, reported as any partial transfer is (clause 7.4); it is not
+   a wrapped count.
+2. **A layout is the target's.** A structure of clause 5.3 is laid out as the
+   target's C ABI lays out its declaration; on i386 a `kal_u64` field is aligned
+   to four bytes and not eight. The immutability of clause 5.3 is that of the
+   declaration, and both sides of the interface compile the same declaration
+   with the same compiler, so they agree. An implementation does not copy a
+   structure between a sixty-four bit and a thirty-two bit layout.
+3. **A handle fits the word.** A handle is a `kal_uintptr`. An implementation
+   that packs more than an index into a handle --- a generation, a kind --- packs
+   it into thirty-two bits on such a target, and a generation that wraps sooner
+   is acceptable where clause 7.2's staleness is still detected for the reuse the
+   environment can make within one wrap.
+4. **Time is sixty-four bits at the environment, too.** An environment that
+   offers both a thirty-two bit and a sixty-four bit form of a time operation is
+   called through the sixty-four bit form, where the environment has one: a
+   thirty-two bit second count ends in 2038, and an answer that wraps there is a
+   wrong answer, not an approximation.
+
+Images (clause 12) are of one architecture; an image of a thirty-two bit
+architecture runs on a loader of that architecture. Clause 11, entry 62.
 
 ## 6. Capability model
 
@@ -1110,6 +1144,33 @@ before and after that transition. An inaccessible, dead, reused or unreachable
 continuation yields `unknown`. Retirement conveys no admission or termination
 authority over the continuation's unit and never reopens the original unit.
 The caller may remain alive to finish its own bookkeeping. Clause 11, entry 58.
+
+### 7.19 A started program that runs to its end first
+
+Some environments have one task: a firmware's boot services, a disk operating
+system, a boot chain. In each, a program that starts another is suspended until
+the started program has ended --- `StartImage` and the EXEC function return when
+the image they started returns --- and nothing in the environment can make the
+two run together. Such an environment can provide `openkal.process`, and the
+text of this interface did not exclude it; what it did not say is how a caller
+learns that the program it started has already ended.
+
+An implementation claiming `KAL_PROCESS_PROP_RUNS_TO_END` returns from
+`kal_process_spawn` only after the started program has ended. Its status is then
+known: `kal_process_wait` answers it at once, the first time it
+is asked. Such an implementation does not claim `KAL_PROCESS_PROP_TERMINATE`,
+for there is no running program to request the end of, nor
+`KAL_PROCESS_PROP_CHANNEL`, for neither end of a channel could read what the
+other writes while it runs; a stream passed to the started program is written
+by it and read by its starter afterwards, and a pipe's capacity bounds what
+passes that way.
+
+A caller that starts a program and then waits for something the program does
+while it runs --- a line on a channel, a file it creates --- reads this property
+first. A caller that only starts and waits needs nothing: the two operations
+mean the same under the property as without it. An implementation that does not
+claim the property starts a program that runs alongside its starter, as before.
+Clause 11, entry 61.
 
 ## 8. Evolution
 
@@ -2134,6 +2195,26 @@ The following are recorded so that they are not mistaken for oversights.
     afterwards, never cleared --- remains true of every implementation of 0.25,
     and a program written against 0.24 reads it as before.
 
+61. **A started program that runs to its end first.** **Specified in 0.25.1**,
+    as `KAL_PROCESS_PROP_RUNS_TO_END` in `openkal.process` (clause 7.19). Three
+    environments the ecosystem prepares an implementation for --- a firmware's
+    boot services, a disk operating system and a boot chain --- have one task,
+    and in each the starter of a program resumes when the started program
+    returns. The interface's text did not forbid such an implementation, and
+    the concurrency the other properties describe is already optional; what was
+    missing was a way for a caller to know. The property is the inverse of the
+    behaviour every earlier implementation has, so no implementation of 0.25
+    changes by it, and an implementation that does not claim it is read as
+    before.
+
+62. **Thirty-two bit targets.** **Stated in 0.25.1** (clauses 5.5 and 12.2).
+    The declarations were already written from the compiler's word and
+    fixed-width types (clauses 5.1 and 5.4); what a thirty-two bit target
+    requires of an implementation --- counts in a word, layouts the target's,
+    handles that fit, time through the environment's sixty-four bit forms --- and
+    what an image of such an architecture is, were not written down. No
+    declaration changes.
+
 ## 12. Images
 
 A program written against this specification is built for an environment: its
@@ -2175,8 +2256,9 @@ the operations a loader needs and a program could not otherwise reach
 | relocations | only the architecture's relative, absolute, global-data and procedure-linkage relocations, and the packed relative form; a loader refuses any other |
 | imports | only names this specification declares, and names other images export; a name of a C library or of an environment is refused. A weak import is optional: it is bound when the implementation or an image the image needs provides it, and is zero otherwise |
 | entry | an executable image's ELF entry is a function of no parameters returning `int`, in the image's convention; its value is the image's status. An image that another loads has no entry |
-| calling convention | the architecture's, fixed for every environment: the System V convention on x86-64, the procedure call standard on AArch64; an implementation whose environment uses another presents entries in this one to the image (12.3) |
-| floating-point state | the convention's at the entry and in each context: on x86-64 the x87 control word `0x037F` (extended precision, every exception masked) and MXCSR `0x1F80`, on AArch64 FPCR zero; an image's C library computes in that state (a `long double` of x86-64 is the x87's extended format) |
+| calling convention | the architecture's, fixed for every environment: the System V convention on x86-64, the procedure call standard on AArch64, the System V i386 convention on i386 (arguments on the stack, the stack aligned to sixteen bytes at a call, the result in `eax`, or `edx:eax` for sixty-four bits); an implementation whose environment uses another presents entries in this one to the image (12.3) |
+| floating-point state | the convention's at the entry and in each context: on x86-64 the x87 control word `0x037F` (extended precision, every exception masked) and MXCSR `0x1F80`, on AArch64 FPCR zero, on i386 the x87 control word `0x037F` and, where the processor has SSE, MXCSR `0x1F80`; an image's C library computes in that state (a `long double` of x86-64 and of i386 is the x87's extended format) |
+| architecture | an image is of one architecture and runs on a loader of that architecture: an i386 image (`ELFCLASS32`, `EM_386`) on an i386 loader, never inside a loader of another (clause 5.5) |
 | platform register | an AArch64 image does not use `x18`, which two environments reserve |
 | stack | a frame larger than a page is touched page by page, in order: one environment commits a context's stack as its guard page is touched, and a frame that steps over the guard ends the program |
 | thread-local storage | through the emulated form, in which a variable is found by a function the image itself supplies; an image does not address the thread pointer, which one environment does not let a program set and another does not let it change |

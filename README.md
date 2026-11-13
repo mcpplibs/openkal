@@ -96,16 +96,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.25.0"
+openkal = "0.25.1"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.26.0"
+openkal-linux = "0.26.1"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.23.0"
+openkal-macos = "0.23.1"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.21.0"
+openkal-windows = "0.21.1"
 ```
 
 The program imports the interface and names no implementation.

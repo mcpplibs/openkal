@@ -94,6 +94,7 @@ inline constexpr props job_limit_supervised{KAL_PROCESS_PROP_JOB_LIMIT_SUPERVISE
 inline constexpr props null_streams  {KAL_PROCESS_PROP_NULL_STREAMS};  // 0.22
 inline constexpr props confine       {KAL_PROCESS_PROP_CONFINE};       // 0.23
 inline constexpr props job_observe   {KAL_PROCESS_PROP_JOB_OBSERVE};   // 0.24
+inline constexpr props runs_to_end   {KAL_PROCESS_PROP_RUNS_TO_END};   // 0.25.1
 namespace job_state {
 inline constexpr kal_u32 unknown = KAL_JOB_UNKNOWN;
 inline constexpr kal_u32 occupied = KAL_JOB_OCCUPIED;
