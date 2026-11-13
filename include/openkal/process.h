@@ -106,6 +106,10 @@ struct kal_preopen {
 #define KAL_PROCESS_PROP_CONFINE        ((kal_uintptr)1u << 14)
 /* Declared units, portable references and retirement. Version 0.24. */
 #define KAL_PROCESS_PROP_JOB_OBSERVE    ((kal_uintptr)1u << 15)
+/* The environment has one task: kal_process_spawn returns after the started
+ * program has ended, and kal_process_wait answers its status at once. Claimed
+ * without TERMINATE and CHANNEL. Clause 7.19. Version 0.25.1. */
+#define KAL_PROCESS_PROP_RUNS_TO_END    ((kal_uintptr)1u << 16)
 
 /* HOW A PROGRAM IS STARTED, AND IT IS ONE OPERATION BECAUSE 0.11 STOPPED
  * MAKING IT A FAMILY.

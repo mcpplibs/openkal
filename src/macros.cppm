@@ -138,6 +138,7 @@ inline constexpr kal_uintptr KAL_PROCESS_PROP_JOB_USAGE_M       = (kal_uintptr)(
 inline constexpr kal_uintptr KAL_PROCESS_PROP_NULL_STREAMS_M    = (kal_uintptr)(KAL_PROCESS_PROP_NULL_STREAMS);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_ONE_STRING_M      = (kal_uintptr)(KAL_PROCESS_PROP_ONE_STRING);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_OPEN_ID_M         = (kal_uintptr)(KAL_PROCESS_PROP_OPEN_ID);
+inline constexpr kal_uintptr KAL_PROCESS_PROP_RUNS_TO_END_M     = (kal_uintptr)(KAL_PROCESS_PROP_RUNS_TO_END);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_STOP_REQUESTED_M  = (kal_uintptr)(KAL_PROCESS_PROP_STOP_REQUESTED);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_STREAM_PASSING_M  = (kal_uintptr)(KAL_PROCESS_PROP_STREAM_PASSING);
 inline constexpr kal_uintptr KAL_PROCESS_PROP_TERMINATE_M       = (kal_uintptr)(KAL_PROCESS_PROP_TERMINATE);

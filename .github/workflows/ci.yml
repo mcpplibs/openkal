@@ -728,11 +728,16 @@ jobs:
             fi
             echo "openkal $here is in ${{ matrix.implementation }}'s range $there"
           elif [ -n "$there" ]; then
-            if [ "$here" != "$there" ]; then
+            # A PATCH RELEASE OF THE SPECIFICATION ADDS ONLY WHAT AN IMPLEMENTATION
+            # MAY DECLINE (clause 8, 0.25.1): an implementation written against an
+            # earlier patch of the same minor version conforms to it, and the
+            # suite's new observations run only where it claims what they observe.
+            # So the two are in step when their major and minor versions agree.
+            if [ "${here%.*}" != "${there%.*}" ]; then
               echo "::error::this is openkal $here and ${{ matrix.implementation }} is written against openkal $there. Nothing is wrong with either; they are not in step. Re-run after the implementation's branch has the matching version." >&2
               exit 1
             fi
-            echo "both describe openkal $here"
+            echo "openkal $here and ${{ matrix.implementation }}'s openkal $there are one minor version"
           else
             impl_branch="$(sed -n 's/^openkal[[:space:]]*=[[:space:]]*{.*branch[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' .impl/mcpp.toml | head -1)"
             if [ -z "$impl_branch" ]; then

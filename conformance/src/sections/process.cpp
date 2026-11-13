@@ -327,6 +327,35 @@ void run() {
                     "an unclaimed channel is refused rather than half provided");
     }
 
+    // A STARTED PROGRAM THAT RUNS TO ITS END FIRST (0.25.1, clause 7.19). The
+    // property is claimed only where the environment has one task; there the
+    // started program has ended when the start returns, so nothing can be
+    // terminated or exchanged with it while it runs, and its status is known.
+    if (kal::process::has(kal::process::runs_to_end)) {
+        observe(kind::behaviour, !kal::process::has(kal::process::terminate),
+                "a program that runs to its end first is not claimed terminable");
+        observe(kind::behaviour, !kal::process::has(kal::process::channel),
+                "a program that runs to its end first is not claimed to share a channel");
+        kal_process child{};
+        if (start_copy_running("openkal-conformance-child", argument_for(errand::exit_with_33), child)) {
+#ifdef MCPP_FEATURE_TIME
+            const kal_u64 before = kal_time_monotonic();
+#endif
+            int status = -1, terminated = -1;
+            const int rc = kal_process_wait(child, &status, &terminated);
+            observe(kind::behaviour, rc == kal_ok && status == 33 && terminated == 0,
+                    "the status of a program that ran to its end is the one it ended with");
+#ifdef MCPP_FEATURE_TIME
+            observe(kind::behaviour, kal_time_monotonic() - before < kal_u64{100} * 1000u * 1000u,
+                    "the status of a program that ran to its end is answered at once");
+#endif
+            kal_process_close(child);
+        } else {
+            unobserved(kind::behaviour, "a program that runs to its end first",
+                       "a copy of this program could not be started");
+        }
+    }
+
     // WHAT A UNIT USES, AND A LIMIT ON IT (version 0.20). Both are observed
     // on a copy that writes its memory through, so that every environment's
     // measure sees it.
