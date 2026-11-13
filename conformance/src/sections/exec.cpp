@@ -20,7 +20,8 @@ namespace {
 // The value is checked rather than merely the fact of returning, because a
 // region that was published without its contents reaching memory would still
 // transfer control and would return whatever the register happened to hold.
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__i386__)
+// mov $42, %eax; ret --- the same encoding in both modes (0.25.1, clause 5.5)
 const unsigned char kReturns42[] = { 0xB8, 0x2A, 0x00, 0x00, 0x00, 0xC3 };
 #elif defined(__aarch64__)
 const unsigned char kReturns42[] = { 0x40, 0x05, 0x80, 0x52,   // mov w0, #42
@@ -33,7 +34,7 @@ const unsigned char* const kReturns42 = nullptr;
 const unsigned long kReturns42Size = 0;
 #endif
 
-#if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
+#if defined(__x86_64__) || defined(__i386__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
 constexpr unsigned long kReturns42Size = sizeof(kReturns42);
 #endif
 
