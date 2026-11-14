@@ -301,7 +301,10 @@ fi
 # whose sections share the working directory's names, so its cases are not
 # divided among processes. The verdict is the engine's: 0 when every case
 # passed. Without MTEST the suite runs as it always has and its exit status is
-# the verdict.
+# the verdict. The suite is an mtest project of its own (tests/cts/mtest.toml), so
+# the engine runs the program from here and keeps the run here; under the
+# repository's project above it, a runner given `--run-under' was handed a name
+# relative to the wrong directory (0.25.2 on the Web row).
 if [ -n "${MTEST:-}" ]; then
     # bash 3.2 (macOS) treats an empty array as unset under `set -u', hence the +form below.
     under=()

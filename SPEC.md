@@ -1,4 +1,4 @@
-# openkal Specification, version 0.25.2
+# openkal Specification, version 0.25.3
 
 ## 1. Scope
 
