@@ -30,28 +30,30 @@ namespace {
 
 // The cases a runner lists and selects (the mtest protocol): one per section,
 // in the order the sections run. A section's case begins at its heading.
-struct section_entry { const char* id; void (*run)(); };
+// `measures': the section reports its cost (kind::cost), which a runner selects
+// as the case `<id>.cost' and therefore has to find listed.
+struct section_entry { const char* id; void (*run)(); bool measures; };
 constexpr section_entry sections[] = {
-    { "openkal.version",  version::run },
-    { "openkal.stream",   stream::run },
-    { "openkal.memory",   memory::run },
-    { "openkal.env",      env::run },
-    { "openkal.time",     time::run },
-    { "openkal.random",   random::run },
-    { "openkal.fs",       fs::run },
-    { "openkal.process",  process::run },
-    { "openkal.task",     task::run },
-    { "openkal.exec",     exec::run },
-    { "openkal.terminal", terminal::run },
-    { "openkal.net",      net::run },
-    { "openkal.datagram", datagram::run },
-    { "openkal.space",    space::run },
-    { "openkal.timeout",  timeout::run },
-    { "openkal.map",      map::run },
-    { "openkal.region",   region::run },
-    { "openkal.prof",     prof::run },
-    { "openkal.debug",    debug::run },
-    { "openkal.abort",    termination::run },
+    { "openkal.version",  version::run, false },
+    { "openkal.stream",   stream::run, true },
+    { "openkal.memory",   memory::run, true },
+    { "openkal.env",      env::run, false },
+    { "openkal.time",     time::run, true },
+    { "openkal.random",   random::run, false },
+    { "openkal.fs",       fs::run, true },
+    { "openkal.process",  process::run, true },
+    { "openkal.task",     task::run, true },
+    { "openkal.exec",     exec::run, false },
+    { "openkal.terminal", terminal::run, false },
+    { "openkal.net",      net::run, false },
+    { "openkal.datagram", datagram::run, false },
+    { "openkal.space",    space::run, false },
+    { "openkal.timeout",  timeout::run, false },
+    { "openkal.map",      map::run, false },
+    { "openkal.region",   region::run, true },
+    { "openkal.prof",     prof::run, true },
+    { "openkal.debug",    debug::run, false },
+    { "openkal.abort",    termination::run, false },
 };
 
 }  // namespace
@@ -59,7 +61,7 @@ constexpr section_entry sections[] = {
 int run_all() {
     protocol::begin();
     if (protocol::listing()) {
-        for (const section_entry& e : sections) protocol::list_case(e.id);
+        for (const section_entry& e : sections) protocol::list_case(e.id, e.measures && performs(kind::cost));
         return protocol::finish(0, 0, 0);
     }
 

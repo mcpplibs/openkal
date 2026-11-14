@@ -88,6 +88,14 @@ observed (entry 60). The conformance suite reports to a test runner by the mtest
 protocol, and checks that an implementation's manifest, `kal_interfaces()` and its
 exported names state the same interfaces.
 
+0.25.2 changes no clause. The suite reaches every name of the surface without
+requiring it, so a link that discards unreached definitions keeps the surface
+it compares (entry 63), and reports each interface's measured cost as a `bench`
+case beside its `cts` case. Every test of this repository reports through mtest
+0.8.5: the checks of the text and the headers (`tests/checks`, `mtest run --set
+checks`), openkal-kit's tests (the mtest library) and the suite, in one report
+of each CI run.
+
 ## How a program uses openkal
 
 A program declares two dependencies. The first fixes the version of the contract

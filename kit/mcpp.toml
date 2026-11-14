@@ -97,5 +97,10 @@ openkal = "0.25.0"
 # tools/run-conformance.sh already does for the conformance suite --- and for the
 # same reason: a change spanning the specification and an implementation must be
 # tested against both halves as written, not against whichever half is published.
+# The tests are written with mtest, so that a runner lists, selects and
+# reports each observation as a case.
+[dev-dependencies]
+mcpplibs.mtest = "0.8.5"
+
 [target.'cfg(os = "linux")'.dev-dependencies]
-openkal-linux = { version = "0.26.0", features = ["standalone"] }
+openkal-linux = { version = "0.26.0" }

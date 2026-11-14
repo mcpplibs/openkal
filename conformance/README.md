@@ -32,9 +32,12 @@ The suite speaks the [mtest test protocol](https://github.com/mcpp-community/mte
 version 1, at level 2, written without a library as the rest of the suite is. Each
 interface is a case of kind `cts` that names the interface as the clause it covers;
 each observation is a case within it, reported as it runs (protocol P3.4): `pass`,
-`fail`, or `skip` with the reason an observation was not made; each measurement of
-cost is a metric in nanoseconds. A selection may name an interface or an
-observation within one; the second runs its interface. Every case holds the
+`fail`, or `skip` with the reason an observation was not made. The measurements
+of an interface's cost (`--features cost`) are a case of their own, of kind
+`bench`, named `<interface>.cost` and reported after the interface's case, each
+measurement a metric in nanoseconds (0.10.0). A selection may name an interface,
+an observation within one, or an interface's cost; each runs its interface, and
+reports only what it named. Every case holds the
 resource `serial:openkal-conformance`, because the sections create fixed names in
 the working directory.
 

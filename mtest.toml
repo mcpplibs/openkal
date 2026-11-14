@@ -1,0 +1,31 @@
+# The tests of the specification, run by mtest (https://github.com/mcpp-community/mtest).
+#
+#   tests/checks/*.sh      the checks of the text and the headers: kind `unit', run here
+#   kit/tests/*.cpp        openkal-kit's cases (`mcpp test' in kit/, tools/run-kit-tests.sh)
+#   conformance/           the suite, against an implementation (tools/run-conformance.sh):
+#                          one `cts' case per interface, one `bench' case per measured cost
+#
+# `mtest run --set checks' runs the first here; the other two need an implementation
+# and report to the same store when MTEST names the engine. `mtest report' reads them
+# together.
+[project]
+store = ".mtest"
+
+[discover.checks]
+globs     = ["tests/checks/*.sh"]
+command   = ["bash", "{path}"]
+kind      = "unit"
+tags_from = { "# requires:" = "requires:" }
+# Two of them change a header and restore it, so none runs beside another.
+resources = ["serial:tree"]
+
+[sets.checks]
+programs = ["tests/checks/*"]
+
+# What a check requires of the machine.
+[capabilities]
+cc    = { command = ["cc", "--version"] }
+clang = { command = ["clang", "--version"] }
+
+[report]
+sections = ["summary", "kinds", "failures", "slowest", "metrics"]

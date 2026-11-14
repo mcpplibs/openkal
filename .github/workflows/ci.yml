@@ -13,6 +13,12 @@ name: CI
 #                 for each system and every observation holds
 #   composability an implementation that provides three interfaces is examined
 #                 for three, rather than failing to link
+#   checks        the text and the headers (tests/checks, mtest.toml's set)
+#
+# Every test reports through mtest (MTEST_VERSION): the checks as `unit' cases,
+# the kit's as cases of the mtest library, the suite as one `cts' case per
+# interface and one `bench' case per measured cost. The `report' job takes every
+# job's store into one report of the run.
 #
 # The three compiler families are covered because the specification is a
 # contract and a contract that holds only under the compiler its author used is
@@ -33,12 +39,12 @@ env:
   # A version verified to build these packages, not a measured minimum. The pin
   # exists for reproducibility rather than because an older mcpp is known to
   # fail.
-  MCPP_VERSION: 2026.11.5.1
+  MCPP_VERSION: 2026.11.13.1
   XLINGS_VERSION: v2026.10.26.1
   # The mtest engine the conformance suite reports to (tools/run-conformance.sh
   # with MTEST set): an xlings package, else the release bundle with this hash.
-  MTEST_VERSION: 0.5.2
-  MTEST_SHA256: be443f8c546b3f4628dcd3f1eb6f45b4d698a7f805232f966349faf8250863c6
+  MTEST_VERSION: 0.8.5
+  MTEST_SHA256: 4b890455ee86eada349b9831db6c0b3101861ad53a64effa548c9749f65f5355
   XLINGS_NON_INTERACTIVE: '1'
 
 jobs:
@@ -297,116 +303,29 @@ jobs:
           done
           rm -rf .abi-probe
 
-      # EVERY MACRO HAS A MODULE SPELLING, AND THIS IS CHECKED RATHER THAN
-      # REMEMBERED --- because twice it was not. `KAL_LOCK_*' in 0.10 and
-      # `KAL_SPAWN_*' in 0.11 were each added to a header, used from a module
-      # consumer, and failed to compile there, because a macro does not cross a
-      # module boundary. Both were found by a consumer's build in another
-      # repository rather than here.
-      #
-      # ⇒ src/macros.cppm is GENERATED. Regenerating and diffing turns "somebody
-      # forgot" into a red build in the repository that made the change.
-      - name: Every macro has a module spelling
+      # THE CHECKS OF THE TEXT AND THE HEADERS (tests/checks, mtest.toml's set
+      # `checks'): the macros' module spellings, the stated version, the C form
+      # without the environment's headers, no backend type in a declaration, and
+      # that the version and type checks fail when they should. Each script states
+      # why it exists; mtest runs them one at a time (two change a header and
+      # restore it) and skips one whose compiler this row lacks, saying so.
+      - uses: ./.github/actions/mtest
+        if: runner.os != 'Windows'
+      - name: The checks of the text and the headers
         if: runner.os != 'Windows'
         run: |
-          bash tools/gen-macros.sh
-          git diff --exit-code src/macros.cppm || {
-            echo "::error::src/macros.cppm is out of date --- run tools/gen-macros.sh and commit it"
-            exit 1
-          }
-
-      # WHAT THE DECLARATIONS SAY THE VERSION IS, AND WHAT THE PACKAGE IS.
-      #
-      # `kal_version' is `return KAL_VERSION;' in every implementation there is,
-      # so the three constants in version.h are what the ecosystem states about
-      # itself and the only thing a consumer bound at load can ask. They had
-      # drifted through two releases, and the comparison clause 6.2 gives that
-      # consumer was between two equal numbers the whole time.
-      - name: The declarations state the version this package is
-        if: runner.os != 'Windows'
-        run: bash tools/check-version.sh
-
-      # AND THE CHECK DETECTS WHAT IT EXISTS TO DETECT, for the reason the type
-      # check below is proved the same way: a check that reports success by
-      # finding nothing reports it identically when it has read nothing.
-      - name: The version check detects a drift
-        if: runner.os != 'Windows'
-        run: |
-          # `sed -i` IS NOT PORTABLE AND THIS MATRIX REACHES THE SYSTEM WHERE
-          # IT IS NOT: one of the three reads the next argument as the suffix
-          # for a backup file, so the edit is attempted upon a file named by
-          # the expression. Measured on this row, on the first run of this
-          # step. The edit is therefore written beside and moved over.
-          cp include/openkal/version.h /tmp/version.h.orig
-          sed 's/^#define KAL_VERSION_MINOR .*/#define KAL_VERSION_MINOR 11u/' \
-            /tmp/version.h.orig > include/openkal/version.h
-          if bash tools/check-version.sh; then
-            cp /tmp/version.h.orig include/openkal/version.h
-            echo "the version check accepted a number the package is not" >&2
-            exit 1
-          fi
-          cp /tmp/version.h.orig include/openkal/version.h
-          echo "the version check rejects a drifted number, as it must"
+          "$MTEST" run --set checks --group "$GITHUB_RUN_ID"
+          "$MTEST" report --format md --group "$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os != 'Windows'
+        with:
+          name: mtest-checks-${{ strategy.job-index }}
+          path: .mtest
+          include-hidden-files: true
+          if-no-files-found: ignore
 
       - name: The module form compiles
         run: mcpp build
-
-      # The C form, with the environment's own headers excluded --- because the
-      # consumer this form exists for, a C library being ported onto openkal, is
-      # compiled that way. The tool needs a driver it can pass -nostdinc to; the
-      # toolchain that has no such spelling compiles the same declarations in
-      # the translation unit the conformance suite carries, which every row of
-      # the conformance job below builds.
-      - name: The C form compiles without the environment's headers
-        if: runner.os != 'Windows'
-        run: |
-          CC=cc bash tools/check-declarations.sh
-          command -v clang >/dev/null && CC=clang bash tools/check-declarations.sh || true
-
-      # AND NO DECLARATION NAMES A BACKEND TYPE.
-      #
-      # The job above asserts the declarations COMPILE. This asserts what they
-      # are written WITH, which is a different freedom and the one that decides
-      # whether a `kal_*` signature means the same thing on four object formats.
-      # `sizeof(long)` is 8 on x86_64 Linux and 4 on x86_64 Windows; a `long` in
-      # an interface would be one signature with two meanings.
-      #
-      # It runs on every row of this matrix rather than once, because a type
-      # is a claim about a TARGET and this matrix is where the targets are.
-      #
-      # Needs a clang-family driver (`-Xclang -ast-print`); rows whose
-      # toolchain has no such spelling are covered by the other rows, and the
-      # step says so rather than passing silently.
-      - name: No declaration names a backend type
-        if: runner.os != 'Windows'
-        run: |
-          cc="$(command -v clang || true)"
-          if [ -z "$cc" ]; then
-            echo "no clang on this row; the type check runs on the rows that have one"
-            exit 0
-          fi
-          bash tools/check-types.sh "$cc" include
-
-      # AND THE CHECK DETECTS WHAT IT EXISTS TO DETECT.
-      #
-      # A check that succeeds by finding nothing succeeds identically when it
-      # reads nothing, and every false green in this ecosystem has had that
-      # shape. `check-types.sh` proves it parsed the headers before reporting;
-      # this proves it would have failed.
-      - name: The type check detects a leak
-        if: runner.os != 'Windows'
-        run: |
-          cc="$(command -v clang || true)"
-          [ -n "$cc" ] || exit 0
-          cp include/openkal/env.h /tmp/env.h.orig
-          printf '\nint kal_env_probe_leak(unsigned long n);\n' >> include/openkal/env.h
-          if bash tools/check-types.sh "$cc" include; then
-            cp /tmp/env.h.orig include/openkal/env.h
-            echo "the type check accepted 'unsigned long' in an interface" >&2
-            exit 1
-          fi
-          cp /tmp/env.h.orig include/openkal/env.h
-          echo "the type check rejects a backend type, as it must"
 
   # ---------------------------------------------------------------------------
   # The property the specification exists for.
@@ -955,6 +874,13 @@ jobs:
         if: matrix.implementation == 'openkal-linux'
         run: |
           bash tools/run-kit-tests.sh '${{ matrix.implementation }}' .impl
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.implementation == 'openkal-linux'
+        with:
+          name: mtest-kit-${{ strategy.job-index }}
+          path: kit/target/mtest
+          include-hidden-files: true
+          if-no-files-found: ignore
 
       # THE EXAMPLE A CONSUMER READS, BUILT AND RUN.
       #
@@ -1040,13 +966,13 @@ jobs:
           grep -qE 'held +\[behaviour\].*' selected.log
 
   # ---------------------------------------------------------------------------
-  # EVERY IMPLEMENTATION'S RUN AS ONE REPORT: each conformance job's store,
-  # taken into one, and reported together as the workflow run's group
-  # (`mtest ci report`): the cases of each interface on each implementation,
-  # the failures, and the measurements of cost.
-  conformance-report:
-    name: conformance (report)
-    needs: conformance
+  # EVERY RUN OF THE WORKFLOW AS ONE REPORT: the stores of the checks (`unit'),
+  # the kit's tests and each implementation's conformance run (`cts', with the
+  # interfaces' costs as `bench' cases), taken into one and reported together as
+  # the workflow run's group (`mtest ci report').
+  report:
+    name: the run, reported (checks, kit, cts, bench)
+    needs: [declarations, conformance]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -1055,9 +981,9 @@ jobs:
       - uses: ./.github/actions/mtest
       - uses: actions/download-artifact@v4
         with:
-          pattern: mtest-cts-*
+          pattern: mtest-*
           path: ${{ runner.temp }}/stores
-      - name: Every implementation's run, reported together
+      - name: Every store of the run, reported together
         run: |
           set -euo pipefail
           found=0
@@ -1066,5 +992,5 @@ jobs:
             "$MTEST" store import --from "$store"
             found=1
           done
-          if [ "$found" = 0 ]; then echo "no conformance job kept a run" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          if [ "$found" = 0 ]; then echo "no job kept a run" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
           "$MTEST" ci report --out "$RUNNER_TEMP/conformance.md"

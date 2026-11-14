@@ -39,6 +39,16 @@ bool g_matched[kMaxSelected];
 // that two observations of one text are two identifiers (P3.2).
 char g_case[64];
 bool g_case_open = false;
+// THE COST OF AN INTERFACE IS ITS OWN CASE (0.10.0): kind `bench', id
+// `<interface>.cost', reported after the interface's `cts' case with the
+// measurements made in it, so that a runner reads, selects and gates the two
+// apart. Found only by running, as the observations are, and listed by none.
+bool g_cts_wanted = true;
+bool g_bench_wanted = true;
+struct measurement { char name[128]; kal_u64 ns; };
+constexpr int kMaxMeasurements = 32;
+measurement g_measured[kMaxMeasurements];
+int g_measured_n = 0;
 kal_u64 g_case_began = 0;
 bool g_case_failed = false;
 int g_case_parts = 0;
@@ -130,9 +140,29 @@ void end_event(const char* id, const char* status, const char* reason, kal_u64 m
     e.raw("}"); e.send();
 }
 
+void bench_id(const char* id, char* out, kal_uintptr cap) {
+    const char suffix[] = ".cost";
+    kal_uintptr n = 0;
+    for (; id[n] && n + sizeof suffix < cap; ++n) out[n] = id[n];
+    for (kal_uintptr i = 0; i < sizeof suffix; ++i) out[n + i] = suffix[i];
+}
+
 void close_case() {
     if (!g_case_open) return;
-    end_event(g_case, g_case_failed ? "fail" : "pass", nullptr, elapsed_ms() - g_case_began);
+    if (g_cts_wanted)
+        end_event(g_case, g_case_failed ? "fail" : "pass", nullptr, elapsed_ms() - g_case_began);
+    if (g_bench_wanted && g_measured_n > 0) {
+        char id[80]; bench_id(g_case, id, sizeof id);
+        line b; b.raw("{\"e\":\"begin\",\"id\":"); b.str(id); b.raw(",\"t\":"); b.num(elapsed_ms());
+        b.raw(",\"kind\":\"bench\",\"clauses\":["); b.str(g_case);
+        b.raw("],\"resources\":[\"serial:openkal-conformance\"]}"); b.send();
+        for (int i = 0; i < g_measured_n; ++i) {
+            line e; e.raw("{\"e\":\"metric\",\"id\":"); e.str(id); e.raw(",\"name\":"); e.str(g_measured[i].name);
+            e.raw(",\"value\":"); e.num(g_measured[i].ns); e.raw(",\"unit\":\"ns\",\"better\":\"lower\"}"); e.send();
+        }
+        end_event(id, "pass", nullptr);
+    }
+    g_measured_n = 0;
     g_case_open = false;
 }
 
@@ -213,7 +243,7 @@ bool begin() {
 
     line e;
     e.raw("{\"e\":\"program\",\"protocol\":1,\"level\":2,\"framework\":\"openkal-conformance\","
-          "\"version\":\"0.9.0\",\"isolation\":[\"process\"]}");
+          "\"version\":\"0.10.0\",\"isolation\":[\"process\"]}");
     e.send();
     return true;
 #else
@@ -224,7 +254,7 @@ bool begin() {
 bool active()  { return g_active; }
 bool listing() { return g_listing; }
 
-bool wanted(const char* id) {
+bool wanted_one(const char* id) {
     if (!g_selecting) return true;
     // A line names the section's case, or a part within it (`<id>/<what>'):
     // selecting a part runs the case that declares it (protocol P3.4).
@@ -255,24 +285,39 @@ bool wanted(const char* id) {
 // and remove fixed names in the working directory they were given, so two
 // copies of this program running at once would observe each other's files; a
 // runner that divides the cases among workers runs them one at a time.
-void list_case(const char* id) {
+bool wanted(const char* id) {
+    char b[80]; bench_id(id, b, sizeof b);
+    const bool cts = wanted_one(id);
+    const bool bench = wanted_one(b);
+    return cts || bench;
+}
+
+void list_case(const char* id, bool bench) {
     line e; e.raw("{\"e\":\"case\",\"id\":"); e.str(id); e.raw(",\"name\":"); e.str(id);
     e.raw(",\"kind\":\"cts\",\"clauses\":["); e.str(id); e.raw("],\"resources\":[\"serial:openkal-conformance\"]}"); e.send();
+    if (!bench) return;
+    char b[80]; bench_id(id, b, sizeof b);
+    line c; c.raw("{\"e\":\"case\",\"id\":"); c.str(b); c.raw(",\"name\":"); c.str(b);
+    c.raw(",\"kind\":\"bench\",\"clauses\":["); c.str(id); c.raw("],\"resources\":[\"serial:openkal-conformance\"]}"); c.send();
 }
 
 void section(const char* heading_text) {
     if (!g_active) return;
     close_case();
     id_of(heading_text, g_case, sizeof g_case);
+    char b[80]; bench_id(g_case, b, sizeof b);
+    g_cts_wanted = wanted_one(g_case);
+    g_bench_wanted = wanted_one(b);
     g_case_open = true;
     g_case_failed = false;
     g_case_parts = 0;
+    g_measured_n = 0;
     g_case_began = elapsed_ms();
-    begin_event(g_case);
+    if (g_cts_wanted) begin_event(g_case);
 }
 
 void observation(kind k, const char* what, bool held, const char* because) {
-    if (!g_active || !g_case_open) return;
+    if (!g_active || !g_case_open || !g_cts_wanted) return;
     // The part's identifier: the case's, the observation's text, and its
     // ordinal where the text recurs in the case.
     char id[1024]; kal_uintptr n = 0;
@@ -308,9 +353,12 @@ void observation(kind k, const char* what, bool held, const char* because) {
 }
 
 void metric(const char* what, kal_u64 ns) {
-    if (!g_active || !g_case_open) return;
-    line e; e.raw("{\"e\":\"metric\",\"id\":"); e.str(g_case); e.raw(",\"name\":"); e.str(what);
-    e.raw(",\"value\":"); e.num(ns); e.raw(",\"unit\":\"ns\",\"better\":\"lower\"}"); e.send();
+    if (!g_active || !g_case_open || !g_bench_wanted || g_measured_n >= kMaxMeasurements) return;
+    measurement& m = g_measured[g_measured_n++];
+    kal_uintptr n = 0;
+    for (; what && what[n] && n + 1 < sizeof m.name; ++n) m.name[n] = what[n];
+    m.name[n] = 0;
+    m.ns = ns;
 }
 
 int finish(int held, int failed, int unobserved) {
