@@ -59,7 +59,7 @@ echo "the C declarations are complete and compile without the environment's head
 # carries a file naming the same entities, every toolchain compiles it, and this
 # is where the file is written --- and where a file that has fallen behind the
 # list is detected, since a stale copy would be compiled happily by all three.
-carried="$here/conformance/src/declarations.c"
+carried="$here/tests/cts/src/declarations.c"
 
 if [ "$write" -eq 1 ]; then
     {
@@ -73,6 +73,28 @@ if [ "$write" -eq 1 ]; then
             [ -n "$n" ] && printf '    (void)sizeof(&%s);\n' "$n"
         done <<< "$names"
         echo '}'
+        echo
+        echo '/* Every name, reached without being required (0.25.2): a link that discards'
+        echo ' * what nothing reaches keeps the names the implementation defines, for the'
+        echo ' * comparison of clause 9, and an absent name is null. A weak reference to a'
+        echo ' * name defined nowhere is accepted by the static link of ELF only. */'
+        echo '#if defined(__ELF__)'
+        while read -r n; do
+            [ -n "$n" ] && printf '#pragma weak %s\n' "$n"
+        done <<< "$names"
+        echo '#endif'
+        echo
+        echo 'unsigned long okc_names_reached(void);'
+        echo 'unsigned long okc_names_reached(void)'
+        echo '{'
+        echo '    unsigned long n = 0;'
+        echo '#if defined(__ELF__)'
+        while read -r n; do
+            [ -n "$n" ] && printf '    n += (const void*)&%s != 0;\n' "$n"
+        done <<< "$names"
+        echo '#endif'
+        echo '    return n;'
+        echo '}'
     } > "$carried.next"
     mv "$carried.next" "$carried"
     echo "wrote $carried: $count name(s)"
@@ -81,9 +103,9 @@ fi
 
 [ -f "$carried" ] || exit 0
 
-carried_names="$(grep -oE '&kal_[a-z_0-9]+' "$carried" | cut -c2- | sort -u)"
+carried_names="$(grep -oE 'sizeof\(&kal_[a-z_0-9]+' "$carried" | cut -c9- | sort -u)"
 if [ "$carried_names" != "$names" ]; then
-    echo "conformance/src/declarations.c does not name the surface list." >&2
+    echo "tests/cts/src/declarations.c does not name the surface list." >&2
     echo "only in SURFACE.txt:" >&2
     comm -23 <(printf '%s\n' "$names") <(printf '%s\n' "$carried_names") >&2
     echo "only in declarations.c:" >&2

@@ -3,19 +3,18 @@
 // The observations are of behaviour. A test that named each entity and did
 // nothing with it would compile against a package whose every operation did
 // nothing, and would report that as working.
-#include <cstdio>
 #include <cstring>
+import mcpplibs.mtest;
 import openkal.types;
 import openkal.task;
 import openkal.kit.endpoint;
 import openkal.kit.channel;
 
+using namespace mcpplibs::mtest;
+
 namespace {
 
-int failures = 0;
-void check(bool held, const char* what) {
-    if (!held) { std::printf("FAIL: %s\n", what); ++failures; }
-}
+void check(bool held, const char* what) { expect(held) << what; }
 
 void endpoint_section() {
     using namespace kal::kit;
@@ -152,10 +151,7 @@ void channel_section() {
     }
 
     kal_task_join(t);
-    check(got == kPayload, "every byte written is read");
-    if (got != kPayload)
-        std::printf("       read %llu of %llu\n",
-                    (unsigned long long)got, (unsigned long long)kPayload);
+    expect(eq(got, kPayload)) << "every byte written is read";
     check(all_a5, "the bytes read are the bytes written");
 
     // A read after the close reports end of input rather than waiting.
@@ -168,9 +164,5 @@ void channel_section() {
 
 }  // namespace
 
-int main() {
-    endpoint_section();
-    channel_section();
-    if (failures == 0) std::printf("openkal-kit: every observation held\n");
-    return failures == 0 ? 0 : 1;
-}
+UTest endpoints{"endpoint", [] { endpoint_section(); }};
+UTest channels{"channel", [] { channel_section(); }};

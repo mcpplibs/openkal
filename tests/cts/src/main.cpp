@@ -45,7 +45,13 @@ import okc.child;
 // two spellings are the same symbol; and clause 9's behavioural half is
 // required of every implementation, including one of a machine with no
 // operating system, so this program has to be linkable in both arrangements.
+// Every name of the surface, reached without being required (declarations.c).
+extern "C" unsigned long okc_names_reached(void);
+volatile unsigned long okc_names_present;
+
 extern "C" int main() {
+    okc_names_present = okc_names_reached();
+
     // Two of the specification's requirements end the program that satisfies
     // them, so they are observed in a copy this program starts. A copy is told
     // what to do through its argument vector and answers through its status.

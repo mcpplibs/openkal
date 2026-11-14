@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Generate src/macros.cppm from the headers.
 #
+#   gen-macros.sh [<output>]      the file written; src/macros.cppm by default
+#
 # THIS EXISTS BECAUSE THE SAME DEFECT HAPPENED TWICE. `KAL_LOCK_*' in 0.10
 # and `KAL_SPAWN_*' in 0.11 were both added to a header, both used from a module
 # consumer, and both failed to compile there --- because a macro DOES NOT CROSS A
@@ -19,8 +21,9 @@ set -euo pipefail
 # KAL_TERM_ECHO before KAL_TERMINATED_LIMIT here and after it in CI.
 export LC_ALL=C
 
+out="${1:-src/macros.cppm}"
+case "$out" in /*) ;; src/macros.cppm) ;; *) out="$PWD/$out" ;; esac
 cd "$(dirname "$0")/.."
-out=src/macros.cppm
 
 names=$(grep -rhoE '^#define +KAL_[A-Z0-9_]+' include/openkal/*.h \
         | awk '{print $2}' | sort -u)

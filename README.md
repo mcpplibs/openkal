@@ -64,7 +64,7 @@ words become types that cannot be mixed.
 | --- | --- |
 | `tools/check-declarations.sh` | compiles a translation unit naming every entity, with `-nostdinc` — because the consumer the header exists for is compiled that way |
 | a test in each implementation | the same list, reached through `import openkal.*` |
-| `conformance/src/declarations.c` | the same list again, compiled by every toolchain that builds the suite |
+| `tests/cts/src/declarations.c` | the same list again, compiled by every toolchain that builds the suite |
 
 The header includes nothing. openkal must be usable on a freestanding target,
 and a consumer compiled with `-nostdinc` has nothing to include.
@@ -88,6 +88,15 @@ observed (entry 60). The conformance suite reports to a test runner by the mtest
 protocol, and checks that an implementation's manifest, `kal_interfaces()` and its
 exported names state the same interfaces.
 
+0.25.2 changes no clause. The suite reaches every name of the surface without
+requiring it, so a link that discards unreached definitions keeps the surface
+it compares (entry 63), and reports each interface's measured cost as a `bench`
+case beside its `cts` case. The tests of this repository are written with mtest
+0.8.5 in its layout (`mtest.toml`): `tests/unit` and `tests/e2e` hold the
+version, the headers through the tools, the 32-bit layout and substitution
+(`mtest run --set checks`, `--set substitution`), `tests/cts` is the suite, and
+openkal-kit's tests use the mtest library; each CI run reports them together.
+
 ## How a program uses openkal
 
 A program declares two dependencies. The first fixes the version of the contract
@@ -96,7 +105,7 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.25.1"
+openkal = "0.25.2"
 
 [target.'cfg(os = "linux")'.dependencies]
 openkal-linux = "0.26.1"
@@ -235,7 +244,7 @@ clause 6.2 tabulates, and the earliest at which the question can be answered —
 source that asks the same question with `#ifdef` asks it during preprocessing,
 which is earlier than any answer exists.
 
-**The behaviour.** [`conformance/`](conformance/) is a program an implementation
+**The behaviour.** [`tests/cts/`](tests/cts/) is a program an implementation
 runs against itself — 193 observations across fifteen interfaces, in four kinds:
 behaviour, ABI, stability and cost.
 

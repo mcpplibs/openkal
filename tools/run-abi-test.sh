@@ -17,7 +17,7 @@
 # was no artifact of the shape that could test it. This produces one.
 #
 # The second implementation is built FROM the first: the same objects, with four
-# names renamed out of the way and answered by `conformance/abi/interposer.cpp'
+# names renamed out of the way and answered by `tests/cts/abi/interposer.cpp'
 # instead. It is a second implementation in the only sense that matters to a
 # consumer --- a different shared object, exporting the same surface, answering
 # differently --- and it is four hundred lines lighter than a second port.
@@ -66,13 +66,13 @@ for o in "$work/obj"/*.o; do
         "$o" "$work/obj2/$(basename "$o")"
 done
 $cxx -std=c++23 -O1 -fPIC -fno-exceptions -fno-rtti -I"$here/include" \
-     -c "$here/conformance/abi/interposer.cpp" -o "$work/obj2/interposer.o"
+     -c "$here/tests/cts/abi/interposer.cpp" -o "$work/obj2/interposer.o"
 $cxx -shared -o "$work/two/libopenkal.so.0" "$work/obj2"/*.o -lpthread \
      -Wl,-soname,libopenkal.so.0
 ln -sf libopenkal.so.0 "$work/two/libopenkal.so"
 
 echo "--- one probe, built once, against neither by name ---"
-$cc -std=c11 -O1 -I"$here/include" "$here/conformance/abi/probe.c" \
+$cc -std=c11 -O1 -I"$here/include" "$here/tests/cts/abi/probe.c" \
     -o "$work/probe" -L"$work/one" -lopenkal -Wl,-rpath,'$ORIGIN'
 
 # THE ONE OBSERVATION THAT MAKES THIS A TEST OF DISTRIBUTION. The binary is

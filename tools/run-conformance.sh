@@ -31,7 +31,7 @@ native() {
 }
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-suite="$here/conformance"
+suite="$here/tests/cts"
 [ -f "$suite/mcpp.toml" ] || { echo "no suite at $suite" >&2; exit 2; }
 
 implementation="$(cd "$implementation" && pwd)"

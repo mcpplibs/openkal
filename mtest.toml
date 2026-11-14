@@ -1,0 +1,22 @@
+# The tests of the specification, run by mtest (https://github.com/mcpp-community/mtest),
+# in its layout:
+#
+#   tests/unit/     the declarations by themselves                         UTest
+#   tests/e2e/      the headers through the tools, the 32-bit layout,
+#                   substitution and the surface checker                  E2E
+#   tests/cts/      the suite, a package run against an implementation
+#                   (tools/run-conformance.sh): a `cts' case per interface,
+#                   a `bench' case per measured cost
+#   kit/tests/      openkal-kit's cases (tools/run-kit-tests.sh)
+#
+# Here `mtest run' builds and runs the first two through `mcpp test' (CI: the
+# job `tests', `--set full'). The suite and the kit need an implementation and
+# keep their runs in their own stores; `mtest report' reads them together.
+[project]
+store = ".mtest"
+
+[host]
+kind = "mcpp"
+
+[report]
+sections = ["summary", "kinds", "failures", "slowest", "metrics"]

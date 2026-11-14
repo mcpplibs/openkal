@@ -31,7 +31,8 @@ bool listing();               // MTEST_MODE=list: list and run nothing
 // no selection was given or the protocol is not spoken.
 bool wanted(const char* id);
 
-void list_case(const char* id);
+// The interface's `cts' case, and its `bench' case `<id>.cost' when `bench'.
+void list_case(const char* id, bool bench);
 void section(const char* heading_text);     // ends the previous case, begins the next
 void observation(kind k, const char* what, bool held, const char* because);
 void metric(const char* what, kal_u64 ns);

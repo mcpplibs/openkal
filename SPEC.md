@@ -1,4 +1,4 @@
-# openkal Specification, version 0.25.1
+# openkal Specification, version 0.25.2
 
 ## 1. Scope
 
@@ -2223,6 +2223,13 @@ The following are recorded so that they are not mistaken for oversights.
     handles that fit, time through the environment's sixty-four bit forms --- and
     what an image of such an architecture is, were not written down. No
     declaration changes.
+
+63. **The surface the conformance suite links.** **Changed in 0.25.2**; no
+    clause and no declaration changes. A link that discards definitions nothing
+    reaches kept of an implementation only what the suite calls, and the
+    comparison of clause 9 then reported an interface absent whose definitions
+    the implementation holds. The suite now reaches every name without
+    requiring it, so a defined name is kept and an absent one is null.
 
 ## 12. Images
 
