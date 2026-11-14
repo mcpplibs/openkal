@@ -9,22 +9,14 @@
 #                   a `bench' case per measured cost
 #   kit/tests/      openkal-kit's cases (tools/run-kit-tests.sh)
 #
-# Here `mtest run --set checks' and `--set substitution' build and run the first
-# two through `mcpp test'. The suite and the kit need an implementation and keep
-# their runs in their own stores; `mtest report' reads them together.
+# Here `mtest run' builds and runs the first two through `mcpp test' (CI: the
+# job `tests', `--set full'). The suite and the kit need an implementation and
+# keep their runs in their own stores; `mtest report' reads them together.
 [project]
 store = ".mtest"
 
 [host]
 kind = "mcpp"
-
-# The headers and the version, on every row of every toolchain.
-[sets.checks]
-programs = ["unit/*", "e2e/headers", "e2e/abi"]
-
-# Substitution and the surface checker, on Linux under each toolchain.
-[sets.substitution]
-programs = ["e2e/substitution"]
 
 [report]
 sections = ["summary", "kinds", "failures", "slowest", "metrics"]

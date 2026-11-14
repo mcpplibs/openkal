@@ -6,13 +6,12 @@ name: CI
 # building and running programs rather than by reading the text. The tests are
 # written with mtest in its layout (mtest.toml) and each job runs a set of them:
 #
-#   declarations  the two forms compile, under three compiler families and on
-#                 three systems, and declare the same entities; the version, the
-#                 macros' module spellings and the 32-bit layout (set `checks':
-#                 tests/unit, tests/e2e/headers.cpp, tests/e2e/abi.cpp)
-#   substitution  a program's source is invariant under a change of
-#                 implementation, and the surface checker fails when it should
-#                 (set `substitution': tests/e2e/substitution.cpp)
+#   declarations  the module form compiles, under three compiler families and
+#                 on three systems
+#   tests         tests/unit and tests/e2e: the version, the C form and its
+#                 entities, no backend type, the layout at 32 and 64 bits, and
+#                 that a program's source is invariant under a change of
+#                 implementation, with the surface checker failing when it should
 #   conformance   the suite (tests/cts) runs against the implementation for each
 #                 system: one `cts' case per interface and one `bench' case per
 #                 measured cost; the kit's cases over the same implementation
@@ -192,39 +191,28 @@ jobs:
           esac
           mcpp toolchain list
 
-      # The set `checks': the version, the macros' module spellings, the C form
-      # without the environment's headers, no backend type in a declaration, and
-      # the frozen layout at thirty-two bits (riscv32 and riscv64, through mcpp,
-      # which resolves each target's toolchain on every row). A case whose
-      # compiler or system this row lacks is skipped and says why.
-      - uses: ./.github/actions/mtest
-      - name: The tests of the headers and the version
-        run: |
-          "$MTEST" run --set checks --group "$GITHUB_RUN_ID"
-          "$MTEST" report --format md --group "$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: mtest-checks-${{ strategy.job-index }}
-          path: .mtest
-          include-hidden-files: true
-          if-no-files-found: ignore
-
       # The C++ form. The modules are the artefact a C++ consumer imports, and
       # building them is what proves the compiler accepts them.
       - name: The module form compiles
         run: mcpp build
 
   # ---------------------------------------------------------------------------
-  # The property the specification exists for.
-  substitution:
-    name: substitution holds (${{ matrix.toolchain }})
-    runs-on: ubuntu-24.04
+  # The tests of tests/unit and tests/e2e (mtest.toml), among them the property
+  # the specification exists for. Their subjects are the text, the headers
+  # through the tools, the layout at both widths and substitution; none depends
+  # on the toolchain a consumer builds with, so they run where the tools run
+  # (POSIX systems), under two compiler families on Linux and on macOS.
+  tests:
+    name: tests (${{ matrix.os }}, ${{ matrix.toolchain }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        toolchain: ['gcc@16.1.0', 'llvm@22.1.8']
+        include:
+          - { os: ubuntu-24.04, toolchain: 'gcc@16.1.0'  }
+          - { os: ubuntu-24.04, toolchain: 'llvm@22.1.8' }
+          - { os: macos-15,     toolchain: 'llvm@22.1.8' }
     steps:
       - uses: actions/checkout@v4
 
@@ -339,19 +327,20 @@ jobs:
           esac
           mcpp toolchain list
 
-      # The set `substitution': one source over two implementations
-      # (examples/substitution), the surface checker rejecting an unspecified
-      # name, and the interface list derived from an artefact. Each case works
-      # on a copy of the example, so the checkout is not written.
+      # Every case: the version, the macros' module spellings, the C form
+      # without the environment's headers (each C compiler present), no backend
+      # type in a declaration, the frozen layout at 32 and 64 bits, one source
+      # over two implementations, and the surface checker. A case whose
+      # compiler this machine lacks is skipped and says why.
       - uses: ./.github/actions/mtest
-      - name: Substitution holds, and the surface checker fails when it should
+      - name: Every test of the specification
         run: |
-          "$MTEST" run --set substitution --group "$GITHUB_RUN_ID"
+          "$MTEST" run --set full --group "$GITHUB_RUN_ID"
           "$MTEST" report --format md --group "$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mtest-substitution-${{ strategy.job-index }}
+          name: mtest-tests-${{ strategy.job-index }}
           path: .mtest
           include-hidden-files: true
           if-no-files-found: ignore
@@ -763,14 +752,14 @@ jobs:
           grep -qE 'held +\[behaviour\].*' selected.log
 
   # ---------------------------------------------------------------------------
-  # EVERY RUN OF THE WORKFLOW AS ONE REPORT: the stores of the sets `checks' and
-  # `substitution' (`unit', `e2e'), of the kit's tests and of each
+  # EVERY RUN OF THE WORKFLOW AS ONE REPORT: the stores of the tests (`unit',
+  # `e2e'), of the kit's tests and of each
   # implementation's conformance run (`cts', with the interfaces' costs as
   # `bench' cases), taken into one and reported together as the workflow run's
   # group (`mtest ci report').
   report:
     name: the run, reported (unit, e2e, kit, cts, bench)
-    needs: [declarations, substitution, conformance]
+    needs: [tests, conformance]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

@@ -38,6 +38,7 @@ void replace(const fs::path& file, std::string_view key, std::string_view to) {
 // examples/substitution without what a build left there, naming this tree.
 fs::path example() {
     const auto to = temp_dir() / "substitution";
+    fs::create_directories(to);
     for (auto it = fs::recursive_directory_iterator{"examples/substitution"};
          it != fs::recursive_directory_iterator{}; ++it) {
         const auto leaf = it->path().filename();
