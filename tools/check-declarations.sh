@@ -59,7 +59,7 @@ echo "the C declarations are complete and compile without the environment's head
 # carries a file naming the same entities, every toolchain compiles it, and this
 # is where the file is written --- and where a file that has fallen behind the
 # list is detected, since a stale copy would be compiled happily by all three.
-carried="$here/conformance/src/declarations.c"
+carried="$here/tests/cts/src/declarations.c"
 
 if [ "$write" -eq 1 ]; then
     {
@@ -105,7 +105,7 @@ fi
 
 carried_names="$(grep -oE 'sizeof\(&kal_[a-z_0-9]+' "$carried" | cut -c9- | sort -u)"
 if [ "$carried_names" != "$names" ]; then
-    echo "conformance/src/declarations.c does not name the surface list." >&2
+    echo "tests/cts/src/declarations.c does not name the surface list." >&2
     echo "only in SURFACE.txt:" >&2
     comm -23 <(printf '%s\n' "$names") <(printf '%s\n' "$carried_names") >&2
     echo "only in declarations.c:" >&2

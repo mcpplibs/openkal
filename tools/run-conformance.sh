@@ -31,7 +31,7 @@ native() {
 }
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-suite="$here/conformance"
+suite="$here/tests/cts"
 [ -f "$suite/mcpp.toml" ] || { echo "no suite at $suite" >&2; exit 2; }
 
 implementation="$(cd "$implementation" && pwd)"
@@ -64,7 +64,7 @@ point_at_the_specification() {
 # trap the rewrite was permanent: the tree was left holding a path from the
 # machine that ran the script, and whoever committed next published it.
 #
-# Measured 2026-08-22: that is what happened. `conformance/mcpp.toml' reached a
+# Measured 2026-08-22: that is what happened. `tests/cts/mcpp.toml' reached a
 # pull request naming /home/<user>/... and continuous integration failed on
 # every row with `path dependency has no mcpp.toml' --- a message about a
 # missing file, on a machine where nothing was missing.

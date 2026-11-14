@@ -11,7 +11,7 @@ mcpp build --features full
 
 The implementation under examination is not named in this package's manifest.
 It is supplied by whoever runs the suite, exactly as any consumer supplies one —
-and `tools/run-conformance.sh` in the parent directory is where that is done, so
+and `tools/run-conformance.sh` of the specification is where that is done, so
 that a change to how it is done is one change:
 
 ```bash
@@ -24,7 +24,10 @@ This package is not published to the index separately. It is a program rather
 than a library — a dependency that contributed a binary target to its dependant
 would be a surprising thing for `[dependencies]` to name — and it is reached by
 checking out the specification, which is the package it is the conformance
-procedure for.
+procedure for. It is the specification's `tests/cts`, a package of its own in
+mtest's layout, because the implementation it needs comes from outside its
+build. It is written without the C++ library, so that it runs where an
+implementation has no C library, and speaks the protocol itself.
 
 ## A runner's view: the mtest test protocol
 
@@ -48,7 +51,7 @@ and the run is kept in `.mtest`:
 
 ```bash
 MTEST=mtest bash .spec/tools/run-conformance.sh openkal-linux . full,optional
-(cd .spec/conformance && mtest report --format md)
+(cd .spec/tests/cts && mtest report --format md)
 ```
 
 The protocol's variables are not passed to the copies the suite starts: a copy is

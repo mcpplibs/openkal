@@ -30,3 +30,14 @@ kind = "lib"
 # built against.
 [build]
 include_dirs = ["include"]
+
+# The tests of the specification (tests/, mtest's layout; mtest.toml). A
+# dependency for development is not resolved for a consumer.
+[dev-dependencies]
+mcpplibs.mtest = "0.8.5"
+
+# One program per file of tests/unit and tests/e2e. tests/cts is a package of
+# its own, run against an implementation (tools/run-conformance.sh), and
+# tests/e2e/data holds what the cases read.
+[test]
+discover = ["tests/*/*.cpp"]

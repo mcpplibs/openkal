@@ -1,31 +1,30 @@
-# The tests of the specification, run by mtest (https://github.com/mcpp-community/mtest).
+# The tests of the specification, run by mtest (https://github.com/mcpp-community/mtest),
+# in its layout:
 #
-#   tests/checks/*.sh      the checks of the text and the headers: kind `unit', run here
-#   kit/tests/*.cpp        openkal-kit's cases (`mcpp test' in kit/, tools/run-kit-tests.sh)
-#   conformance/           the suite, against an implementation (tools/run-conformance.sh):
-#                          one `cts' case per interface, one `bench' case per measured cost
+#   tests/unit/     the declarations by themselves                         UTest
+#   tests/e2e/      the headers through the tools, the 32-bit layout,
+#                   substitution and the surface checker                  E2E
+#   tests/cts/      the suite, a package run against an implementation
+#                   (tools/run-conformance.sh): a `cts' case per interface,
+#                   a `bench' case per measured cost
+#   kit/tests/      openkal-kit's cases (tools/run-kit-tests.sh)
 #
-# `mtest run --set checks' runs the first here; the other two need an implementation
-# and report to the same store when MTEST names the engine. `mtest report' reads them
-# together.
+# Here `mtest run --set checks' and `--set substitution' build and run the first
+# two through `mcpp test'. The suite and the kit need an implementation and keep
+# their runs in their own stores; `mtest report' reads them together.
 [project]
 store = ".mtest"
 
-[discover.checks]
-globs     = ["tests/checks/*.sh"]
-command   = ["bash", "{path}"]
-kind      = "unit"
-tags_from = { "# requires:" = "requires:" }
-# Two of them change a header and restore it, so none runs beside another.
-resources = ["serial:tree"]
+[host]
+kind = "mcpp"
 
+# The headers and the version, on every row of every toolchain.
 [sets.checks]
-programs = ["tests/checks/*"]
+programs = ["unit/*", "e2e/headers", "e2e/abi"]
 
-# What a check requires of the machine.
-[capabilities]
-cc    = { command = ["cc", "--version"] }
-clang = { command = ["clang", "--version"] }
+# Substitution and the surface checker, on Linux under each toolchain.
+[sets.substitution]
+programs = ["e2e/substitution"]
 
 [report]
 sections = ["summary", "kinds", "failures", "slowest", "metrics"]
