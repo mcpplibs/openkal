@@ -2224,16 +2224,12 @@ The following are recorded so that they are not mistaken for oversights.
     what an image of such an architecture is, were not written down. No
     declaration changes.
 
-63. **The conformance suite keeps the surface under a discarding link.**
-    **Changed in 0.25.2**; no clause and no declaration changes. A link that
-    discards the sections nothing reaches (`--gc-sections`) kept of an
-    implementation only what the suite calls, and the comparison of the
-    exported names with the manifest (clause 9) reported an interface missing
-    whose definitions the implementation held: `openkal.process` on
-    `i686-linux-musl`, four functions of jobs the suite calls nowhere. The suite
-    now reaches every name of the surface weakly on ELF, which keeps a defined
-    name and resolves an absent one to null, so a program still links against
-    an implementation of some interfaces.
+63. **The surface the conformance suite links.** **Changed in 0.25.2**; no
+    clause and no declaration changes. A link that discards definitions nothing
+    reaches kept of an implementation only what the suite calls, and the
+    comparison of clause 9 then reported an interface absent whose definitions
+    the implementation holds. The suite now reaches every name without
+    requiring it, so a defined name is kept and an absent one is null.
 
 ## 12. Images
 

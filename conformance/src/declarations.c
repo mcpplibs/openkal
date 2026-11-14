@@ -189,18 +189,10 @@ void okc_declarations_c(void)
     (void)sizeof(&kal_version);
 }
 
-/* EVERY NAME REACHED WEAKLY FROM main, ON ELF (0.25.2).
- *
- * A link that discards the sections nothing reaches (--gc-sections, which
- * openkal-musl's rows use) keeps of an implementation only what the program
- * calls, and the comparison of the exported names with the manifest then
- * reported an interface missing whose definitions the objects held:
- * openkal.process on i686-linux-musl, four kal_process_job_* functions the
- * suite calls nowhere. A weak reference keeps a defined name and resolves an
- * absent one to null, so the program still links against an implementation
- * of some interfaces. ELF only: a weak reference to a name defined nowhere is
- * refused by the Mach-O link, and neither that link nor the PE one discarded
- * a name here. */
+/* Every name, reached without being required (0.25.2): a link that discards
+ * what nothing reaches keeps the names the implementation defines, for the
+ * comparison of clause 9, and an absent name is null. A weak reference to a
+ * name defined nowhere is accepted by the static link of ELF only. */
 #if defined(__ELF__)
 #pragma weak kal_abort
 #pragma weak kal_alloc

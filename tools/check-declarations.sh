@@ -74,18 +74,10 @@ if [ "$write" -eq 1 ]; then
         done <<< "$names"
         echo '}'
         echo
-        echo '/* EVERY NAME REACHED WEAKLY FROM main, ON ELF (0.25.2).'
-        echo ' *'
-        echo ' * A link that discards the sections nothing reaches (--gc-sections, which'
-        echo ' * openkal-musl'"'"'s rows use) keeps of an implementation only what the program'
-        echo ' * calls, and the comparison of the exported names with the manifest then'
-        echo ' * reported an interface missing whose definitions the objects held:'
-        echo ' * openkal.process on i686-linux-musl, four kal_process_job_* functions the'
-        echo ' * suite calls nowhere. A weak reference keeps a defined name and resolves an'
-        echo ' * absent one to null, so the program still links against an implementation'
-        echo ' * of some interfaces. ELF only: a weak reference to a name defined nowhere is'
-        echo ' * refused by the Mach-O link, and neither that link nor the PE one discarded'
-        echo ' * a name here. */'
+        echo '/* Every name, reached without being required (0.25.2): a link that discards'
+        echo ' * what nothing reaches keeps the names the implementation defines, for the'
+        echo ' * comparison of clause 9, and an absent name is null. A weak reference to a'
+        echo ' * name defined nowhere is accepted by the static link of ELF only. */'
         echo '#if defined(__ELF__)'
         while read -r n; do
             [ -n "$n" ] && printf '#pragma weak %s\n' "$n"

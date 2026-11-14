@@ -45,8 +45,7 @@ import okc.child;
 // two spellings are the same symbol; and clause 9's behavioural half is
 // required of every implementation, including one of a machine with no
 // operating system, so this program has to be linkable in both arrangements.
-// Every name of the surface, reached weakly on ELF so that a link discarding
-// unreached sections keeps what the implementation defines (declarations.c).
+// Every name of the surface, reached without being required (declarations.c).
 extern "C" unsigned long okc_names_reached(void);
 volatile unsigned long okc_names_present;
 
