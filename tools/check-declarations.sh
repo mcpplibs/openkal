@@ -73,6 +73,36 @@ if [ "$write" -eq 1 ]; then
             [ -n "$n" ] && printf '    (void)sizeof(&%s);\n' "$n"
         done <<< "$names"
         echo '}'
+        echo
+        echo '/* EVERY NAME REACHED WEAKLY FROM main, ON ELF (0.25.2).'
+        echo ' *'
+        echo ' * A link that discards the sections nothing reaches (--gc-sections, which'
+        echo ' * openkal-musl'"'"'s rows use) keeps of an implementation only what the program'
+        echo ' * calls, and the comparison of the exported names with the manifest then'
+        echo ' * reported an interface missing whose definitions the objects held:'
+        echo ' * openkal.process on i686-linux-musl, four kal_process_job_* functions the'
+        echo ' * suite calls nowhere. A weak reference keeps a defined name and resolves an'
+        echo ' * absent one to null, so the program still links against an implementation'
+        echo ' * of some interfaces. ELF only: a weak reference to a name defined nowhere is'
+        echo ' * refused by the Mach-O link, and neither that link nor the PE one discarded'
+        echo ' * a name here. */'
+        echo '#if defined(__ELF__)'
+        while read -r n; do
+            [ -n "$n" ] && printf '#pragma weak %s\n' "$n"
+        done <<< "$names"
+        echo '#endif'
+        echo
+        echo 'unsigned long okc_names_reached(void);'
+        echo 'unsigned long okc_names_reached(void)'
+        echo '{'
+        echo '    unsigned long n = 0;'
+        echo '#if defined(__ELF__)'
+        while read -r n; do
+            [ -n "$n" ] && printf '    n += (const void*)&%s != 0;\n' "$n"
+        done <<< "$names"
+        echo '#endif'
+        echo '    return n;'
+        echo '}'
     } > "$carried.next"
     mv "$carried.next" "$carried"
     echo "wrote $carried: $count name(s)"
@@ -81,7 +111,7 @@ fi
 
 [ -f "$carried" ] || exit 0
 
-carried_names="$(grep -oE '&kal_[a-z_0-9]+' "$carried" | cut -c2- | sort -u)"
+carried_names="$(grep -oE 'sizeof\(&kal_[a-z_0-9]+' "$carried" | cut -c9- | sort -u)"
 if [ "$carried_names" != "$names" ]; then
     echo "conformance/src/declarations.c does not name the surface list." >&2
     echo "only in SURFACE.txt:" >&2

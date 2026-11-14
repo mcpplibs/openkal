@@ -1,4 +1,4 @@
-# openkal Specification, version 0.25.1
+# openkal Specification, version 0.25.2
 
 ## 1. Scope
 
@@ -2223,6 +2223,17 @@ The following are recorded so that they are not mistaken for oversights.
     handles that fit, time through the environment's sixty-four bit forms --- and
     what an image of such an architecture is, were not written down. No
     declaration changes.
+
+63. **The conformance suite keeps the surface under a discarding link.**
+    **Changed in 0.25.2**; no clause and no declaration changes. A link that
+    discards the sections nothing reaches (`--gc-sections`) kept of an
+    implementation only what the suite calls, and the comparison of the
+    exported names with the manifest (clause 9) reported an interface missing
+    whose definitions the implementation held: `openkal.process` on
+    `i686-linux-musl`, four functions of jobs the suite calls nowhere. The suite
+    now reaches every name of the surface weakly on ELF, which keeps a defined
+    name and resolves an absent one to null, so a program still links against
+    an implementation of some interfaces.
 
 ## 12. Images
 

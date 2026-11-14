@@ -96,7 +96,7 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.25.1"
+openkal = "0.25.2"
 
 [target.'cfg(os = "linux")'.dependencies]
 openkal-linux = "0.26.1"
