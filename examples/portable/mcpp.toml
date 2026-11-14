@@ -9,7 +9,7 @@ name    = "portable"
 version = "0.1.0"
 
 [dependencies]
-openkal = "0.25.2"
+openkal = "0.25.3"
 
 # AND THE VERSIONS HAVE TO FOLLOW THE SOURCE, which is the reason this example
 # is a criterion rather than an assumption.
@@ -25,13 +25,13 @@ openkal = "0.25.2"
 # so no repository's continuous integration compiled it. The platform legs
 # below exist so that it cannot go stale silently again.
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.26.1"
+openkal-linux = "0.26.3"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.23.1"
+openkal-macos = "0.23.2"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.21.1"
+openkal-windows = "0.21.2"
 
 # ANDROID IS NOT A LINE HERE, AND THAT IS THE POINT.
 #
@@ -57,7 +57,7 @@ openkal-windows = "0.21.1"
 # All three iOS rows match: the device and both simulator arches carry
 # `os = "ios"`.
 [target.'cfg(os = "ios")'.dependencies]
-openkal-macos = "0.23.1"
+openkal-macos = "0.23.2"
 
 # THE WEB IS THE ONE PLATFORM THAT NEEDED NEW SOFTWARE.
 #
@@ -82,4 +82,4 @@ openkal-macos = "0.23.1"
 # error would have produced a program that links, runs, and fails where a
 # reader cannot connect it to a missing facility. See the README.
 [target.'cfg(os = "emscripten")'.dependencies]
-openkal-emscripten = "0.14.1"
+openkal-emscripten = "0.14.2"

@@ -21,6 +21,8 @@
 - **CI 收敛。** `tests` 作业在 Linux（gcc、llvm）与 macOS（llvm）上执行 `mtest run --set full`；
   `declarations` 作业在五行上只构建模块形式。这些用例的对象是文本、头文件和工具，与消费者使用的工具链无关，
   所以不必在每一行上运行。
+- **套件是独立的 mtest 项目（0.25.3）。** `tests/cts/mtest.toml` 使引擎在套件目录运行程序并把运行记录存入 `tests/cts/.mtest`。
+  0.25.2 缺少该文件，引擎向上取仓库根的 `mtest.toml`：记录写入根存储，交给运行器（Web 行的 `node`）的相对程序名按根目录解析而失败。
 - **兼容。** `tools/run-conformance.sh` 的参数不变，实现仓库的调用方式不变。套件的存储变为
   `tests/cts/.mtest`；读取该存储的实现仓库 CI（linux、macos、windows、posix、emscripten）和 freebsd 的
   独立运行脚本在本版合入后同步路径。

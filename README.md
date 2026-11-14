@@ -94,8 +94,15 @@ it compares (entry 63), and reports each interface's measured cost as a `bench`
 case beside its `cts` case. The tests of this repository are written with mtest
 0.8.5 in its layout (`mtest.toml`): `tests/unit` and `tests/e2e` hold the
 version, the headers through the tools, the 32-bit layout and substitution
-(`mtest run --set checks`, `--set substitution`), `tests/cts` is the suite, and
-openkal-kit's tests use the mtest library; each CI run reports them together.
+(`mtest run --set full`), `tests/cts` is the suite, and openkal-kit's tests use
+the mtest library; each CI run reports them together.
+
+0.25.3 changes no clause. The suite is an mtest project of its own
+(`tests/cts/mtest.toml`): an engine that runs it keeps the run in
+`tests/cts/.mtest` and starts its program from there, as under 0.25.1. Under
+0.25.2 the engine took the repository's project above it, so the run was kept
+in the repository's store, and a program handed to a runner (`node` on the Web)
+was named relative to the wrong directory.
 
 ## How a program uses openkal
 
@@ -105,16 +112,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.25.2"
+openkal = "0.25.3"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.26.1"
+openkal-linux = "0.26.3"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.23.1"
+openkal-macos = "0.23.2"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.21.1"
+openkal-windows = "0.21.2"
 ```
 
 The program imports the interface and names no implementation.

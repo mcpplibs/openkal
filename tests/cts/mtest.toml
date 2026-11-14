@@ -1,0 +1,9 @@
+# The suite is a package of its own (tools/run-conformance.sh builds it against an
+# implementation) and an mtest project of its own: an engine run here keeps its
+# runs in tests/cts/.mtest and runs the suite's program from this directory, not
+# from the repository's project above it (../../mtest.toml).
+[project]
+store = ".mtest"
+
+[report]
+sections = ["summary", "kinds", "failures", "slowest", "metrics"]
