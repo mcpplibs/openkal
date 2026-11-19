@@ -128,12 +128,15 @@ void run() {
         bool examined = false;
         char name[room];
         for (kal_uintptr i = 0; i < n && i < 64; ++i) {
+            // Examined once there is a variable to ask about: a first variable
+            // that is not found again is a variable that was examined, and
+            // until 0.26.0 it was reported as an environment with none.
+            examined = true;
             const kal_intptr nlen = kal_env_var_at(i, name, room);
             if (nlen < 0 || static_cast<kal_uintptr>(nlen) >= room) { consistent = false; break; }
             if (kal_env_var(name, static_cast<kal_uintptr>(nlen), buf, room) < 0) {
                 consistent = false; break;
             }
-            examined = true;
         }
         if (examined)
             observe(kind::behaviour, consistent,
