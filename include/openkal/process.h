@@ -322,6 +322,11 @@ extern "C" {
  * Everything that varies between one start and another is in `kal_spawn', which
  * is why this is one declaration and not a family --- see the comment there.
  *
+ * THE VECTOR AND THE ENVIRONMENT ARE BOUNDED BY THE ENVIRONMENT ALONE (version
+ * 0.26, clause 7.6): an implementation keeps no bound of its own upon the
+ * number of elements or their size, and a start the environment refuses for
+ * the size of what it was given is kal_err_no_space.
+ *
  * EACH ENVIRONMENT ENTRY IS `NAME=value', and an entry that holds no `=', or
  * whose name is empty, is kal_err_invalid and starts nothing. Version 0.17
  * states it: one implementation refused such an entry and another passed it to
@@ -660,6 +665,17 @@ void kal_process_job_close(struct kal_job);
  * reports exactly one of the three states. Unsupported observation, identity
  * ambiguity, an inaccessible unit or an expired native reference is UNKNOWN,
  * never EMPTY. A positively empty unit has no remaining active member.
+ *
+ * WHAT A REFERENCE'S ORIGIN ESTABLISHES (version 0.26, clause 7.18). A
+ * reference names the start of the system and the process space it was made
+ * in, the space by something the environment gives to no later space. One
+ * made under an earlier start is EMPTY: every program of that start has ended.
+ * Where the environment withholds a unit's identifier while a member remains,
+ * an identifier a program of another birth now holds is EMPTY. One made in
+ * another space of this start cannot be observed from here, and waiting does
+ * not change that: `open' reports kal_err_not_supported, to this caller
+ * always, where UNKNOWN is a condition that may pass. JOB_OBSERVE is claimed
+ * only where a reference can be made.
  *
  * The job returned by `create' is the job supplied to the EXISTING spawn:
  * one start, with the declared unit stated by its caller. Before `retire',

@@ -243,7 +243,7 @@ bool begin() {
 
     line e;
     e.raw("{\"e\":\"program\",\"protocol\":1,\"level\":2,\"framework\":\"openkal-conformance\","
-          "\"version\":\"0.10.1\",\"isolation\":[\"process\"]}");
+          "\"version\":\"0.11.0\",\"isolation\":[\"process\"]}");
     e.send();
     return true;
 #else
