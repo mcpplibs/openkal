@@ -38,7 +38,20 @@ enum class errand {
                          // reports the fault (0.23)
     write_in_first_grant,    // creates a file in its first preopen: 70 refused
                              // as read-only, 71 created, 72 anything else (0.23)
+    count_vectors,       // ends with 100, plus 1 for `vector_count' arguments, 2
+                         // for `vector_count' variables of the expected name and
+                         // value, 4 for an argument of `vector_long' bytes (0.26)
+    declare_unit,        // declares its own unit: 80 a reference was made, 81
+                         // kal_err_not_supported, 82 anything else (0.26)
 };
+
+// What the copy counts under `count_vectors' (clause 7.6): the number of
+// arguments after the errand's and of variables, a variable's name and the
+// length of its value, and the length of the one long argument.
+inline constexpr kal_uintptr vector_count = 2000;
+inline constexpr char        vector_name[] = "OKC_V";
+inline constexpr kal_uintptr vector_value = 100;
+inline constexpr kal_uintptr vector_long  = kal_uintptr{1} << 20;
 
 // The names the starter grants and the copy expects, in order, and the marker
 // each directory holds. The second name carries both separators an
@@ -98,5 +111,11 @@ bool start_copy_with(const char* errand_argument, kal_uintptr flags,
 bool start_copy_granting_with(const char* errand_argument, const kal_preopen* grants,
                               kal_uintptr count, kal_uintptr flags, const kal_spawn_streams& streams,
                               int& spawned, int& status, int& terminated);
+
+// The same, with the vector and the environment given whole (clause 7.6,
+// 0.26): `argv[0]' and `argv[1]' are the copy's name and its errand.
+bool start_copy_given(const char** argv, const kal_uintptr* lens, kal_uintptr count,
+                      const char** env, const kal_uintptr* env_lens, kal_uintptr env_count,
+                      int& spawned, int& status, int& terminated);
 
 }  // namespace okc

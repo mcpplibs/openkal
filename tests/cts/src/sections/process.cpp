@@ -356,6 +356,77 @@ void run() {
         }
     }
 
+    // THE VECTOR AND THE ENVIRONMENT ARE BOUNDED BY THE ENVIRONMENT ALONE
+    // (version 0.26, clause 7.6). Each start is given something an
+    // implementation with a bound of its own would refuse; the answer is the
+    // copy having read all of it, or kal_err_no_space where the environment
+    // itself admits less. Which environment admits how much is not this
+    // suite's to know; an implementation asserts its own environment's bound in
+    // its own tests.
+    {
+        static const char* argv[2 + vector_count];
+        static kal_uintptr lens[2 + vector_count];
+        static char        entries[vector_count][sizeof vector_name + 6 + vector_value];
+        static const char* env[vector_count];
+        static kal_uintptr env_lens[vector_count];
+        static char        long_argument[vector_long];
+        const auto length = [](const char* s) { kal_uintptr n = 0; while (s[n]) ++n; return n; };
+        argv[0] = "openkal-conformance-child";
+        argv[1] = argument_for(errand::count_vectors);
+        for (kal_uintptr i = 0; i < 2; ++i) lens[i] = length(argv[i]);
+        for (kal_uintptr i = 0; i < vector_count; ++i) { argv[2 + i] = "a"; lens[2 + i] = 1; }
+        for (kal_uintptr i = 0; i < vector_count; ++i) {
+            // OKC_V0000=xxx…: a name, four digits, and a value of vector_value bytes.
+            char* e = entries[i]; kal_uintptr n = 0;
+            for (const char* c = vector_name; *c; ++c) e[n++] = *c;
+            for (kal_uintptr d = 1000; d != 0; d /= 10) e[n++] = static_cast<char>('0' + (i / d) % 10);
+            e[n++] = '=';
+            for (kal_uintptr v = 0; v < vector_value; ++v) e[n++] = 'x';
+            env[i] = e; env_lens[i] = n;
+        }
+        for (kal_uintptr i = 0; i < vector_long; ++i) long_argument[i] = 'b';
+
+        const auto given = [&](kal_uintptr count, const char** e, const kal_uintptr* el,
+                               kal_uintptr ec, int bit, const char* what) {
+            int spawned = 0, status = 0, terminated = 0;
+            if (!start_copy_given(argv, lens, count, e, el, ec, spawned, status, terminated)) {
+                unobserved(kind::behaviour, what, "a copy of this program could not be started");
+                return;
+            }
+            observe(kind::behaviour,
+                    spawned == kal_ok ? terminated == 0 && status >= 100 && ((status - 100) & bit) != 0
+                                      : spawned == kal_err_no_space,
+                    what);
+        };
+        given(2 + vector_count, nullptr, nullptr, 0, 1,
+              "two thousand arguments reach the copy, or the environment's refusal is kal_err_no_space");
+        given(2, env, env_lens, vector_count, 2,
+              "two thousand variables reach the copy, or the environment's refusal is kal_err_no_space");
+        argv[2] = long_argument; lens[2] = vector_long;
+        given(3, nullptr, nullptr, 0, 4,
+              "an argument of one mebibyte reaches the copy, or the environment's refusal is "
+              "kal_err_no_space");
+    }
+
+    // A UNIT IS CLAIMED WHERE A REFERENCE CAN BE MADE (version 0.26, clause
+    // 7.18). Declared in a copy: the caller becomes the unit's leader, which
+    // this program is not to become.
+    {
+        int status = 0, terminated = 0;
+        if (start_copy("openkal-conformance-child", argument_for(errand::declare_unit),
+                       status, terminated)) {
+            if (kal::process::has(kal::process::job_observe))
+                observe(kind::behaviour, terminated == 0 && status == 80,
+                        "an implementation that claims observable units makes a reference");
+            else
+                observe(kind::behaviour, terminated == 0 && status == 81,
+                        "an implementation that does not claim observable units refuses to declare one");
+        } else {
+            unobserved(kind::behaviour, "a unit is declared where the property is claimed",
+                       "a copy of this program could not be started");
+        }
+    }
+
     // WHAT A UNIT USES, AND A LIMIT ON IT (version 0.20). Both are observed
     // on a copy that writes its memory through, so that every environment's
     // measure sees it.

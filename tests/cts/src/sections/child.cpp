@@ -46,6 +46,8 @@ const char* argument_for(errand e) {
         case errand::report_resources:   return "--child-report-resources";
         case errand::fault:              return "--child-fault";
         case errand::write_in_first_grant: return "--child-write-in-first-grant";
+        case errand::count_vectors:      return "--child-count-vectors";
+        case errand::declare_unit:       return "--child-declare-unit";
         case errand::none:               break;
     }
     return "";
@@ -74,6 +76,11 @@ errand child_errand() {
         if (same(a, len, argument_for(errand::report_resources))) return errand::report_resources;
         if (same(a, len, argument_for(errand::fault)))            return errand::fault;
         if (same(a, len, argument_for(errand::write_in_first_grant))) return errand::write_in_first_grant;
+        if (same(a, len, argument_for(errand::count_vectors)))    return errand::count_vectors;
+        if (same(a, len, argument_for(errand::declare_unit)))     return errand::declare_unit;
+        // The errand is the second element; what follows it under
+        // `count_vectors' is two thousand elements that name none.
+        break;
     }
 #endif
     return errand::none;
@@ -292,6 +299,41 @@ after g_after;
             }
 #endif
             kal_exit(72);
+        case errand::count_vectors:
+#ifdef MCPP_FEATURE_ENV
+            {
+                // The lengths are asked with no buffer, so the copy holds
+                // neither vector: what it reports is what it was given.
+                int status = 100;
+                const kal_uintptr args = kal_env_arg_count();
+                if (args == 2 + vector_count) status += 1;
+                kal_uintptr named = 0;
+                const kal_uintptr prefix = sizeof vector_name - 1;
+                for (kal_uintptr i = 0; i < kal_env_var_count(); ++i) {
+                    char name[64];
+                    const kal_intptr n = kal_env_var_at(i, name, sizeof name);
+                    if (n < static_cast<kal_intptr>(prefix) || static_cast<kal_uintptr>(n) >= sizeof name) continue;
+                    if (!same(name, prefix, vector_name)) continue;
+                    if (kal_env_var(name, static_cast<kal_uintptr>(n), nullptr, 0)
+                            == static_cast<kal_intptr>(vector_value)) ++named;
+                }
+                if (named == vector_count) status += 2;
+                for (kal_uintptr i = 2; i < args; ++i)
+                    if (kal_env_arg(i, nullptr, 0) == static_cast<kal_intptr>(vector_long)) { status += 4; break; }
+                kal_exit(status);
+            }
+#endif
+            kal_exit(99);
+        case errand::declare_unit:
+#ifdef MCPP_FEATURE_PROCESS
+            {
+                kal_job unit{}; char reference[512]; kal_uintptr used = 0;
+                const int e = kal_process_job_create(&unit, reference, sizeof reference, &used);
+                if (e == kal_ok) kal_exit(used != 0 ? 80 : 82);
+                kal_exit(e == kal_err_not_supported ? 81 : 82);
+            }
+#endif
+            kal_exit(82);
         case errand::hold_memory:
         case errand::grow_memory:
             // Memory written through, so that every environment charges it ---
@@ -473,6 +515,22 @@ bool start_copy_granting_with(const char* errand_argument, const kal_preopen* gr
     return e == kal_ok;
 }
 
+bool start_copy_given(const char** argv, const kal_uintptr* lens, kal_uintptr count,
+                      const char** env, const kal_uintptr* env_lens, kal_uintptr env_count,
+                      int& spawned, int& status, int& terminated) {
+    kal_dir base{}; const char* rel = nullptr; kal_uintptr rel_len = 0;
+    if (!locate_self(base, rel, rel_len)) return false;
+    const kal_spawn_streams streams{ 0, 0, 0 };
+    const kal_spawn         how{ base, kal::fs::working(), nullptr, nullptr, 0, 0 };
+    kal_process child{};
+    spawned = kal_process_spawn(&how, rel, rel_len, argv, lens, count, env, env_lens, env_count,
+                                &streams, &child);
+    if (spawned != kal_ok) return true;
+    const int e = kal_process_wait(child, &status, &terminated);
+    kal_process_close(child);
+    return e == kal_ok;
+}
+
 bool start_copy_with(const char* errand_argument, kal_uintptr flags,
                      const kal_spawn_streams& streams, int& spawned,
                      int& status, int& terminated) {
@@ -498,6 +556,8 @@ bool start_copy_running(const char*, const char*, kal_process&) { return false; 
 bool start_copy_in_unit(const char*, kal_job&, kal_process&) { return false; }
 bool start_copy_granting(const char*, const kal_preopen*, kal_uintptr, int&, int&) { return false; }
 bool start_copy_with(const char*, kal_uintptr, const kal_spawn_streams&, int&, int&, int&) { return false; }
+bool start_copy_given(const char**, const kal_uintptr*, kal_uintptr, const char**,
+                      const kal_uintptr*, kal_uintptr, int&, int&, int&) { return false; }
 bool start_copy_granting_with(const char*, const kal_preopen*, kal_uintptr, kal_uintptr,
                               const kal_spawn_streams&, int&, int&, int&) { return false; }
 

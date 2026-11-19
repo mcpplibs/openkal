@@ -104,6 +104,20 @@ the mtest library; each CI run reports them together.
 in the repository's store, and a program handed to a runner (`node` on the Web)
 was named relative to the wrong directory.
 
+## Version 0.26
+
+A start is bounded by the environment alone: an implementation keeps no bound of
+its own upon the number or size of the arguments and variables it is given, and
+the environment's refusal for size is `kal_err_no_space` (clause 7.6, entry 64).
+A unit's reference names the start of the system and the process space it was
+made in. A reference from an earlier start, and an identifier since given to a
+program of another birth, are `empty`; a reference from another space is refused
+by `kal_process_job_open` with `kal_err_not_supported`, an answer that does not
+change by waiting; and `KAL_PROCESS_PROP_JOB_OBSERVE` is claimed only where a
+reference can be made (clause 7.18, entry 65). No declaration changes. Both are
+requirements upon every implementation, so the minor version advances (clause
+8), and the suite observes each.
+
 ## How a program uses openkal
 
 A program declares two dependencies. The first fixes the version of the contract
@@ -112,16 +126,16 @@ conditional on the target.
 
 ```toml
 [dependencies]
-openkal = "0.25.3"
+openkal = "0.26.0"
 
 [target.'cfg(os = "linux")'.dependencies]
-openkal-linux = "0.26.3"
+openkal-linux = "0.27.0"
 
 [target.'cfg(os = "macos")'.dependencies]
-openkal-macos = "0.23.2"
+openkal-macos = "0.24.0"
 
 [target.'cfg(windows)'.dependencies]
-openkal-windows = "0.21.2"
+openkal-windows = "0.23.0"
 ```
 
 The program imports the interface and names no implementation.

@@ -1,4 +1,4 @@
-# openkal Specification, version 0.25.3
+# openkal Specification, version 0.26.0
 
 ## 1. Scope
 
@@ -886,6 +886,16 @@ and the others joined after it by single spaces, unaltered; an implementation
 claims it with `KAL_PROCESS_PROP_ONE_STRING`, and one whose environment gives a
 program a vector reports `kal_err_not_supported` (version 0.17.1).
 
+The vector and the environment are bounded by the environment alone. An
+implementation shall keep no bound of its own, upon the number of elements of
+either or upon their size, below what its environment admits. A start that the
+environment refuses for the size of what it was given shall be reported as
+`kal_err_no_space`: the request did not fit, which a caller acts upon by giving
+less, and which neither `kal_err_no_memory` nor `kal_err_io` states. Which
+environment admits how much is not specified, and a caller that must stay
+within every environment's bound gives a program its arguments in a file.
+Clause 11, entry 64.
+
 This rule was absent from version 0.3, and both implementations existing at the
 time prepended the path. They agreed only because they shared an author; a third
 implementer had nothing to consult. The defect was found by writing one program
@@ -1144,6 +1154,32 @@ before and after that transition. An inaccessible, dead, reused or unreachable
 continuation yields `unknown`. Retirement conveys no admission or termination
 authority over the continuation's unit and never reopens the original unit.
 The caller may remain alive to finish its own bookkeeping. Clause 11, entry 58.
+
+A reference names where it was made: the start of the system, and, where an
+environment divides its programs into spaces of which one cannot enumerate
+another's, the space. An implementation shall identify a space by something the
+environment gives to no later space, and shall not answer a reference from the
+programs of a space other than the reference's own. From this the answers
+follow (version 0.26):
+
+| the reference | answer |
+| --- | --- |
+| was made under an earlier start of the system | `empty`: every program of that start has ended |
+| names a unit whose identifier a program of another birth now holds, where the environment withholds a unit's identifier while a member remains | `empty` |
+| was made in another space of this start | `kal_process_job_open` reports `kal_err_not_supported`, to this caller always |
+| names a unit whose native identity the environment did not keep once its last holder was lost | the same: the loss is not evidence that the members have ended, and the unit cannot be opened again |
+| cannot be decided now and may be later | `unknown` |
+
+`unknown` is thereby a condition that may pass, and a caller may wait upon it;
+`kal_err_not_supported` from `kal_process_job_open` is one that does not, and a
+caller that waits upon it waits for nothing.
+
+An implementation claims `KAL_PROCESS_PROP_JOB_OBSERVE` only where it can make a
+reference: where the start of the system, the space and a program's birth can
+all be read. Where one cannot, it does not claim the property, and
+`kal_process_job_create` reports `kal_err_not_supported`; a caller learns it
+from `kal_process_props` before it starts anything (clause 6.1). Clause 11,
+entry 65.
 
 ### 7.19 A started program that runs to its end first
 
@@ -2230,6 +2266,33 @@ The following are recorded so that they are not mistaken for oversights.
     comparison of clause 9 then reported an interface absent whose definitions
     the implementation holds. The suite now reaches every name without
     requiring it, so a defined name is kept and an absent one is null.
+
+64. **A start bounded by the environment alone.** **Specified in 0.26**, in
+    clause 7.6. Two implementations refused a start whose vector or environment
+    had more than 512 elements and reported `kal_err_no_memory`; neither
+    constant guarded a fixed buffer, and the specification authorised neither.
+    A build tool passes a compiler one argument for each include directory and
+    each definition, and an environment prepared by a development tool holds
+    several hundred variables, so the bound was met by ordinary programs and
+    its report named a cause that was not the cause. The environment's own
+    refusal reached a caller as `kal_err_io`. An implementation now keeps no
+    bound below its environment's, and the environment's refusal is
+    `kal_err_no_space`. No declaration changes; the requirement is upon every
+    implementation, so the minor version advances (clause 8).
+
+65. **What an observation answers, and where a unit is claimed.** **Specified
+    in 0.26**, in clause 7.18. An observer had two outcomes, `empty` and
+    `unknown`, for three facts: a unit that is empty, one that is occupied or
+    not yet decidable, and one that cannot be observed from where the observer
+    is. The third does not change by waiting, and a caller that waited upon it
+    refused for ever a build interrupted in another process space. Two cases
+    answered `unknown` that can be established as `empty`: a reference from an
+    earlier start of the system, and an identifier since given to a program of
+    another birth. One implementation identified a process space by a number
+    its kernel gives again to a later space, so a reference could be answered
+    from the programs of an unrelated space. The reference now names its space
+    exactly, the answers are those of the table in 7.18, and the property is
+    claimed only where a reference can be made. No declaration changes.
 
 ## 12. Images
 
