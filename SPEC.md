@@ -1167,6 +1167,7 @@ follow (version 0.26):
 | was made under an earlier start of the system | `empty`: every program of that start has ended |
 | names a unit whose identifier a program of another birth now holds, where the environment withholds a unit's identifier while a member remains | `empty` |
 | was made in another space of this start | `kal_process_job_open` reports `kal_err_not_supported`, to this caller always |
+| names a unit whose native identity the environment did not keep once its last holder was lost | the same: the loss is not evidence that the members have ended, and the unit cannot be opened again |
 | cannot be decided now and may be later | `unknown` |
 
 `unknown` is thereby a condition that may pass, and a caller may wait upon it;

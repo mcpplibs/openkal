@@ -652,8 +652,10 @@ void kal_process_job_close(struct kal_job);
  * a caller. `open' obtains an observation reference to the original unit;
  * closing it ends nothing. An environment that cannot retain a native unit
  * identity after its last observer is lost shall not report name absence as
- * emptiness. It reports UNKNOWN. Neither a dead leader nor a stale reference
- * proves that the unit's other programs have ended.
+ * emptiness: `open' refuses such a reference with kal_err_not_supported
+ * (version 0.26), as it does any reference the caller can never observe.
+ * Neither a dead leader nor a stale reference proves that the unit's other
+ * programs have ended.
  *
  * A job obtained by `open' shall be passed only to `observe' and `close',
  * never to spawn, enter, terminate, limit or another control operation. This
@@ -672,8 +674,9 @@ void kal_process_job_close(struct kal_job);
  * made under an earlier start is EMPTY: every program of that start has ended.
  * Where the environment withholds a unit's identifier while a member remains,
  * an identifier a program of another birth now holds is EMPTY. One made in
- * another space of this start cannot be observed from here, and waiting does
- * not change that: `open' reports kal_err_not_supported, to this caller
+ * another space of this start, and one whose native identity was not kept
+ * once its last holder was lost, cannot be observed from here, and waiting
+ * does not change that: `open' reports kal_err_not_supported, to this caller
  * always, where UNKNOWN is a condition that may pass. JOB_OBSERVE is claimed
  * only where a reference can be made.
  *
